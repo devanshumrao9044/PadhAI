@@ -1,14 +1,21 @@
 import { Tabs } from 'expo-router';
-import { Text, View } from 'react-native';
+import { Text, View, Image, ImageSourcePropType } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// Reusable Tab Icon Component
-function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
+// 🚀 Upgraded Reusable Tab Icon Component
+function TabIcon({ source, color, focused }: { source: ImageSourcePropType; color: string; focused: boolean }) {
   return (
     <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 4 }}>
-      <Text style={{ fontSize: focused ? 22 : 18, opacity: focused ? 1 : 0.5 }}>
-        {emoji}
-      </Text>
+      <Image 
+        source={source}
+        style={{
+          width: 24,
+          height: 24,
+          tintColor: color, // 🚀 MAGIC: Expo ka active/inactive color is PNG ko paint kar dega
+          transform: [{ scale: focused ? 1.1 : 1 }], // 🚀 Halkasa bounce effect active hone par
+        }}
+        resizeMode="contain"
+      />
     </View>
   );
 }
@@ -42,42 +49,54 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" focused={focused} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon source={require('../../assets/images/Home.png')} color={color} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="focus"
         options={{
           title: 'Focus',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="⏱️" focused={focused} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon source={require('../../assets/images/timer.png')} color={color} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="tracker"
         options={{
           title: 'Tracker',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="📚" focused={focused} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon source={require('../../assets/images/tracker.png')} color={color} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="analytics"
         options={{
           title: 'Stats',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="📊" focused={focused} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon source={require('../../assets/images/Analytics.png')} color={color} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="leaderboard"
         options={{
           title: 'Rank',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="🏆" focused={focused} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon source={require('../../assets/images/Leaderboard.png')} color={color} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="👤" focused={focused} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon source={require('../../assets/images/Profile.png')} color={color} focused={focused} />
+          ),
         }}
       />
       <Tabs.Screen name="stats" options={{ href: null }} />
