@@ -46,11 +46,13 @@ const styles = StyleSheet.create({
   },
   inputError: {
     borderColor: '#FF4757',
+    borderWidth: 1.5, // Thoda thick kiya taaki clearly dikhe
   },
   error: {
     color: '#FF4757',
     fontSize: 12,
     marginTop: 4,
     marginLeft: 4,
+    fontWeight: '500', // Error text thoda bold kiya hai
   },
 });
