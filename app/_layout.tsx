@@ -38,8 +38,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const inFocus = segments[0] === 'focus';
     const inTracker = segments[0] === 'tracker';
     const inStreakBroken = segments[0] === 'streak-broken';
+    const inReferral = segments[0] === 'referral';
 
-    const isProtected = inAuthGroup || inOnboarding || inFocus || inTracker || inStreakBroken;
+    const isProtected = inAuthGroup || inOnboarding || inFocus || inTracker || inStreakBroken || inReferral;
 
     if (!session && isProtected) {
       // Not logged in but trying to access protected route — go to login
@@ -145,6 +146,7 @@ export default function RootLayout() {
             <Stack.Screen name="focus/complete" options={{ animation: 'fade', gestureEnabled: false }} />
             <Stack.Screen name="focus/levelup" options={{ animation: 'fade', gestureEnabled: false }} />
             <Stack.Screen name="focus/broken" options={{ animation: 'fade', gestureEnabled: false }} />
+            <Stack.Screen name="referral" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="tracker/[subjectId]" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="tracker/chapters/[chapterId]" options={{ animation: 'slide_from_right' }} />
           </Stack>

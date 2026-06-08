@@ -1,5 +1,7 @@
 import React, { createContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { AppState } from 'react-native';
+import 'react-native-get-random-values';
+import { v4 as uuidv4 } from 'uuid';
 import { getItem, setItem, removeItem, StorageKeys } from '@/services/storage';
 import { supabase } from '@/services/supabase';
 import {
@@ -8,21 +10,12 @@ import {
 } from '@/types/models';
 import { calculateSessionXP, XP_REWARDS, getLevelForXP } from '@/constants/levels';
 
-// ✅ Cross-platform UUID — no external package needed
-function uuidv4(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
 export type AppContextType = {
   comebackPending: boolean;
   setComebackPending: (v: boolean) => void;
+  hasUnlockedReward: boolean;
+  setHasUnlockedReward: (v: boolean) => void;
+  referralCount: number;
   user: UserProfile | null;
   isOnboarded: boolean;
   setUser: (u: UserProfile) => Promise<void>;
@@ -162,6 +155,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [xpLog, setXpLog] = useState<XPTransaction[]>([]);
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
   const [comebackPending, setComebackPendingState] = useState(false);
+  const [hasUnlockedReward, setHasUnlockedRewardState] = useState(false);
+  const [referralCount, setReferralCount] = useState(0);
 
   const addToSyncQueue = async (task: Omit<SyncTask, 'id'>) => {
     const existingQueue = (await getItem<SyncTask[]>(OFFLINE_QUEUE_KEY)) || [];
@@ -222,6 +217,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (authData?.user) {
         const userId = authData.user.id;
 
+        // Load user profile from DB
         const { data: profileData } = await supabase
           .from('users')
           .select('*')
@@ -233,6 +229,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setUserState(mappedUser);
           setIsOnboardedState(!!(profileData.name && profileData.name !== 'Student'));
           await setItem(StorageKeys.USER, mappedUser);
+        }
+
+        // Load referral count and check jackpot
+        try {
+          const { count } = await supabase
+            .from('referrals')
+            .select('id', { count: 'exact', head: true })
+            .eq('referrer_id', userId)
+            .eq('status', 'completed');
+          const rCount = count ?? 0;
+          setReferralCount(rCount);
+          if (rCount >= 5) setHasUnlockedRewardState(true);
+        } catch {
+          // ignore
         }
 
         const [subRes, chapRes, sessRes, sumRes, xpRes] = await Promise.all([
@@ -298,7 +308,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [load]);
 
-  // ── setUser ───────────────────────────────────────────────────────────────
+  // ── setUser: sync to Supabase ─────────────────────────────────────────────
   const setUser = async (u: UserProfile) => {
     setUserState(u);
     await setItem(StorageKeys.USER, u);
@@ -485,11 +495,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const xp = calculateSessionXP(actualMins) + bonusFromComeback;
       if (comebackPending) setComebackPendingState(false);
 
+      // Level-up detection
       const oldLevelRank = activeUser ? getLevelForXP(activeUser.xpTotal).rank : 1;
       const newXPTotal = (activeUser?.xpTotal ?? 0) + xp;
       const newLevelRank = getLevelForXP(newXPTotal).rank;
       const leveledUp = newLevelRank > oldLevelRank;
-
       const sessionPayload = {
         id: sessionId,
         user_id: activeUser?.id ?? '',
@@ -521,6 +531,65 @@ export function AppProvider({ children }: { children: ReactNode }) {
           await addToSyncQueue({ table: 'focus_sessions', action: 'insert', payload: sessionPayload });
         }
       }
+      // ── Referral Validation Trigger ────────────────────────────────────
+      try {
+        if (activeUser?.id) {
+          const { data: pendingRef } = await supabase
+            .from('referrals')
+            .select('id, referrer_id')
+            .eq('referee_id', activeUser.id)
+            .eq('status', 'pending')
+            .maybeSingle();
+
+          if (pendingRef) {
+            // Mark referral as completed
+            await supabase
+              .from('referrals')
+              .update({ status: 'completed' })
+              .eq('id', pendingRef.id);
+
+            // Award +50 XP to current user (referee headstart)
+            await awardXP(50, 'referral_headstart');
+
+            // Award +25 XP to referrer via DB function or direct update
+            const { data: referrerProfile } = await supabase
+              .from('users')
+              .select('xp')
+              .eq('id', pendingRef.referrer_id)
+              .single();
+            if (referrerProfile) {
+              await supabase
+                .from('users')
+                .update({ xp: (referrerProfile.xp ?? 0) + 25 })
+                .eq('id', pendingRef.referrer_id);
+              await supabase.from('xp_transactions').insert([{
+                user_id: pendingRef.referrer_id,
+                amount: 25,
+                reason: 'referral_invite_completed',
+                created_at: new Date().toISOString(),
+              }]);
+            }
+
+            // Check jackpot for referrer
+            const { count: newCount } = await supabase
+              .from('referrals')
+              .select('id', { count: 'exact', head: true })
+              .eq('referrer_id', pendingRef.referrer_id)
+              .eq('status', 'completed');
+
+            // If current user IS the referrer, update local state
+            if (pendingRef.referrer_id === activeUser.id) {
+              const rCount = newCount ?? 0;
+              setReferralCount(rCount);
+              if (rCount >= 5) setHasUnlockedRewardState(true);
+            }
+          }
+        }
+      } catch (refErr) {
+        console.log('Referral trigger error (non-fatal):', refErr);
+      }
+      // ── End Referral Trigger ───────────────────────────────────────────
+
       processSyncQueue();
       return { ...sessionObj, leveledUp, newLevelRank };
     } catch {
@@ -572,6 +641,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const setComebackPending = (v: boolean) => setComebackPendingState(v);
+  const setHasUnlockedReward = (v: boolean) => setHasUnlockedRewardState(v);
 
   const processPostSessionData = async (mins: number, xpDelta: number, isCompleted: boolean, activeUser: UserProfile) => {
     try {
@@ -654,9 +724,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       getDailySummary, getLast7Days, getLast90Days,
       xpLog, awardXP, deductXP, checkStreak,
       comebackPending, setComebackPending,
+      hasUnlockedReward, setHasUnlockedReward, referralCount,
       isLoading, reload: load,
     }}>
       {children}
     </AppContext.Provider>
   );
-  }
+}

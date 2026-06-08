@@ -1,3 +1,4 @@
+import 'react-native-web';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   ScrollView, View, Text, StyleSheet, RefreshControl
