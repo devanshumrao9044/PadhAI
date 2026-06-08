@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
 import AuthInput from './AuthInput';
@@ -19,6 +19,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
+  const [apiError, setApiError] = useState<string | null>(null);
 
   function validate(): boolean {
     const newErrors: Errors = {};
@@ -29,12 +30,14 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
     else if (password.length < 6) newErrors.password = 'Password Must be at least 6 characters';
     
     setErrors(newErrors);
+    setApiError(null);
     return Object.keys(newErrors).length === 0;
   }
 
   async function handleLogin() {
     if (!validate()) return;
     setLoading(true);
+    setApiError(null);
     
     try {
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -44,17 +47,17 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
 
       if (authError) {
         if (authError.message === 'Email not confirmed') {
-          Alert.alert('Verify Email', 'Please verify your email to login.');
+          setApiError('Please verify your email to login.');
         } else if (authError.message === 'Invalid login credentials') {
-          Alert.alert('Login Failed', 'Invalid email or password.');
+          setApiError('Invalid email or password.');
         } else {
-          Alert.alert('Login Failed', authError.message);
+          setApiError(authError.message);
         }
         return;
       }
 
       if (!authData?.user) {
-        Alert.alert('Error', 'Login failed. Please try again.');
+        setApiError('Login failed. Please try again.');
         return;
       }
 
@@ -71,7 +74,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
       }
 
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Something went wrong. Try again.');
+      setApiError(error.message || 'Something went wrong. Try again.');
     } finally {
       setLoading(false);
     }
@@ -82,11 +85,14 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
       <Text style={styles.title}>Welcome Back 👋</Text>
       <Text style={styles.subtitle}>Login to continue</Text>
 
+      {/* Top Level API Message */}
+      {apiError && <Text style={styles.topError}>{apiError}</Text>}
+
       <AuthInput
         label="Email"
         placeholder="your@email.com"
         value={email}
-        onChangeText={(t) => { setEmail(t); setErrors(p => ({ ...p, email: undefined })); }}
+        onChangeText={(t) => { setEmail(t); setErrors(p => ({ ...p, email: undefined })); setApiError(null); }}
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
@@ -97,7 +103,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
         label="Password"
         placeholder="••••••••"
         value={password}
-        onChangeText={(t) => { setPassword(t); setErrors(p => ({ ...p, password: undefined })); }}
+        onChangeText={(t) => { setPassword(t); setErrors(p => ({ ...p, password: undefined })); setApiError(null); }}
         secureTextEntry
         error={errors.password}
       />
@@ -138,7 +144,18 @@ const styles = StyleSheet.create({
   subtitle: {
     color: '#55556A',
     fontSize: 13,
-    marginBottom: 24,
+    marginBottom: 16,
+  },
+  topError: {
+    color: '#FF4757',
+    fontSize: 13,
+    fontWeight: '600',
+    backgroundColor: 'rgba(255, 71, 87, 0.1)',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#FF4757',
   },
   btn: {
     marginTop: 6,
@@ -159,3 +176,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+
