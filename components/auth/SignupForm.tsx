@@ -1,205 +1,179 @@
 import { useState } from 'react';
-import {
-  View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Alert, ActivityIndicator
-} from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { supabase } from '../../services/supabase';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { router } from 'expo-router';
+import { supabase } from '@/services/supabase';
+import AuthInput from './AuthInput';
+import AuthButton from './AuthButton';
 
 interface Props {
   onSwitchToLogin: () => void;
+}
+
+interface Errors {
+  name?: string;
+  email?: string;
+  password?: string;
 }
 
 export default function SignupForm({ onSwitchToLogin }: Props) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [referralCode, setReferralCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Errors>({});
+
+  function validate(): boolean {
+    const newErrors: Errors = {};
+    if (!name.trim() || name.trim().length < 3)
+      newErrors.name = 'Name must be at least 3 characters';
+      
+    if (!email.trim()) newErrors.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(email)) newErrors.email = 'Enter a valid email';
+    
+    if (!password.trim()) newErrors.password = 'Password is required';
+    else if (password.length < 6) newErrors.password = 'Must be at least 6 characters';
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }
 
   async function handleSignup() {
-    if (!name || !email || !password) {
-      Alert.alert('Error', 'fill all fields ');
-      return;
-    }
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password should be at least 6 characters.');
-      return;
-    }
+    if (!validate()) return;
     setLoading(true);
+    
     try {
-      // Validate referral code if provided
-      let referrerId: string | null = null;
-      const trimmedCode = referralCode.trim().toUpperCase();
-      if (trimmedCode) {
-        const { data: refUser } = await supabase
-          .from('users')
-          .select('id')
-          .eq('my_referral_code', trimmedCode)
-          .single();
-        if (!refUser) {
-          Alert.alert('Invalid Code', 'Yeh referral code valid nahi hai. Check karke try kar.');
-          setLoading(false);
-          return;
-        }
-        referrerId = refUser.id;
-      }
-
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { name } },
+      const { data: signupData, error: signupError } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password: password.trim(),
+        options: { data: { name: name.trim() } },
       });
-      if (error) throw error;
 
-      // If referral code was valid, update referred_by and create pending referral
-      if (referrerId && data.user) {
-        await supabase
-          .from('users')
-          .update({ referred_by: referrerId })
-          .eq('id', data.user.id);
-
-        await supabase.from('referrals').insert([{
-          referrer_id: referrerId,
-          referee_id: data.user.id,
-          status: 'pending',
-        }]);
+      if (signupError) {
+        if (signupError.message.includes('already registered')) {
+          Alert.alert('Already Registered', 'This email is already in use. Please login.');
+        } else {
+          Alert.alert('Signup Failed', signupError.message);
+        }
+        return;
       }
 
-      Alert.alert('✅ Account is created!', 'Login now.');
-      onSwitchToLogin();
+      // If email confirmation is OFF — direct login
+      if (signupData?.session) {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('name')
+          .eq('id', signupData.user!.id)
+          .single();
+
+        if (!profile?.name || profile.name === 'Student') {
+          router.replace('/onboarding');
+        } else {
+          router.replace('/(tabs)');
+        }
+      } else {
+        // If email confirmation is ON
+        Alert.alert(
+          'Account Created ✅',
+          'Please verify your email to login.',
+          [{ text: 'OK', onPress: onSwitchToLogin }]
+        );
+      }
+
     } catch (error: any) {
-      Alert.alert('Signup Failed', error.message);
+      Alert.alert('Error', error.message || 'Something went wrong. Try again.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   return (
     <View style={styles.card}>
       <Text style={styles.title}>Join PadhAI 🎯</Text>
+      <Text style={styles.subtitle}>Start tracking your studies today</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Name"
-        placeholderTextColor="#9CA3AF"
+      <AuthInput
+        label="Name"
+        placeholder="Your full name"
         value={name}
-        onChangeText={setName}
+        onChangeText={(t) => { setName(t); setErrors(p => ({ ...p, name: undefined })); }}
+        autoCapitalize="words"
+        error={errors.name}
       />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email address"
-        placeholderTextColor="#9CA3AF"
+      <AuthInput
+        label="Email"
+        placeholder="your@email.com"
         value={email}
-        onChangeText={setEmail}
+        onChangeText={(t) => { setEmail(t); setErrors(p => ({ ...p, email: undefined })); }}
         keyboardType="email-address"
         autoCapitalize="none"
+        autoCorrect={false}
+        error={errors.email}
       />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Password (min 6 characters)"
-        placeholderTextColor="#9CA3AF"
+      <AuthInput
+        label="Password"
+        placeholder="••••••••"
         value={password}
-        onChangeText={setPassword}
+        onChangeText={(t) => { setPassword(t); setErrors(p => ({ ...p, password: undefined })); }}
         secureTextEntry
+        error={errors.password}
       />
 
-      {/* Optional referral code — always visible */}
-      <View style={styles.referralBox}>
-        <MaterialIcons name="card-giftcard" size={16} color="#9B7FFF" />
-        <Text style={styles.referralBoxLabel}>Referral Code (optional)</Text>
-      </View>
-      <TextInput
-        style={[styles.input, styles.referralInput]}
-        placeholder="e.g. STU-ABC123"
-        placeholderTextColor="#6B7280"
-        value={referralCode}
-        onChangeText={setReferralCode}
-        autoCapitalize="characters"
-      />
-
-      <TouchableOpacity
-        style={styles.button}
+      <AuthButton
+        label="Create Account →"
         onPress={handleSignup}
-        disabled={loading}
-      >
-        {loading
-          ? <ActivityIndicator color="#fff" />
-          : <Text style={styles.buttonText}>Sign Up →</Text>
-        }
-      </TouchableOpacity>
+        loading={loading}
+        style={styles.btn}
+      />
 
-      <TouchableOpacity onPress={onSwitchToLogin}>
-        <Text style={styles.switchText}>
-          Already have an account? Login Now
-        </Text>
-      </TouchableOpacity>
+      <View style={styles.switchRow}>
+        <Text style={styles.switchText}>Already have an account? </Text>
+        <TouchableOpacity onPress={onSwitchToLogin} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text style={styles.switchLink}>Log In</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#1C1C1E',
-    borderRadius: 24,
+    backgroundColor: '#12121A',
+    borderRadius: 20,
     padding: 24,
     width: '100%',
     borderWidth: 1,
-    borderColor: '#2D2D2D',
+    borderColor: 'rgba(255,255,255,0.07)',
   },
   title: {
-    color: '#FFFFFF',
+    color: '#F1F1F6',
     fontSize: 22,
-    fontWeight: '700',
+    fontWeight: '800',
+    marginBottom: 4,
+    includeFontPadding: false,
+  },
+  subtitle: {
+    color: '#55556A',
+    fontSize: 13,
     marginBottom: 24,
-    textAlign: 'center',
   },
-  input: {
-    backgroundColor: '#2D2D2D',
-    borderRadius: 12,
-    padding: 16,
-    color: '#FFFFFF',
-    fontSize: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#374151',
+  btn: {
+    marginTop: 6,
+    marginBottom: 20,
   },
-  button: {
-    backgroundColor: '#6B21A8',
-    borderRadius: 12,
-    padding: 16,
+  switchRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
   },
   switchText: {
-    color: '#6B21A8',
-    textAlign: 'center',
-    fontSize: 14,
-  },
-  referralBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginBottom: 6,
-    marginTop: 2,
-  },
-  referralBoxLabel: {
-    color: '#9B7FFF',
+    color: '#55556A',
     fontSize: 13,
-    fontWeight: '500',
   },
-  referralInput: {
-    borderColor: '#6B21A8',
-    borderWidth: 1.5,
-    letterSpacing: 2,
-    color: '#C4B5FD',
-    marginBottom: 0,
+  switchLink: {
+    color: '#7C5CFC',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
