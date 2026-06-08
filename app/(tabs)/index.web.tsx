@@ -1,4 +1,3 @@
-import 'react-native-web'; // Required: ensures react-native-web is available for web bundle resolution
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   ScrollView, View, Text, StyleSheet, RefreshControl
@@ -13,7 +12,6 @@ export default function Dashboard() {
   const [userName, setUserName] = useState('Student');
   const [streak, setStreak] = useState(0);
   const [todayMinutes, setTodayMinutes] = useState(0);
-  const [goalHours, setGoalHours] = useState(4);
   const [xpTotal, setXpTotal] = useState(0);
   const [chaptersTotal, setChaptersTotal] = useState(0);
   const [chaptersDone, setChaptersDone] = useState(0);
@@ -25,17 +23,14 @@ export default function Dashboard() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
       const { data } = await supabase
         .from('users')
         .select('name, streak, daily_goal_minutes, xp')
         .eq('id', user.id)
         .single();
-
       if (data) {
         setUserName(data.name || 'Student');
         setStreak(data.streak || 0);
-        setGoalHours(Math.round((data.daily_goal_minutes || 120) / 60));
         setXpTotal(data.xp || 0);
       }
       setUserId(user.id);
@@ -48,13 +43,11 @@ export default function Dashboard() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
       const { data } = await supabase
         .from('chapters')
         .select('status, is_deleted')
         .eq('user_id', user.id)
         .eq('is_deleted', false);
-
       if (data) {
         setChaptersTotal(data.length);
         setChaptersDone(data.filter((c: any) => c.status === 'done').length);
@@ -68,17 +61,14 @@ export default function Dashboard() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-
       const { data } = await supabase
         .from('focus_sessions')
         .select('actual_minutes')
         .eq('user_id', user.id)
-        .eq('completed', true)
+        .eq('broken', false)
         .gte('started_at', today.toISOString());
-
       if (data) {
         const total = data.reduce(
           (sum: number, s: any) => sum + (s.actual_minutes || 0), 0
@@ -94,60 +84,29 @@ export default function Dashboard() {
     await Promise.all([loadUserData(), loadTodayStats(), loadChaptersStats()]);
   }
 
-  useEffect(() => {
-    loadAll();
-  }, []);
+  useEffect(() => { loadAll(); }, []);
 
-  // Real-time subscriptions
   useEffect(() => {
     if (!userId) return;
-
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-    }
-
+    if (channelRef.current) supabase.removeChannel(channelRef.current);
     const channel = supabase
       .channel(`dashboard-web-${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'focus_sessions',
-          filter: `user_id=eq.${userId}`,
-        },
-        () => {
-          loadTodayStats();
-          loadUserData();
-        }
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'focus_sessions', filter: `user_id=eq.${userId}` },
+        () => { loadTodayStats(); loadUserData(); }
       )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'chapters',
-          filter: `user_id=eq.${userId}`,
-        },
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'chapters', filter: `user_id=eq.${userId}` },
         () => loadChaptersStats()
       )
       .subscribe();
-
     channelRef.current = channel;
-
-    return () => {
-      supabase.removeChannel(channel);
-      channelRef.current = null;
-    };
+    return () => { supabase.removeChannel(channel); channelRef.current = null; };
   }, [userId]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    try {
-      await loadAll();
-    } finally {
-      setRefreshing(false);
-    }
+    try { await loadAll(); } finally { setRefreshing(false); }
   }, []);
 
   return (
@@ -155,9 +114,8 @@ export default function Dashboard() {
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={true} 
-        overScrollMode="always" // 🚀 Android/Web trackpad scroll hooks ko allow karta hai
-        bounces={true}          // 🚀 iOS aur modern browsers mein bounce activate rakhta hai
+        showsVerticalScrollIndicator={false}
+        bounces={true}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -168,7 +126,6 @@ export default function Dashboard() {
           />
         }
       >
-        {/* Header Section */}
         <View style={styles.header}>
           <Text style={styles.appName}>
             पढ़<Text style={styles.ai}>AI</Text>
@@ -179,21 +136,15 @@ export default function Dashboard() {
             })}
           </Text>
         </View>
-
-        {/* Dashboard Components */}
         <GreetingCard name={userName} streak={streak} />
-
         <StatsRow
           todayMins={todayMinutes}
           xp={xpTotal}
           chaptersTotal={chaptersTotal}
           chaptersDone={chaptersDone}
         />
-
         <QuickShortcuts />
-
         <QuoteCard />
-
       </ScrollView>
     </View>
   );
@@ -204,15 +155,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0F0F0F',
     minHeight: '100vh' as any,
-    // 🚀 Browser ke default pull gesture conflict ko handle karne ke liye
-    overscrollBehaviorY: 'contain' as any, 
   },
-  scroll: {
-    flex: 1,
-  },
+  scroll: { flex: 1 },
   content: {
     flexGrow: 1,
-    paddingHorizontal: 20,
+    padding: 20,
     paddingTop: 56,
     paddingBottom: 120,
     maxWidth: 640,
@@ -223,19 +170,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
-  appName: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: '#FFFFFF',
-  },
-  ai: {
-    color: '#A855F7',
-  },
-  date: {
-    color: '#6B7280',
-    fontSize: 14,
-    fontWeight: '500',
-  }
+  appName: { fontSize: 28, fontWeight: '900', color: '#FFFFFF' },
+  ai: { color: '#A855F7' },
+  date: { color: '#6B7280', fontSize: 14, fontWeight: '500' },
 });
