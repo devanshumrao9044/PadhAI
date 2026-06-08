@@ -1,13 +1,16 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { useEffect } from 'react';
+import { View, ActivityIndicator } from 'react-native';
+import { router } from 'expo-router';
+
 export default function Stats() {
+  useEffect(() => {
+    router.replace('/(tabs)/analytics');
+  }, []);
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>📊 Analytics</Text>
+    <View style={{ flex: 1, backgroundColor: '#0A0A0F',
+      justifyContent: 'center', alignItems: 'center' }}>
+      <ActivityIndicator color="#A855F7" />
     </View>
   );
 }
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F0F0F',
-    justifyContent: 'center', alignItems: 'center' },
-  text: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
-});
