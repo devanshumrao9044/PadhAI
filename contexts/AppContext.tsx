@@ -1,7 +1,5 @@
 import React, { createContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { AppState } from 'react-native';
-import 'react-native-get-random-values';
-import { v4 as uuidv4 } from 'uuid';
 import { getItem, setItem, removeItem, StorageKeys } from '@/services/storage';
 import { supabase } from '@/services/supabase';
 import {
@@ -9,6 +7,18 @@ import {
   FocusSession, DailySummary, XPTransaction, ActiveSession
 } from '@/types/models';
 import { calculateSessionXP, XP_REWARDS, getLevelForXP } from '@/constants/levels';
+
+// ✅ Cross-platform UUID — no external package needed
+function uuidv4(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 export type AppContextType = {
   comebackPending: boolean;
@@ -212,7 +222,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (authData?.user) {
         const userId = authData.user.id;
 
-        // Load user profile from DB
         const { data: profileData } = await supabase
           .from('users')
           .select('*')
@@ -289,7 +298,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [load]);
 
-  // ── setUser: sync to Supabase ─────────────────────────────────────────────
+  // ── setUser ───────────────────────────────────────────────────────────────
   const setUser = async (u: UserProfile) => {
     setUserState(u);
     await setItem(StorageKeys.USER, u);
@@ -467,7 +476,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return sessionId;
   };
 
-    const COMEBACK_BONUS_XP = 50;
+  const COMEBACK_BONUS_XP = 50;
 
   const completeSession = async (sessionId: string, actualMins: number): Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number }) | null> => {
     try {
@@ -476,11 +485,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const xp = calculateSessionXP(actualMins) + bonusFromComeback;
       if (comebackPending) setComebackPendingState(false);
 
-      // Level-up detection
       const oldLevelRank = activeUser ? getLevelForXP(activeUser.xpTotal).rank : 1;
       const newXPTotal = (activeUser?.xpTotal ?? 0) + xp;
       const newLevelRank = getLevelForXP(newXPTotal).rank;
       const leveledUp = newLevelRank > oldLevelRank;
+
       const sessionPayload = {
         id: sessionId,
         user_id: activeUser?.id ?? '',
@@ -650,4 +659,4 @@ export function AppProvider({ children }: { children: ReactNode }) {
       {children}
     </AppContext.Provider>
   );
-}
+  }
