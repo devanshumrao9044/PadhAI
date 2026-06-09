@@ -1,7 +1,16 @@
 import React, { createContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { AppState } from 'react-native';
-import 'react-native-get-random-values';
-import { v4 as uuidv4 } from 'uuid';
+// Cross-platform UUID generator (no native crypto dependency)
+function uuidv4(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 import { getItem, setItem, removeItem, StorageKeys } from '@/services/storage';
 import { supabase } from '@/services/supabase';
 import {
