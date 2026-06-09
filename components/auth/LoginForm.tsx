@@ -11,74 +11,78 @@ interface Props {
   onSwitchToSignup: () => void;
 }
 
-interface FormErrors {
-  email?: string;
-  password?: string;
+// ── Pure validation function ──────────────────────────────────────────────────
+// Called during render — never stored in async state
+function getLoginErrors(email: string, password: string) {
+  const errors: { email?: string; password?: string } = {};
+
+  if (!email.trim()) {
+    errors.email = 'Email is required.';
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    errors.email = 'Please enter a valid email address.';
+  }
+
+  if (!password.trim()) {
+    errors.password = 'Password is required.';
+  } else if (password.length < 6) {
+    errors.password = 'Password must be at least 6 characters.';
+  }
+
+  return errors;
 }
 
 export default function LoginForm({ onSwitchToSignup }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [submitted, setSubmitted] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  function validate(): FormErrors {
-    const e: FormErrors = {};
-
-    if (!email.trim()) {
-      e.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(email.trim())) {
-      e.email = 'Enter a valid email';
-    }
-
-    if (!password.trim()) {
-      e.password = 'Enter the password';
-    } else if (password.trim().length < 6) {
-      e.password = 'Password should be at least 6 characters';
-    }
-
-    return e;
-  }
+  // Errors are derived from current field values during render
+  // This guarantees they always reflect the current state — no async batching issues
+  const errors = submitted ? getLoginErrors(email, password) : {};
+  const hasErrors = Object.keys(errors).length > 0;
 
   async function handleLogin() {
+    setSubmitted(true);
     setApiError(null);
 
-    const validationErrors = validate();
-    setErrors(validationErrors);
-
-    if (Object.keys(validationErrors).length > 0) {
-      return;
-    }
+    const currentErrors = getLoginErrors(email, password);
+    if (Object.keys(currentErrors).length > 0) return;
 
     setLoading(true);
     try {
-      const { data: authData, error: authError } =
-        await supabase.auth.signInWithPassword({
-          email: email.trim().toLowerCase(),
-          password: password.trim(),
-        });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password: password.trim(),
+      });
 
-      if (authError) {
-        if (authError.message === 'Email not confirmed') {
-          setApiError('Please confirm your email.');
-        } else if (authError.message === 'Invalid login credentials') {
-          setApiError('Email or password is incorrect.');
-        } else {
-          setApiError(authError.message);
+      if (error) {
+        switch (error.message) {
+          case 'Invalid login credentials':
+            setApiError('Incorrect email or password. Please try again.');
+            break;
+          case 'Email not confirmed':
+            setApiError('Please verify your email address.');
+            break;
+          case 'Too many requests':
+            setApiError('Too many attempts. Please wait a moment and try again.');
+            break;
+          default:
+            setApiError(error.message ?? 'Login failed. Please try again.');
         }
         return;
       }
 
-      if (!authData?.user) {
-        setApiError('I was not able to log in.Try again.');
+      if (!data?.user) {
+        setApiError('Login failed. Please try again.');
         return;
       }
 
       const { data: profile } = await supabase
         .from('users')
         .select('name')
-        .eq('id', authData.user.id)
+        .eq('id', data.user.id)
         .single();
 
       if (!profile?.name || profile.name === 'Student') {
@@ -87,8 +91,8 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
         router.replace('/(tabs)');
       }
 
-    } catch (error: any) {
-      setApiError(error.message || 'Something went wrong.Try again.');
+    } catch (err: any) {
+      setApiError(err?.message ?? 'An unexpected error occurred.');
     } finally {
       setLoading(false);
     }
@@ -96,48 +100,50 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Welcome Back 👋</Text>
-      <Text style={styles.subtitle}>Login to continue</Text>
+      <Text style={styles.title}>Welcome back</Text>
+      <Text style={styles.subtitle}>Sign in </Text>
 
-      {!!apiError && (
+      {apiError ? (
         <View style={styles.apiErrorBox}>
+          <Text style={styles.apiErrorIcon}>⚠</Text>
           <Text style={styles.apiErrorText}>{apiError}</Text>
         </View>
-      )}
+      ) : null}
 
       <AuthInput
-        label="Email"
+        label="Email Address"
         placeholder="your@email.com"
         value={email}
         onChangeText={(t) => {
           setEmail(t);
-          if (errors.email) setErrors(p => ({ ...p, email: undefined }));
-          if (apiError) setApiError(null);
+          setApiError(null);
         }}
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
+        autoComplete="email"
         error={errors.email}
       />
 
       <AuthInput
         label="Password"
-        placeholder="••••••••"
+        placeholder="Enter your password"
         value={password}
         onChangeText={(t) => {
           setPassword(t);
-          if (errors.password) setErrors(p => ({ ...p, password: undefined }));
-          if (apiError) setApiError(null);
+          setApiError(null);
         }}
         secureTextEntry
+        autoComplete="password"
         error={errors.password}
       />
 
       <AuthButton
-        label="Login →"
+        label={loading ? 'Signing in...' : 'Sign In'}
         onPress={handleLogin}
         loading={loading}
-        style={styles.btn}
+        disabled={submitted && hasErrors}
+        style={styles.submitBtn}
       />
 
       <View style={styles.switchRow}>
@@ -145,8 +151,9 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
         <TouchableOpacity
           onPress={onSwitchToSignup}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          activeOpacity={0.7}
         >
-          <Text style={styles.switchLink}>Sign Up</Text>
+          <Text style={styles.switchLink}>Create account</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -155,40 +162,50 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#12121A',
+    backgroundColor: '#0F0F1A',
     borderRadius: 20,
     padding: 24,
     width: '100%',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
+    borderColor: 'rgba(124, 92, 252, 0.15)',
   },
   title: {
     color: '#F1F1F6',
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '800',
     marginBottom: 4,
     includeFontPadding: false,
   },
   subtitle: {
-    color: '#55556A',
+    color: '#6B7280',
     fontSize: 13,
-    marginBottom: 16,
+    marginBottom: 24,
   },
   apiErrorBox: {
-    backgroundColor: 'rgba(255, 71, 87, 0.1)',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: 'rgba(255, 71, 87, 0.08)',
     borderWidth: 1,
-    borderColor: '#FF4757',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 16,
+    borderColor: 'rgba(255, 71, 87, 0.35)',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 20,
+  },
+  apiErrorIcon: {
+    color: '#FF4757',
+    fontSize: 14,
+    marginTop: 1,
   },
   apiErrorText: {
+    flex: 1,
     color: '#FF4757',
     fontSize: 13,
     fontWeight: '600',
+    lineHeight: 18,
   },
-  btn: {
-    marginTop: 6,
+  submitBtn: {
+    marginTop: 4,
     marginBottom: 20,
   },
   switchRow: {
@@ -197,7 +214,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   switchText: {
-    color: '#55556A',
+    color: '#6B7280',
     fontSize: 13,
   },
   switchLink: {
