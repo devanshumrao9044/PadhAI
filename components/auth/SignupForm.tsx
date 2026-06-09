@@ -175,7 +175,7 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
       />
 
       <AuthButton
-        label={loading ? 'Creating account...' : 'Create Account →'}
+        label={loading ?'Create Account →'}
         onPress={handleSignup}
         loading={loading}
         disabled={submitted && hasErrors}
