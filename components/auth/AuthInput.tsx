@@ -8,16 +8,18 @@ interface Props extends TextInputProps {
   error?: string;
 }
 
-export default function AuthInput({ label, error, ...props }: Props) {
+export default function AuthInput({ label, error, style, ...props }: Props) {
   return (
     <View style={styles.wrapper}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
-        style={[styles.input, error ? styles.inputError : null]}
+        style={[styles.input, error ? styles.inputError : null, style]}
         placeholderTextColor="#4B5563"
         {...props}
       />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {!!error && (
+        <Text style={styles.errorText}>{error}</Text>
+      )}
     </View>
   );
 }
@@ -46,13 +48,13 @@ const styles = StyleSheet.create({
   },
   inputError: {
     borderColor: '#FF4757',
-    borderWidth: 1.5, // Thoda thick kiya taaki clearly dikhe
+    borderWidth: 1.5,
   },
-  error: {
+  errorText: {
     color: '#FF4757',
     fontSize: 12,
-    marginTop: 4,
+    fontWeight: '500',
+    marginTop: 5,
     marginLeft: 4,
-    fontWeight: '500', // Error text thoda bold kiya hai
   },
 });
