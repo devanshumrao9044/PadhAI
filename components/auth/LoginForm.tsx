@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import {
+  View, Text, TouchableOpacity, StyleSheet
+} from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
 import AuthInput from './AuthInput';
@@ -9,7 +11,7 @@ interface Props {
   onSwitchToSignup: () => void;
 }
 
-interface Errors {
+interface FormErrors {
   email?: string;
   password?: string;
 }
@@ -18,38 +20,50 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<Errors>({});
+  const [errors, setErrors] = useState<FormErrors>({});
   const [apiError, setApiError] = useState<string | null>(null);
 
-  function validate(): boolean {
-    const newErrors: Errors = {};
-    if (!email.trim()) newErrors.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(email)) newErrors.email = 'Enter a valid email';
-    
-    if (!password.trim()) newErrors.password = 'Password is required';
-    else if (password.length < 6) newErrors.password = 'Password Must be at least 6 characters';
-    
-    setErrors(newErrors);
-    setApiError(null);
-    return Object.keys(newErrors).length === 0;
+  function validate(): FormErrors {
+    const e: FormErrors = {};
+
+    if (!email.trim()) {
+      e.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(email.trim())) {
+      e.email = 'Enter a valid email';
+    }
+
+    if (!password.trim()) {
+      e.password = 'Enter the password';
+    } else if (password.trim().length < 6) {
+      e.password = 'Password should be at least 6 characters';
+    }
+
+    return e;
   }
 
   async function handleLogin() {
-    if (!validate()) return;
-    setLoading(true);
     setApiError(null);
-    
+
+    const validationErrors = validate();
+    setErrors(validationErrors);
+
+    if (Object.keys(validationErrors).length > 0) {
+      return;
+    }
+
+    setLoading(true);
     try {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password: password.trim(),
-      });
+      const { data: authData, error: authError } =
+        await supabase.auth.signInWithPassword({
+          email: email.trim().toLowerCase(),
+          password: password.trim(),
+        });
 
       if (authError) {
         if (authError.message === 'Email not confirmed') {
-          setApiError('Please verify your email to login.');
+          setApiError('Please confirm your email.');
         } else if (authError.message === 'Invalid login credentials') {
-          setApiError('Invalid email or password.');
+          setApiError('Email or password is incorrect.');
         } else {
           setApiError(authError.message);
         }
@@ -57,7 +71,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
       }
 
       if (!authData?.user) {
-        setApiError('Login failed. Please try again.');
+        setApiError('I was not able to log in.Try again.');
         return;
       }
 
@@ -74,7 +88,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
       }
 
     } catch (error: any) {
-      setApiError(error.message || 'Something went wrong. Try again.');
+      setApiError(error.message || 'Something went wrong.Try again.');
     } finally {
       setLoading(false);
     }
@@ -85,14 +99,21 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
       <Text style={styles.title}>Welcome Back 👋</Text>
       <Text style={styles.subtitle}>Login to continue</Text>
 
-      {/* Top Level API Message */}
-      {apiError && <Text style={styles.topError}>{apiError}</Text>}
+      {!!apiError && (
+        <View style={styles.apiErrorBox}>
+          <Text style={styles.apiErrorText}>{apiError}</Text>
+        </View>
+      )}
 
       <AuthInput
         label="Email"
         placeholder="your@email.com"
         value={email}
-        onChangeText={(t) => { setEmail(t); setErrors(p => ({ ...p, email: undefined })); setApiError(null); }}
+        onChangeText={(t) => {
+          setEmail(t);
+          if (errors.email) setErrors(p => ({ ...p, email: undefined }));
+          if (apiError) setApiError(null);
+        }}
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
@@ -103,7 +124,11 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
         label="Password"
         placeholder="••••••••"
         value={password}
-        onChangeText={(t) => { setPassword(t); setErrors(p => ({ ...p, password: undefined })); setApiError(null); }}
+        onChangeText={(t) => {
+          setPassword(t);
+          if (errors.password) setErrors(p => ({ ...p, password: undefined }));
+          if (apiError) setApiError(null);
+        }}
         secureTextEntry
         error={errors.password}
       />
@@ -117,7 +142,10 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
 
       <View style={styles.switchRow}>
         <Text style={styles.switchText}>Don't have an account? </Text>
-        <TouchableOpacity onPress={onSwitchToSignup} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity
+          onPress={onSwitchToSignup}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
           <Text style={styles.switchLink}>Sign Up</Text>
         </TouchableOpacity>
       </View>
@@ -146,16 +174,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 16,
   },
-  topError: {
+  apiErrorBox: {
+    backgroundColor: 'rgba(255, 71, 87, 0.1)',
+    borderWidth: 1,
+    borderColor: '#FF4757',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 16,
+  },
+  apiErrorText: {
     color: '#FF4757',
     fontSize: 13,
     fontWeight: '600',
-    backgroundColor: 'rgba(255, 71, 87, 0.1)',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#FF4757',
   },
   btn: {
     marginTop: 6,
@@ -176,4 +206,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-
