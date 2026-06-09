@@ -134,7 +134,7 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
 
       <AuthInput
         label="Full Name"
-        placeholder="e.g. Arjun Sharma"
+        placeholder="e.g. Devansh "
         value={name}
         onChangeText={(t) => {
           setName(t);
