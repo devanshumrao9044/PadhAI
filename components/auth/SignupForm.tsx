@@ -11,7 +11,6 @@ interface Props {
   onSwitchToLogin: () => void;
 }
 
-// ── Pure validation function ──────────────────────────────────────────────────
 function getSignupErrors(name: string, email: string, password: string) {
   const errors: {
     name?: string;
@@ -53,7 +52,6 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
   const [apiError, setApiError] = useState<string | null>(null);
   const [apiSuccess, setApiSuccess] = useState<string | null>(null);
 
-  // Errors derived during render — guaranteed to reflect current values
   const errors = submitted ? getSignupErrors(name, email, password) : {};
   const hasErrors = Object.keys(errors).length > 0;
 
@@ -81,7 +79,7 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
           error.message.toLowerCase().includes('already exists') ||
           error.message.toLowerCase().includes('user already')
         ) {
-          setApiError('This email is already registered. Please Log-in instead.');
+          setApiError('This email is already registered. Please sign in instead.');
         } else {
           setApiError(error.message ?? 'Sign up failed. Please try again.');
         }
@@ -102,7 +100,7 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
         }
       } else {
         setApiSuccess(
-          'Account created ! Check your email to verify your address.'
+          'Account created! Check your email to verify your address, then sign in.'
         );
       }
 
@@ -134,7 +132,7 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
 
       <AuthInput
         label="Full Name"
-        placeholder="e.g. Devansh "
+        placeholder="e.g. Devansh Rao"
         value={name}
         onChangeText={(t) => {
           setName(t);
@@ -142,7 +140,6 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
         }}
         autoCapitalize="words"
         autoCorrect={false}
-        autoComplete="name"
         error={errors.name}
       />
 
@@ -157,7 +154,6 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
-        autoComplete="email"
         error={errors.email}
       />
 
@@ -170,12 +166,11 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
           setApiError(null);
         }}
         secureTextEntry
-        autoComplete="password-new"
         error={errors.password}
       />
 
       <AuthButton
-        label={loading ?'Create Account →'}
+        label={loading ? 'Creating account...' : 'Create Account →'}
         onPress={handleSignup}
         loading={loading}
         disabled={submitted && hasErrors}
