@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import {
+  View, Text, TouchableOpacity, StyleSheet
+} from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
 import AuthInput from './AuthInput';
@@ -9,7 +11,7 @@ interface Props {
   onSwitchToLogin: () => void;
 }
 
-interface Errors {
+interface FormErrors {
   name?: string;
   email?: string;
   password?: string;
@@ -20,51 +22,63 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<Errors>({});
+  const [errors, setErrors] = useState<FormErrors>({});
   const [apiError, setApiError] = useState<string | null>(null);
   const [apiSuccess, setApiSuccess] = useState<string | null>(null);
 
-  function validate(): boolean {
-    const newErrors: Errors = {};
-    if (!name.trim() || name.trim().length < 3)
-      newErrors.name = 'Name must be at least 3 characters';
-      
-    if (!email.trim()) newErrors.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(email)) newErrors.email = 'Enter a valid email';
-    
-    if (!password.trim()) newErrors.password = 'Password is required';
-    else if (password.length < 6) newErrors.password = 'Must be at least 6 characters';
-    
-    setErrors(newErrors);
-    setApiError(null);
-    setApiSuccess(null);
-    
-    return Object.keys(newErrors).length === 0;
+  function validate(): FormErrors {
+    const e: FormErrors = {};
+
+    if (!name.trim()) {
+      e.name = 'Enter Your Name';
+    } else if (name.trim().length < 3) {
+      e.name = 'The name should be at least 3 letters';
+    }
+
+    if (!email.trim()) {
+      e.email = 'Enter you Email';
+    } else if (!/\S+@\S+\.\S+/.test(email.trim())) {
+      e.email = 'Enter Valid Email';
+    }
+
+    if (!password.trim()) {
+      e.password = 'Enter the password';
+    } else if (password.trim().length < 6) {
+      e.password = 'Password should be at least 6 characters.';
+    }
+
+    return e;
   }
 
   async function handleSignup() {
-    if (!validate()) return;
-    setLoading(true);
     setApiError(null);
     setApiSuccess(null);
-    
+
+    const validationErrors = validate();
+    setErrors(validationErrors);
+
+    if (Object.keys(validationErrors).length > 0) {
+      return;
+    }
+
+    setLoading(true);
     try {
-      const { data: signupData, error: signupError } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
-        password: password.trim(),
-        options: { data: { name: name.trim() } },
-      });
+      const { data: signupData, error: signupError } =
+        await supabase.auth.signUp({
+          email: email.trim().toLowerCase(),
+          password: password.trim(),
+          options: { data: { name: name.trim() } },
+        });
 
       if (signupError) {
         if (signupError.message.includes('already registered')) {
-          setApiError('This email is already in use. Please login.');
+          setApiError('Already registered your Email. Login Now.');
         } else {
           setApiError(signupError.message);
         }
         return;
       }
 
-      // If email confirmation is OFF — direct login
       if (signupData?.session) {
         const { data: profile } = await supabase
           .from('users')
@@ -78,12 +92,11 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
           router.replace('/(tabs)');
         }
       } else {
-        // If email confirmation is ON
-        setApiSuccess('Account Created ✅ Please verify your email to login.');
+        setApiSuccess('Account Created Successfully ✅ Confirm email.');
       }
 
     } catch (error: any) {
-      setApiError(error.message || 'Something went wrong. Try again.');
+      setApiError(error.message || 'Something went wrong. Try Again.');
     } finally {
       setLoading(false);
     }
@@ -92,17 +105,29 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
   return (
     <View style={styles.card}>
       <Text style={styles.title}>Join PadhAI 🎯</Text>
-      <Text style={styles.subtitle}>Start tracking your studies today</Text>
+      <Text style={styles.subtitle}>Focus Your mind.</Text>
 
-      {/* Top Level API Messages */}
-      {apiError && <Text style={styles.topError}>{apiError}</Text>}
-      {apiSuccess && <Text style={styles.topSuccess}>{apiSuccess}</Text>}
+      {!!apiError && (
+        <View style={styles.apiErrorBox}>
+          <Text style={styles.apiErrorText}>{apiError}</Text>
+        </View>
+      )}
+
+      {!!apiSuccess && (
+        <View style={styles.apiSuccessBox}>
+          <Text style={styles.apiSuccessText}>{apiSuccess}</Text>
+        </View>
+      )}
 
       <AuthInput
-        label="Name"
-        placeholder="Your full name"
+        label="Naam"
+        placeholder="Devansh "
         value={name}
-        onChangeText={(t) => { setName(t); setErrors(p => ({ ...p, name: undefined })); setApiError(null); }}
+        onChangeText={(t) => {
+          setName(t);
+          if (errors.name) setErrors(p => ({ ...p, name: undefined }));
+          if (apiError) setApiError(null);
+        }}
         autoCapitalize="words"
         error={errors.name}
       />
@@ -111,7 +136,11 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
         label="Email"
         placeholder="your@email.com"
         value={email}
-        onChangeText={(t) => { setEmail(t); setErrors(p => ({ ...p, email: undefined })); setApiError(null); }}
+        onChangeText={(t) => {
+          setEmail(t);
+          if (errors.email) setErrors(p => ({ ...p, email: undefined }));
+          if (apiError) setApiError(null);
+        }}
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
@@ -122,7 +151,11 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
         label="Password"
         placeholder="••••••••"
         value={password}
-        onChangeText={(t) => { setPassword(t); setErrors(p => ({ ...p, password: undefined })); setApiError(null); }}
+        onChangeText={(t) => {
+          setPassword(t);
+          if (errors.password) setErrors(p => ({ ...p, password: undefined }));
+          if (apiError) setApiError(null);
+        }}
         secureTextEntry
         error={errors.password}
       />
@@ -136,7 +169,10 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
 
       <View style={styles.switchRow}>
         <Text style={styles.switchText}>Already have an account? </Text>
-        <TouchableOpacity onPress={onSwitchToLogin} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity
+          onPress={onSwitchToLogin}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
           <Text style={styles.switchLink}>Log In</Text>
         </TouchableOpacity>
       </View>
@@ -165,27 +201,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 16,
   },
-  topError: {
+  apiErrorBox: {
+    backgroundColor: 'rgba(255, 71, 87, 0.1)',
+    borderWidth: 1,
+    borderColor: '#FF4757',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 16,
+  },
+  apiErrorText: {
     color: '#FF4757',
     fontSize: 13,
     fontWeight: '600',
-    backgroundColor: 'rgba(255, 71, 87, 0.1)',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#FF4757',
   },
-  topSuccess: {
+  apiSuccessBox: {
+    backgroundColor: 'rgba(76, 175, 125, 0.1)',
+    borderWidth: 1,
+    borderColor: '#4CAF7D',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 16,
+  },
+  apiSuccessText: {
     color: '#4CAF7D',
     fontSize: 13,
     fontWeight: '600',
-    backgroundColor: 'rgba(76, 175, 125, 0.1)',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#4CAF7D',
   },
   btn: {
     marginTop: 6,
