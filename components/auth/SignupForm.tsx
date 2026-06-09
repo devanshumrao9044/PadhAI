@@ -11,10 +11,37 @@ interface Props {
   onSwitchToLogin: () => void;
 }
 
-interface FormErrors {
-  name?: string;
-  email?: string;
-  password?: string;
+// ── Pure validation function ──────────────────────────────────────────────────
+function getSignupErrors(name: string, email: string, password: string) {
+  const errors: {
+    name?: string;
+    email?: string;
+    password?: string;
+  } = {};
+
+  if (!name.trim()) {
+    errors.name = 'Full name is required.';
+  } else if (name.trim().length < 3) {
+    errors.name = 'Name must be at least 3 characters.';
+  } else if (name.trim().length > 40) {
+    errors.name = 'Name must be under 40 characters.';
+  }
+
+  if (!email.trim()) {
+    errors.email = 'Email is required.';
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    errors.email = 'Please enter a valid email address.';
+  }
+
+  if (!password.trim()) {
+    errors.password = 'Password is required.';
+  } else if (password.length < 6) {
+    errors.password = 'Password must be at least 6 characters.';
+  } else if (password.length > 72) {
+    errors.password = 'Password must be under 72 characters.';
+  }
+
+  return errors;
 }
 
 export default function SignupForm({ onSwitchToLogin }: Props) {
@@ -22,68 +49,50 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [submitted, setSubmitted] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [apiSuccess, setApiSuccess] = useState<string | null>(null);
 
-  function validate(): FormErrors {
-    const e: FormErrors = {};
-
-    if (!name.trim()) {
-      e.name = 'Enter Your Name';
-    } else if (name.trim().length < 3) {
-      e.name = 'The name should be at least 3 letters';
-    }
-
-    if (!email.trim()) {
-      e.email = 'Enter you Email';
-    } else if (!/\S+@\S+\.\S+/.test(email.trim())) {
-      e.email = 'Enter Valid Email';
-    }
-
-    if (!password.trim()) {
-      e.password = 'Enter the password';
-    } else if (password.trim().length < 6) {
-      e.password = 'Password should be at least 6 characters.';
-    }
-
-    return e;
-  }
+  // Errors derived during render — guaranteed to reflect current values
+  const errors = submitted ? getSignupErrors(name, email, password) : {};
+  const hasErrors = Object.keys(errors).length > 0;
 
   async function handleSignup() {
+    setSubmitted(true);
     setApiError(null);
     setApiSuccess(null);
 
-    const validationErrors = validate();
-    setErrors(validationErrors);
-
-    if (Object.keys(validationErrors).length > 0) {
-      return;
-    }
+    const currentErrors = getSignupErrors(name, email, password);
+    if (Object.keys(currentErrors).length > 0) return;
 
     setLoading(true);
     try {
-      const { data: signupData, error: signupError } =
-        await supabase.auth.signUp({
-          email: email.trim().toLowerCase(),
-          password: password.trim(),
-          options: { data: { name: name.trim() } },
-        });
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password: password.trim(),
+        options: {
+          data: { name: name.trim() },
+        },
+      });
 
-      if (signupError) {
-        if (signupError.message.includes('already registered')) {
-          setApiError('Already registered your Email. Login Now.');
+      if (error) {
+        if (
+          error.message.toLowerCase().includes('already registered') ||
+          error.message.toLowerCase().includes('already exists') ||
+          error.message.toLowerCase().includes('user already')
+        ) {
+          setApiError('This email is already registered. Please Log-in instead.');
         } else {
-          setApiError(signupError.message);
+          setApiError(error.message ?? 'Sign up failed. Please try again.');
         }
         return;
       }
 
-      if (signupData?.session) {
+      if (data?.session) {
         const { data: profile } = await supabase
           .from('users')
           .select('name')
-          .eq('id', signupData.user!.id)
+          .eq('id', data.user!.id)
           .single();
 
         if (!profile?.name || profile.name === 'Student') {
@@ -92,11 +101,13 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
           router.replace('/(tabs)');
         }
       } else {
-        setApiSuccess('Account Created Successfully ✅ Confirm email.');
+        setApiSuccess(
+          'Account created ! Check your email to verify your address.'
+        );
       }
 
-    } catch (error: any) {
-      setApiError(error.message || 'Something went wrong. Try Again.');
+    } catch (err: any) {
+      setApiError(err?.message ?? 'An unexpected error occurred.');
     } finally {
       setLoading(false);
     }
@@ -104,67 +115,71 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Join PadhAI 🎯</Text>
-      <Text style={styles.subtitle}>Focus Your mind.</Text>
+      <Text style={styles.title}>Create account</Text>
+      <Text style={styles.subtitle}>Start your focused study journey today</Text>
 
-      {!!apiError && (
+      {apiError ? (
         <View style={styles.apiErrorBox}>
+          <Text style={styles.apiErrorIcon}>⚠</Text>
           <Text style={styles.apiErrorText}>{apiError}</Text>
         </View>
-      )}
+      ) : null}
 
-      {!!apiSuccess && (
+      {apiSuccess ? (
         <View style={styles.apiSuccessBox}>
+          <Text style={styles.apiSuccessIcon}>✓</Text>
           <Text style={styles.apiSuccessText}>{apiSuccess}</Text>
         </View>
-      )}
+      ) : null}
 
       <AuthInput
-        label="Naam"
-        placeholder="Devansh "
+        label="Full Name"
+        placeholder="e.g. Arjun Sharma"
         value={name}
         onChangeText={(t) => {
           setName(t);
-          if (errors.name) setErrors(p => ({ ...p, name: undefined }));
-          if (apiError) setApiError(null);
+          setApiError(null);
         }}
         autoCapitalize="words"
+        autoCorrect={false}
+        autoComplete="name"
         error={errors.name}
       />
 
       <AuthInput
-        label="Email"
+        label="Email Address"
         placeholder="your@email.com"
         value={email}
         onChangeText={(t) => {
           setEmail(t);
-          if (errors.email) setErrors(p => ({ ...p, email: undefined }));
-          if (apiError) setApiError(null);
+          setApiError(null);
         }}
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
+        autoComplete="email"
         error={errors.email}
       />
 
       <AuthInput
         label="Password"
-        placeholder="••••••••"
+        placeholder="At least 6 characters"
         value={password}
         onChangeText={(t) => {
           setPassword(t);
-          if (errors.password) setErrors(p => ({ ...p, password: undefined }));
-          if (apiError) setApiError(null);
+          setApiError(null);
         }}
         secureTextEntry
+        autoComplete="password-new"
         error={errors.password}
       />
 
       <AuthButton
-        label="Create Account →"
+        label={loading ? 'Creating account...' : 'Create Account'}
         onPress={handleSignup}
         loading={loading}
-        style={styles.btn}
+        disabled={submitted && hasErrors}
+        style={styles.submitBtn}
       />
 
       <View style={styles.switchRow}>
@@ -172,8 +187,9 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
         <TouchableOpacity
           onPress={onSwitchToLogin}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          activeOpacity={0.7}
         >
-          <Text style={styles.switchLink}>Log In</Text>
+          <Text style={styles.switchLink}>Sign in</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -182,53 +198,74 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#12121A',
+    backgroundColor: '#0F0F1A',
     borderRadius: 20,
     padding: 24,
     width: '100%',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
+    borderColor: 'rgba(124, 92, 252, 0.15)',
   },
   title: {
     color: '#F1F1F6',
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '800',
     marginBottom: 4,
     includeFontPadding: false,
   },
   subtitle: {
-    color: '#55556A',
+    color: '#6B7280',
     fontSize: 13,
-    marginBottom: 16,
+    marginBottom: 24,
   },
   apiErrorBox: {
-    backgroundColor: 'rgba(255, 71, 87, 0.1)',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: 'rgba(255, 71, 87, 0.08)',
     borderWidth: 1,
-    borderColor: '#FF4757',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 16,
+    borderColor: 'rgba(255, 71, 87, 0.35)',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 20,
+  },
+  apiErrorIcon: {
+    color: '#FF4757',
+    fontSize: 14,
+    marginTop: 1,
   },
   apiErrorText: {
+    flex: 1,
     color: '#FF4757',
     fontSize: 13,
     fontWeight: '600',
+    lineHeight: 18,
   },
   apiSuccessBox: {
-    backgroundColor: 'rgba(76, 175, 125, 0.1)',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: 'rgba(46, 213, 115, 0.08)',
     borderWidth: 1,
-    borderColor: '#4CAF7D',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 16,
+    borderColor: 'rgba(46, 213, 115, 0.35)',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 20,
+  },
+  apiSuccessIcon: {
+    color: '#2ED573',
+    fontSize: 14,
+    marginTop: 1,
+    fontWeight: '700',
   },
   apiSuccessText: {
-    color: '#4CAF7D',
+    flex: 1,
+    color: '#2ED573',
     fontSize: 13,
     fontWeight: '600',
+    lineHeight: 18,
   },
-  btn: {
-    marginTop: 6,
+  submitBtn: {
+    marginTop: 4,
     marginBottom: 20,
   },
   switchRow: {
@@ -237,7 +274,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   switchText: {
-    color: '#55556A',
+    color: '#6B7280',
     fontSize: 13,
   },
   switchLink: {
