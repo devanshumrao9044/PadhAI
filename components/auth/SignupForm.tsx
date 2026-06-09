@@ -11,7 +11,6 @@ interface Props {
   onSwitchToLogin: () => void;
 }
 
-// ── Pure validation function ──────────────────────────────────────────────────
 function getSignupErrors(name: string, email: string, password: string) {
   const errors: {
     name?: string;
@@ -53,7 +52,6 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
   const [apiError, setApiError] = useState<string | null>(null);
   const [apiSuccess, setApiSuccess] = useState<string | null>(null);
 
-  // Errors derived during render — guaranteed to reflect current values
   const errors = submitted ? getSignupErrors(name, email, password) : {};
   const hasErrors = Object.keys(errors).length > 0;
 
@@ -102,7 +100,7 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
         }
       } else {
         setApiSuccess(
-          'Account created ! Check your email to verify your address.'
+          'Account created! Check your email to verify your address.'
         );
       }
 
@@ -134,7 +132,7 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
 
       <AuthInput
         label="Full Name"
-        placeholder="e.g. Devansh "
+        placeholder="e.g. Devansh"
         value={name}
         onChangeText={(t) => {
           setName(t);

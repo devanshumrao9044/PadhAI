@@ -11,8 +11,6 @@ interface Props {
   onSwitchToSignup: () => void;
 }
 
-// ── Pure validation function ──────────────────────────────────────────────────
-// Called during render — never stored in async state
 function getLoginErrors(email: string, password: string) {
   const errors: { email?: string; password?: string } = {};
 
@@ -38,8 +36,6 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
   const [submitted, setSubmitted] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  // Errors are derived from current field values during render
-  // This guarantees they always reflect the current state — no async batching issues
   const errors = submitted ? getLoginErrors(email, password) : {};
   const hasErrors = Object.keys(errors).length > 0;
 
@@ -147,7 +143,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
       />
 
       <View style={styles.switchRow}>
-        <Text style={styles.switchText}>Don't have an account? </Text>
+        <Text style={styles.switchText}>{"Don't have an account? "}</Text>
         <TouchableOpacity
           onPress={onSwitchToSignup}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

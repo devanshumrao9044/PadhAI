@@ -1,17 +1,15 @@
 import { View, Text, StyleSheet } from 'react-native';
 
-interface Props {
-  tagline?: string;
-}
-
-export default function AuthLogo({ tagline = '"Stay Focused. Study Hard. No Excuses."' }: Props) {
+export default function AuthLogo() {
   return (
     <View style={styles.container}>
       <View style={styles.logoBox}>
         <Text style={styles.logoText}>पढ़</Text>
         <Text style={styles.logoAI}>AI</Text>
       </View>
-      <Text style={styles.tagline}>{tagline}</Text>
+      <Text style={styles.tagline}>
+        "Stay Focused. Study Hard. No Excuses."
+      </Text>
     </View>
   );
 }
@@ -19,12 +17,12 @@ export default function AuthLogo({ tagline = '"Stay Focused. Study Hard. No Excu
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 32,
   },
   logoBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   logoText: {
     fontSize: 56,
