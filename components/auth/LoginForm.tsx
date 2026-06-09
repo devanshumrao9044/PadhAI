@@ -139,7 +139,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
       />
 
       <AuthButton
-        label={loading ? 'Signing in...' : 'Sign In'}
+        label={loading ? 'Sign In →'}
         onPress={handleLogin}
         loading={loading}
         disabled={submitted && hasErrors}
