@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
-  View, KeyboardAvoidingView,
-  Platform, ScrollView, StyleSheet, Text
+  View, Text, KeyboardAvoidingView,
+  Platform, ScrollView, StyleSheet
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LoginForm from '@/components/auth/LoginForm';
@@ -23,7 +23,6 @@ export default function AuthScreen() {
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
-          {/* Logo */}
           <View style={styles.logoBox}>
             <Text style={styles.logoText}>पढ़</Text>
             <Text style={styles.logoAI}>AI</Text>
