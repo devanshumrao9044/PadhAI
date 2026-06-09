@@ -11,6 +11,8 @@ interface Props {
   onSwitchToSignup: () => void;
 }
 
+// ── Pure validation function ──────────────────────────────────────────────────
+// Called during render — never stored in async state
 function getLoginErrors(email: string, password: string) {
   const errors: { email?: string; password?: string } = {};
 
@@ -36,6 +38,8 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
   const [submitted, setSubmitted] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
+  // Errors are derived from current field values during render
+  // This guarantees they always reflect the current state — no async batching issues
   const errors = submitted ? getLoginErrors(email, password) : {};
   const hasErrors = Object.keys(errors).length > 0;
 
@@ -59,7 +63,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
             setApiError('Incorrect email or password. Please try again.');
             break;
           case 'Email not confirmed':
-            setApiError('Please verify your email address before signing in.');
+            setApiError('Please verify your email address.');
             break;
           case 'Too many requests':
             setApiError('Too many attempts. Please wait a moment and try again.');
@@ -97,7 +101,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
   return (
     <View style={styles.card}>
       <Text style={styles.title}>Welcome back</Text>
-      <Text style={styles.subtitle}>Sign in to continue your streak</Text>
+      <Text style={styles.subtitle}>Sign in </Text>
 
       {apiError ? (
         <View style={styles.apiErrorBox}>
@@ -117,6 +121,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
+        autoComplete="email"
         error={errors.email}
       />
 
@@ -129,6 +134,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
           setApiError(null);
         }}
         secureTextEntry
+        autoComplete="password"
         error={errors.password}
       />
 
