@@ -66,6 +66,18 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
     ? getForgotErrors(forgotEmail)
     : {};
 
+  function switchToForgot() {
+    setMode('forgot');
+    setForgotEmail('');
+    setForgotSubmitted(false);
+    setForgotApiError(null);
+    setForgotSuccess(null);
+  }
+
+  function switchToLogin() {
+    setMode('login');
+  }
+
   // ── Login handler ─────────────────────────────────────────────────────────
   async function handleLogin() {
     setLoginSubmitted(true);
@@ -123,58 +135,57 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
 
   // ── Forgot password handler ───────────────────────────────────────────────
   async function handleForgotPassword() {
-  setForgotSubmitted(true);
-  setForgotApiError(null);
-  setForgotSuccess(null);
+    setForgotSubmitted(true);
+    setForgotApiError(null);
+    setForgotSuccess(null);
 
-  if (Object.keys(getForgotErrors(forgotEmail)).length > 0) return;
+    if (Object.keys(getForgotErrors(forgotEmail)).length > 0) return;
 
-  setForgotLoading(true);
-  try {
-    const trimmedEmail = forgotEmail.trim().toLowerCase();
+    setForgotLoading(true);
+    try {
+      const trimmedEmail = forgotEmail.trim().toLowerCase();
 
-    // ── Step 1: Check if account exists in our users table ────────────────
-    const { data: existingUser, error: lookupError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', trimmedEmail)
-      .maybeSingle();
+      // ── Step 1: Check if account exists in our users table ────────────────
+      const { data: existingUser, error: lookupError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', trimmedEmail)
+        .maybeSingle();
 
-    if (lookupError) {
-      setForgotApiError('Something went wrong. Please try again.');
-      return;
-    }
+      if (lookupError) {
+        setForgotApiError('Something went wrong. Please try again.');
+        return;
+      }
 
-    if (!existingUser) {
-      // No account found — do NOT send reset email
-      setForgotApiError(
-        'No account found with this email address. Please sign up first.'
+      if (!existingUser) {
+        setForgotApiError(
+          'No account found with this email address. Please sign up first.'
+        );
+        return;
+      }
+
+      // ── Step 2: Account exists — send reset email ─────────────────────────
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        trimmedEmail,
+        { redirectTo: 'padhai://reset-password' }
       );
-      return;
+
+      if (resetError) {
+        setForgotApiError(resetError.message ?? 'Failed to send reset email.');
+        return;
+      }
+
+      setForgotSuccess(
+        `Password reset link sent to ${trimmedEmail}. Check your inbox.`
+      );
+
+    } catch (err: any) {
+      setForgotApiError(err?.message ?? 'An unexpected error occurred.');
+    } finally {
+      setForgotLoading(false);
     }
-
-    // ── Step 2: Account exists — send reset email ─────────────────────────
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-      trimmedEmail,
-      { redirectTo: 'padhai://reset-password' }
-    );
-
-    if (resetError) {
-      setForgotApiError(resetError.message ?? 'Failed to send reset email.');
-      return;
-    }
-
-    setForgotSuccess(
-      `Password reset link sent to ${trimmedEmail}. Check your inbox.`
-    );
-
-  } catch (err: any) {
-    setForgotApiError(err?.message ?? 'An unexpected error occurred.');
-  } finally {
-    setForgotLoading(false);
   }
-  }
-  
+
   // FORGOT PASSWORD VIEW
   if (mode === 'forgot') {
     return (
@@ -235,7 +246,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
           <AuthButton
             label="Back to Sign In"
             onPress={switchToLogin}
-            variant="ghost"
+            variant="secondary"
             style={styles.submitBtn}
           />
         )}
@@ -243,7 +254,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
     );
   }
 
-//LOGIN VIEW :- 
+  // LOGIN VIEW
   return (
     <View style={styles.card}>
       <Text style={styles.title}>Welcome back</Text>
@@ -295,7 +306,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
       />
 
       <View style={styles.switchRow}>
-        <Text style={styles.switchText}>Don't have an account? </Text>
+        <Text style={styles.switchText}>{"Don't have an account? "}</Text>
         <TouchableOpacity
           onPress={onSwitchToSignup}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
