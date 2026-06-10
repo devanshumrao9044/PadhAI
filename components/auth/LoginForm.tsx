@@ -79,91 +79,53 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
   }
 
   // ── Login handler ─────────────────────────────────────────────────────────
-  async function handleLogin() {
-    setLoginSubmitted(true);
-    setLoginApiError(null);
-
-    if (Object.keys(getLoginErrors(email, password)).length > 0) return;
-
-    setLoginLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password: password.trim(),
-      });
-
-      if (error) {
-        switch (error.message) {
-          case 'Invalid login credentials':
-            setLoginApiError('Incorrect email or password. Please try again.');
-            break;
-          case 'Email not confirmed':
-            setLoginApiError('Please verify your email before signing in.');
-            break;
-          case 'Too many requests':
-            setLoginApiError('Too many attempts. Please wait and try again.');
-            break;
-          default:
-            setLoginApiError(error.message ?? 'Login failed. Please try again.');
-        }
-        return;
-      }
-
-      if (!data?.user) {
-        setLoginApiError('Login failed. Please try again.');
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from('users')
-        .select('name')
-        .eq('id', data.user.id)
-        .single();
-
-      if (!profile?.name || profile.name === 'Student') {
-        router.replace('/onboarding');
-      } else {
-        router.replace('/(tabs)');
-      }
-
-    } catch (err: any) {
-      setLoginApiError(err?.message ?? 'An unexpected error occurred.');
-    } finally {
-      setLoginLoading(false);
-    }
-  }
-
-  // ── Forgot password handler ───────────────────────────────────────────────
   async function handleForgotPassword() {
-    setForgotSubmitted(true);
-    setForgotApiError(null);
-    setForgotSuccess(null);
+  setForgotSubmitted(true);
+  setForgotApiError(null);
+  setForgotSuccess(null);
 
-    if (Object.keys(getForgotErrors(forgotEmail)).length > 0) return;
+  if (Object.keys(getForgotErrors(forgotEmail)).length > 0) return;
 
-    setForgotLoading(true);
-    try {
-      const trimmedEmail = forgotEmail.trim().toLowerCase();
+  setForgotLoading(true);
+  try {
+    const trimmedEmail = forgotEmail.trim().toLowerCase();
 
-      // ── Step 1: Check if account exists in our users table ────────────────
-      const { data: existingUser, error: lookupError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('email', trimmedEmail)
-        .maybeSingle();
+    // Step 1: Check if account exists
+    // Note: ignore lookupError — RLS may block read but null data = no user
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', trimmedEmail)
+      .maybeSingle();
 
-      if (lookupError) {
-        setForgotApiError('Something went wrong. Please try again.');
-        return;
-      }
+    if (!existingUser) {
+      setForgotApiError(
+        'No account found with this email. Please sign up first.'
+      );
+      return;
+    }
 
-      if (!existingUser) {
-        setForgotApiError(
-          'No account found with this email address. Please sign up first.'
-        );
-        return;
-      }
+    // Step 2: Account exists — send reset email
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      trimmedEmail,
+      { redirectTo: 'padhai://reset-password' }
+    );
 
+    if (resetError) {
+      setForgotApiError(resetError.message ?? 'Failed to send reset email.');
+      return;
+    }
+
+    setForgotSuccess(
+      `Password reset link sent to ${trimmedEmail}. Check your inbox.`
+    );
+
+  } catch (err: any) {
+    setForgotApiError(err?.message ?? 'An unexpected error occurred.');
+  } finally {
+    setForgotLoading(false);
+  }
+    }
       // ── Step 2: Account exists — send reset email ─────────────────────────
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         trimmedEmail,
