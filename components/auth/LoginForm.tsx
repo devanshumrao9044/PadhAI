@@ -123,55 +123,59 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
 
   // ── Forgot password handler ───────────────────────────────────────────────
   async function handleForgotPassword() {
-    setForgotSubmitted(true);
-    setForgotApiError(null);
-    setForgotSuccess(null);
+  setForgotSubmitted(true);
+  setForgotApiError(null);
+  setForgotSuccess(null);
 
-    if (Object.keys(getForgotErrors(forgotEmail)).length > 0) return;
+  if (Object.keys(getForgotErrors(forgotEmail)).length > 0) return;
 
-    setForgotLoading(true);
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        forgotEmail.trim().toLowerCase(),
-        {
-          // Deep link back into app after reset
-          redirectTo: 'padhai://reset-password',
-        }
-      );
+  setForgotLoading(true);
+  try {
+    const trimmedEmail = forgotEmail.trim().toLowerCase();
 
-      if (error) {
-        setForgotApiError(error.message ?? 'Failed to send reset email.');
-        return;
-      }
+    // ── Step 1: Check if account exists in our users table ────────────────
+    const { data: existingUser, error: lookupError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', trimmedEmail)
+      .maybeSingle();
 
-      // Always show success — Supabase never reveals if email exists
-      setForgotSuccess(
-        `Password reset email sent to ${forgotEmail.trim().toLowerCase()}. Check your inbox and follow the link.`
-      );
-
-    } catch (err: any) {
-      setForgotApiError(err?.message ?? 'An unexpected error occurred.');
-    } finally {
-      setForgotLoading(false);
+    if (lookupError) {
+      setForgotApiError('Something went wrong. Please try again.');
+      return;
     }
-  }
 
-  function switchToForgot() {
-    setForgotEmail(email); // Pre-fill with login email if already typed
-    setForgotSubmitted(false);
-    setForgotApiError(null);
-    setForgotSuccess(null);
-    setMode('forgot');
-  }
+    if (!existingUser) {
+      // No account found — do NOT send reset email
+      setForgotApiError(
+        'No account found with this email address. Please sign up first.'
+      );
+      return;
+    }
 
-  function switchToLogin() {
-    setLoginApiError(null);
-    setMode('login');
-  }
+    // ── Step 2: Account exists — send reset email ─────────────────────────
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      trimmedEmail,
+      { redirectTo: 'padhai://reset-password' }
+    );
 
-  // ══════════════════════════════════════════════════════════════════════════
+    if (resetError) {
+      setForgotApiError(resetError.message ?? 'Failed to send reset email.');
+      return;
+    }
+
+    setForgotSuccess(
+      `Password reset link sent to ${trimmedEmail}. Check your inbox.`
+    );
+
+  } catch (err: any) {
+    setForgotApiError(err?.message ?? 'An unexpected error occurred.');
+  } finally {
+    setForgotLoading(false);
+  }
+  }
+  
   // FORGOT PASSWORD VIEW
-  // ══════════════════════════════════════════════════════════════════════════
   if (mode === 'forgot') {
     return (
       <View style={styles.card}>
@@ -239,9 +243,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
     );
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // LOGIN VIEW
-  // ══════════════════════════════════════════════════════════════════════════
+//LOGIN VIEW :- 
   return (
     <View style={styles.card}>
       <Text style={styles.title}>Welcome back</Text>
