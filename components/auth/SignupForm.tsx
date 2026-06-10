@@ -65,44 +65,74 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
-        password: password.trim(),
-        options: {
-          data: { name: name.trim() },
-        },
+      const trimmedEmail = email.trim().toLowerCase();
+      const trimmedPassword = password.trim();
+      const trimmedName = name.trim();
+
+      // ── Step 1: Attempt signup ────────────────────────────────────────────
+      const { data: signupData, error: signupError } = await supabase.auth.signUp({
+        email: trimmedEmail,
+        password: trimmedPassword,
+        options: { data: { name: trimmedName } },
       });
 
-      if (error) {
+      // ── Step 2: Handle signup-level errors ────────────────────────────────
+      if (signupError) {
+        // Only show "already registered" for actual signup-level errors
+        const msg = signupError.message.toLowerCase();
         if (
-          error.message.toLowerCase().includes('already registered') ||
-          error.message.toLowerCase().includes('already exists') ||
-          error.message.toLowerCase().includes('user already')
+          msg.includes('already registered') ||
+          msg.includes('already exists') ||
+          msg.includes('user already')
         ) {
-          setApiError('This email is already registered. Please Log-in instead.');
+          setApiError(
+            'An account with this email already exists. Please sign in.'
+          );
         } else {
-          setApiError(error.message ?? 'Sign up failed. Please try again.');
+          setApiError(signupError.message);
         }
         return;
       }
 
-      if (data?.session) {
-        const { data: profile } = await supabase
-          .from('users')
-          .select('name')
-          .eq('id', data.user!.id)
-          .single();
-
-        if (!profile?.name || profile.name === 'Student') {
-          router.replace('/onboarding');
-        } else {
-          router.replace('/(tabs)');
-        }
-      } else {
-        setApiSuccess(
-          'Account created! Check your email to verify your address.'
-        );
+      // ── Step 3: Session returned — email confirm is OFF ───────────────────
+      if (signupData?.session) {
+        router.replace('/onboarding');
+        return;
       }
+
+      // ── Step 4: No session — try immediate sign-in ────────────────────────
+      // Supabase sometimes creates the user but doesn't return a session.
+      // Attempt sign-in with same credentials to get a session.
+      if (signupData?.user) {
+        const { data: signInData, error: signInError } =
+          await supabase.auth.signInWithPassword({
+            email: trimmedEmail,
+            password: trimmedPassword,
+          });
+
+        if (!signInError && signInData?.session) {
+          // Successfully signed in — go to onboarding
+          router.replace('/onboarding');
+          return;
+        }
+
+        if (signInError?.message === 'Email not confirmed') {
+          // Email confirmation is ON in Supabase — tell user to verify
+          setApiSuccess(
+            'Account created! Please check your email to verify your address, then sign in.'
+          );
+          return;
+        }
+
+        // Sign-in failed for unknown reason — account was still created
+        setApiSuccess(
+          'Account created! Please sign in.'
+        );
+        return;
+      }
+
+      // ── Fallback ──────────────────────────────────────────────────────────
+      setApiError('Something went wrong. Please try again.');
 
     } catch (err: any) {
       setApiError(err?.message ?? 'An unexpected error occurred.');
@@ -118,14 +148,14 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
 
       {apiError ? (
         <View style={styles.apiErrorBox}>
-          <Text style={styles.apiErrorIcon}>⚠</Text>
+          <Text style={styles.apiErrorIcon}>⚠ </Text>
           <Text style={styles.apiErrorText}>{apiError}</Text>
         </View>
       ) : null}
 
       {apiSuccess ? (
         <View style={styles.apiSuccessBox}>
-          <Text style={styles.apiSuccessIcon}>✓</Text>
+          <Text style={styles.apiSuccessIcon}>✓ </Text>
           <Text style={styles.apiSuccessText}>{apiSuccess}</Text>
         </View>
       ) : null}
@@ -134,13 +164,9 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
         label="Full Name"
         placeholder="e.g. Devansh"
         value={name}
-        onChangeText={(t) => {
-          setName(t);
-          setApiError(null);
-        }}
+        onChangeText={(t) => { setName(t); setApiError(null); }}
         autoCapitalize="words"
         autoCorrect={false}
-        autoComplete="name"
         error={errors.name}
       />
 
@@ -148,14 +174,10 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
         label="Email Address"
         placeholder="your@email.com"
         value={email}
-        onChangeText={(t) => {
-          setEmail(t);
-          setApiError(null);
-        }}
+        onChangeText={(t) => { setEmail(t); setApiError(null); }}
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
-        autoComplete="email"
         error={errors.email}
       />
 
@@ -163,12 +185,8 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
         label="Password"
         placeholder="At least 6 characters"
         value={password}
-        onChangeText={(t) => {
-          setPassword(t);
-          setApiError(null);
-        }}
+        onChangeText={(t) => { setPassword(t); setApiError(null); }}
         secureTextEntry
-        autoComplete="password-new"
         error={errors.password}
       />
 
@@ -218,7 +236,6 @@ const styles = StyleSheet.create({
   apiErrorBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
     backgroundColor: 'rgba(255, 71, 87, 0.08)',
     borderWidth: 1,
     borderColor: 'rgba(255, 71, 87, 0.35)',
@@ -229,7 +246,6 @@ const styles = StyleSheet.create({
   apiErrorIcon: {
     color: '#FF4757',
     fontSize: 14,
-    marginTop: 1,
   },
   apiErrorText: {
     flex: 1,
@@ -241,7 +257,6 @@ const styles = StyleSheet.create({
   apiSuccessBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
     backgroundColor: 'rgba(46, 213, 115, 0.08)',
     borderWidth: 1,
     borderColor: 'rgba(46, 213, 115, 0.35)',
@@ -252,7 +267,6 @@ const styles = StyleSheet.create({
   apiSuccessIcon: {
     color: '#2ED573',
     fontSize: 14,
-    marginTop: 1,
     fontWeight: '700',
   },
   apiSuccessText: {
