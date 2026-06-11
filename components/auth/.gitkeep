@@ -1,0 +1,4 @@
+# Keeps the components/auth/ directory tracked in Git at all times.
+# WARNING: NEVER delete this directory or files inside it (LoginForm.tsx, SignupForm.tsx, etc.)
+# Accidental deletion will cause critical failures in dynamic auth gating and application routing.
+
