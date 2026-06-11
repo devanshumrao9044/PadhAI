@@ -135,26 +135,59 @@ export default function ProfileScreen() {
     setLoading(true);
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (authUser) {
-        await supabase
-          .from('users')
-          .update({
-            name: editName,
-            target_exam: editExam,
-            class_level: editClass,
-            daily_goal_minutes: mins,
-            avatar_url: editAvatarUrl,
-          })
-          .eq('id', authUser.id);
+      if (!authUser) throw new Error("No User Found");
+
+      let finalAvatarUrl = editAvatarUrl;
+
+      // 🚀 SUPABASE STORAGE UPLOAD LOGIC
+      // Agar user ne nayi photo select ki hai jo ki Supabase ka url nahi hai
+      if (editAvatarUrl && editAvatarUrl !== user.avatarUrl && !editAvatarUrl.includes('supabase.co')) {
+        const ext = editAvatarUrl.split('.').pop()?.toLowerCase() || 'jpeg';
+        const fileName = `${authUser.id}-${Date.now()}.${ext}`;
+        const filePath = `public/${fileName}`;
+
+        // Local image ko blob mein convert karna
+        const response = await fetch(editAvatarUrl);
+        const blob = await response.blob();
+
+        // Supabase storage bucket 'avatars' mein upload karna
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(filePath, blob, {
+            contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}`,
+            upsert: true,
+          });
+
+        if (uploadError) throw uploadError;
+
+        // Cloud Public URL fetch karna
+        const { data: { publicUrl } } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(filePath);
+
+        finalAvatarUrl = publicUrl;
       }
 
+      // Update in Supabase database (Users Table)
+      await supabase
+        .from('users')
+        .update({
+          name: editName,
+          target_exam: editExam,
+          class_level: editClass,
+          daily_goal_minutes: mins,
+          avatar_url: finalAvatarUrl, // Saving Cloud URL instead of local URI
+        })
+        .eq('id', authUser.id);
+
+      // Update in Local App State
       await setUser({
         ...user,
         fullName: editName,
         targetExam: editExam,
         classLevel: editClass,
         dailyGoalMinutes: mins,
-        avatarUrl: editAvatarUrl,
+        avatarUrl: finalAvatarUrl, 
       });
 
       setEditVisible(false);
