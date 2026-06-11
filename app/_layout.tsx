@@ -16,13 +16,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const appCtx = useContext(AppContext);
 
   useEffect(() => {
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
       setChecking(false);
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
     });
@@ -31,7 +29,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (checking) return; // Wait for session check to finish
+    if (checking) return;
 
     const inAuthGroup = segments[0] === '(tabs)';
     const inOnboarding = segments[0] === 'onboarding';
@@ -43,26 +41,21 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const isProtected = inAuthGroup || inOnboarding || inFocus || inTracker || inStreakBroken || inReferral;
 
     if (!session && isProtected) {
-      // Not logged in but trying to access protected route — go to login
       router.replace('/');
     } else if (session && !streakCheckedRef.current) {
-      // First time session is confirmed this launch — run streak guard then redirect
       streakCheckedRef.current = true;
       const uid = session.user.id;
       if (segments[0] === 'index' && !inAuthGroup) {
-        // Coming from login/root screen — check streak, then onboarding redirect
         (async () => {
           await checkStreakOnLaunch(uid);
           checkAndRedirect(uid);
         })();
       } else {
-        // Already inside the app (session persisted from last launch) — only streak guard
         checkStreakOnLaunch(uid);
       }
     }
   }, [session, segments, checking]);
 
-  // ── Streak Guard: runs once per launch after session is confirmed ──
   const checkStreakOnLaunch = async (userId: string) => {
     try {
       const { data: profile } = await supabase
@@ -71,7 +64,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         .eq('id', userId)
         .single();
 
-      if (!profile || profile.streak <= 0) return; // nothing to break
+      if (!profile || profile.streak <= 0) return;
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -83,18 +76,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         : null;
       if (lastStudy) lastStudy.setHours(0, 0, 0, 0);
 
-      // Streak breaks if user never studied OR last study was before yesterday
       const isBroken = !lastStudy || lastStudy < yesterday;
 
       if (isBroken) {
-        await supabase
-          .from('users')
-          .update({ streak: 0 })
-          .eq('id', userId);
-
-        // Flag comeback bonus for the user's next completed session
+        await supabase.from('users').update({ streak: 0 }).eq('id', userId);
         appCtx?.setComebackPending(true);
-
         router.replace('/streak-broken');
       }
     } catch (err) {
