@@ -7,6 +7,8 @@ import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme
 import { useApp } from '@/hooks/useApp';
 import { getLevelForXP } from '@/constants/levels';
 import { COMPLETION_MESSAGES } from '@/constants/messages';
+import { supabase } from '@/services/supabase';
+import { processReferralOnFirstSession } from '@/services/referralService';
 
 // Floating confetti particle
 function ConfettiDot({ color, delay, startX }: { color: string; delay: number; startX: number }) {
@@ -71,6 +73,25 @@ export default function FocusCompleteScreen() {
 
   const messageRef = useRef(COMPLETION_MESSAGES[Math.floor(Math.random() * COMPLETION_MESSAGES.length)]);
   const level = user ? getLevelForXP(user.xpTotal) : null;
+
+  // Referral hook processing on component mount
+  useEffect(() => {
+    async function triggerReferralCheck() {
+      try {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
+          // Define standard callback to trigger if your service requires it locally
+          const awardXP = async (uid: string, amount: number, reason: string) => {
+            await supabase.rpc('add_xp_transaction', { target_user_id: uid, xp_amount: amount, xp_reason: reason });
+          };
+          await processReferralOnFirstSession(authUser.id, awardXP);
+        }
+      } catch (err) {
+        console.log('Referral execution hook error:', err);
+      }
+    }
+    triggerReferralCheck();
+  }, []);
 
   useEffect(() => {
     // Base animations
@@ -235,7 +256,6 @@ export default function FocusCompleteScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-
   confettiLayer: {
     position: 'absolute',
     top: 0,
@@ -245,14 +265,12 @@ const styles = StyleSheet.create({
     zIndex: 10,
     overflow: 'hidden',
   },
-
   content: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: Spacing.xl,
   },
-
   trophyContainer: {
     width: 160,
     height: 160,
@@ -273,7 +291,6 @@ const styles = StyleSheet.create({
     height: 180,
     borderRadius: 90,
   },
-
   textSection: {
     alignItems: 'center',
     width: '100%',
@@ -298,7 +315,6 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     marginBottom: Spacing.lg,
   },
-
   xpCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -325,8 +341,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.base,
     color: Colors.warning + 'AA',
   },
-
-  // ── Comeback Banner ──────────────────────────────────────────────────────
   comebackBanner: {
     width: '100%',
     borderRadius: Radius.lg,
@@ -392,7 +406,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
-
   levelRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -407,7 +420,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: Colors.textTertiary,
   },
-
   actions: { width: '100%', gap: 10 },
   continueBtn: {
     backgroundColor: Colors.primary,
