@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
+import { applyReferralCode } from '@/services/referralService';
 import AuthInput from './AuthInput';
 import AuthButton from './AuthButton';
 
@@ -47,6 +48,7 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -65,32 +67,41 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
-        password: password.trim(),
+      const trimmedEmail = email.trim().toLowerCase();
+      const trimmedPassword = password.trim();
+
+      const { data: signupData, error: signupError } = await supabase.auth.signUp({
+        email: trimmedEmail,
+        password: trimmedPassword,
         options: {
           data: { name: name.trim() },
         },
       });
 
-      if (error) {
+      if (signupError) {
+        const msg = signupError.message.toLowerCase();
         if (
-          error.message.toLowerCase().includes('already registered') ||
-          error.message.toLowerCase().includes('already exists') ||
-          error.message.toLowerCase().includes('user already')
+          msg.includes('already registered') ||
+          msg.includes('already exists') ||
+          msg.includes('user already')
         ) {
           setApiError('This email is already registered. Please Log-in instead.');
         } else {
-          setApiError(error.message ?? 'Sign up failed. Please try again.');
+          setApiError(signupError.message ?? 'Sign up failed. Please try again.');
         }
         return;
       }
 
-      if (data?.session) {
+      // Referral code check aur execute
+      if (referralCode.trim() && signupData?.user) {
+        await applyReferralCode(signupData.user.id, referralCode.trim());
+      }
+
+      if (signupData?.session) {
         const { data: profile } = await supabase
           .from('users')
           .select('name')
-          .eq('id', data.user!.id)
+          .eq('id', signupData.user.id)
           .single();
 
         if (!profile?.name || profile.name === 'Student') {
@@ -98,11 +109,31 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
         } else {
           router.replace('/(tabs)');
         }
-      } else {
-        setApiSuccess(
-          'Account created! Check your email to verify your address.'
-        );
+        return;
       }
+
+      if (signupData?.user) {
+        const { data: signInData, error: signInError } =
+          await supabase.auth.signInWithPassword({
+            email: trimmedEmail,
+            password: trimmedPassword,
+          });
+
+        if (!signInError && signInData?.session) {
+          router.replace('/onboarding');
+          return;
+        }
+
+        if (signInError?.message === 'Email not confirmed') {
+          setApiSuccess('Account created! Please verify your email, then sign in.');
+          return;
+        }
+
+        setApiSuccess('Account created! Please sign in.');
+        return;
+      }
+
+      setApiError('Something went wrong. Please try again.');
 
     } catch (err: any) {
       setApiError(err?.message ?? 'An unexpected error occurred.');
@@ -170,6 +201,15 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
         secureTextEntry
         autoComplete="password-new"
         error={errors.password}
+      />
+
+      <AuthInput
+        label="Referral Code (Optional)"
+        placeholder="e.g. DEVS12345"
+        value={referralCode}
+        onChangeText={(t) => setReferralCode(t.toUpperCase())}
+        autoCapitalize="characters"
+        autoCorrect={false}
       />
 
       <AuthButton
@@ -281,3 +321,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+
