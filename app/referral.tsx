@@ -1,364 +1,95 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Share,
-  Linking, Animated, Pressable, Modal, ScrollView,
-  ActivityIndicator, Alert
+  View, Text, StyleSheet, TouchableOpacity,
+  Share, Clipboard, ScrollView, ActivityIndicator,
+  Linking, Modal, Pressable
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { MaterialIcons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
-import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
-import { useApp } from '@/hooks/useApp';
+import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
+import { fetchReferralStats } from '@/services/referralService';
 
-const ADMIN_INSTAGRAM = 'ziddistudent'; // Change to real handle
-const ADMIN_EMAIL = 'admin@ziddistudent.com'; // Change to real email
-const MAX_REFERRALS = 5;
+const REWARD_THRESHOLD = 5;
+const INSTAGRAM_URL = 'https://www.instagram.com/materialhubx';
+const EMAIL_ADDRESS = 'materialhubx@gmail.com';
 
-function ProgressBar({ current, max }: { current: number; max: number }) {
-  const fillAnim = useRef(new Animated.Value(0)).current;
-  const progress = Math.min(current / max, 1);
-
-  useEffect(() => {
-    Animated.timing(fillAnim, {
-      toValue: progress,
-      duration: 900,
-      useNativeDriver: false,
-    }).start();
-  }, [progress]);
-
-  const segmentWidth = `${(1 / max) * 100}%` as any;
-
-  return (
-    <View>
-      {/* Segmented track */}
-      <View style={pb.track}>
-        {Array.from({ length: max }).map((_, i) => {
-          const filled = i < current;
-          return (
-            <View
-              key={i}
-              style={[
-                pb.segment,
-                { width: segmentWidth },
-                filled ? pb.segmentFilled : pb.segmentEmpty,
-              ]}
-            >
-              {filled ? (
-                <View style={pb.segmentCheck}>
-                  <MaterialIcons name="check" size={12} color="#fff" />
-                </View>
-              ) : (
-                <Text style={pb.segmentNum}>{i + 1}</Text>
-              )}
-            </View>
-          );
-        })}
-      </View>
-      <View style={pb.labelRow}>
-        <Text style={pb.labelLeft}>{current} / {max} successful referrals</Text>
-        <Text style={pb.labelRight}>
-          {max - current > 0 ? `${max - current} more for jackpot!` : '🎉 Jackpot unlocked!'}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-const pb = StyleSheet.create({
-  track: { flexDirection: 'row', gap: 6 },
-  segment: {
-    height: 44,
-    borderRadius: Radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-  },
-  segmentFilled: {
-    backgroundColor: Colors.primary,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.6,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  segmentEmpty: {
-    backgroundColor: Colors.surfaceVariant,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  segmentCheck: {},
-  segmentNum: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, color: Colors.textTertiary },
-  labelRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
-  labelLeft: { fontSize: FontSize.xs, color: Colors.textSecondary },
-  labelRight: { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.semiBold },
-});
-
-// ── Jackpot Modal ────────────────────────────────────────────────────────────
-function JackpotModal({ visible, code, onClose }: { visible: boolean; code: string; onClose: () => void }) {
-  const scaleAnim = useRef(new Animated.Value(0.7)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.spring(scaleAnim, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }),
-        Animated.timing(opacityAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [visible]);
-
-  const openInstagram = () => {
-    const url = `instagram://user?username=${ADMIN_INSTAGRAM}`;
-    Linking.canOpenURL(url).then(supported => {
-      if (supported) {
-        Linking.openURL(url);
-      } else {
-        Linking.openURL(`https://instagram.com/${ADMIN_INSTAGRAM}`);
-      }
-    });
-  };
-
-  const openEmail = () => {
-    const subject = 'Claiming my 5 Referral Reward!';
-    const body = `Hi Admin,\n\nMaine 5 successful referrals complete kar liye hain.\nMera referral code: ${code}\n\nPlease mera exclusive reward claim karo.\n\nThanks!`;
-    Linking.openURL(
-      `mailto:${ADMIN_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-    );
-  };
-
-  return (
-    <Modal visible={visible} transparent animationType="none">
-      <Pressable style={jm.overlay} onPress={onClose}>
-        <Animated.View
-          style={[jm.card, { transform: [{ scale: scaleAnim }], opacity: opacityAnim }]}
-        >
-          <Pressable>
-            {/* Glow ring */}
-            <View style={jm.glow} />
-
-            <Text style={jm.emoji}>🎉</Text>
-            <Text style={jm.title}>Jackpot!</Text>
-            <Text style={jm.subtitle}>Tu ZiddiStudent ka Star Inviter ban gaya!</Text>
-            <Text style={jm.desc}>
-              5 successful referrals complete! Admin se contact karke apna exclusive reward claim kar.
-            </Text>
-
-            <View style={jm.codeBox}>
-              <Text style={jm.codeLabel}>Your Code</Text>
-              <Text style={jm.codeValue}>{code}</Text>
-            </View>
-
-            <TouchableOpacity style={jm.instaBtn} onPress={openInstagram} activeOpacity={0.85}>
-              <MaterialIcons name="photo-camera" size={20} color="#fff" />
-              <Text style={jm.instaBtnText}>Claim via Instagram</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={jm.emailBtn} onPress={openEmail} activeOpacity={0.85}>
-              <MaterialIcons name="email" size={20} color={Colors.primary} />
-              <Text style={jm.emailBtnText}>Claim via Email</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={jm.closeBtn} onPress={onClose}>
-              <Text style={jm.closeBtnText}>Close</Text>
-            </TouchableOpacity>
-          </Pressable>
-        </Animated.View>
-      </Pressable>
-    </Modal>
-  );
-}
-
-const jm = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.lg,
-  },
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xl,
-    padding: Spacing.xl,
-    width: '100%',
-    maxWidth: 360,
-    borderWidth: 1.5,
-    borderColor: Colors.primary + '55',
-    overflow: 'hidden',
-    alignItems: 'center',
-  },
-  glow: {
-    position: 'absolute',
-    top: -60,
-    left: '50%',
-    marginLeft: -100,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: Colors.primary + '15',
-  },
-  emoji: { fontSize: 48, textAlign: 'center', marginBottom: Spacing.sm },
-  title: {
-    fontSize: FontSize.xxl,
-    fontWeight: FontWeight.extraBold,
-    color: Colors.textPrimary,
-    textAlign: 'center',
-    includeFontPadding: false,
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.semiBold,
-    color: Colors.primary,
-    textAlign: 'center',
-    marginBottom: Spacing.sm,
-  },
-  desc: {
-    fontSize: FontSize.base,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: Spacing.md,
-  },
-  codeBox: {
-    backgroundColor: Colors.surfaceVariant,
-    borderRadius: Radius.md,
-    paddingVertical: 10,
-    paddingHorizontal: Spacing.md,
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  codeLabel: { fontSize: FontSize.xs, color: Colors.textTertiary, marginBottom: 2, letterSpacing: 1 },
-  codeValue: { fontSize: FontSize.xl, fontWeight: FontWeight.extraBold, color: Colors.primary, letterSpacing: 2 },
-  instaBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#E1306C',
-    borderRadius: Radius.md,
-    paddingVertical: 14,
-    width: '100%',
-    marginBottom: 10,
-  },
-  instaBtnText: { color: '#fff', fontWeight: FontWeight.bold, fontSize: FontSize.base },
-  emailBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: Colors.primary + '18',
-    borderRadius: Radius.md,
-    paddingVertical: 14,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: Colors.primary + '44',
-    marginBottom: Spacing.sm,
-  },
-  emailBtnText: { color: Colors.primary, fontWeight: FontWeight.bold, fontSize: FontSize.base },
-  closeBtn: { paddingVertical: 8 },
-  closeBtnText: { color: Colors.textTertiary, fontSize: FontSize.sm },
-});
-
-// ── Main Screen ──────────────────────────────────────────────────────────────
 export default function ReferralScreen() {
-  const router = useRouter();
-  const { user } = useApp();
-  const [referralCode, setReferralCode] = useState('');
-  const [completedReferrals, setCompletedReferrals] = useState(0);
-  const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [showJackpot, setShowJackpot] = useState(false);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [myCode, setMyCode] = useState<string | null>(null);
+  const [completed, setCompleted] = useState(0);
+  const [pending, setPending] = useState(0);
+  const [hasUnlockedReward, setHasUnlockedReward] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [showReward, setShowReward] = useState(false);
 
-  const loadReferralData = useCallback(async () => {
-    try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) return;
-
-      const { data: profile } = await supabase
-        .from('users')
-        .select('my_referral_code')
-        .eq('id', authUser.id)
-        .single();
-
-      if (profile?.my_referral_code) {
-        setReferralCode(profile.my_referral_code);
-      }
-
-      const { count } = await supabase
-        .from('referrals')
-        .select('id', { count: 'exact', head: true })
-        .eq('referrer_id', authUser.id)
-        .eq('status', 'completed');
-
-      setCompletedReferrals(count ?? 0);
-    } catch (err) {
-      console.log('Referral load error:', err);
-    } finally {
-      setLoading(false);
-      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-    }
+  const load = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const stats = await fetchReferralStats(user.id);
+    setMyCode(stats.myCode);
+    setCompleted(stats.completed);
+    setPending(stats.pending);
+    setHasUnlockedReward(stats.hasUnlockedReward);
+    setLoading(false);
+    if (stats.hasUnlockedReward) setShowReward(true);
   }, []);
 
-  useEffect(() => {
-    loadReferralData();
-  }, [loadReferralData]);
+  useEffect(() => { load(); }, [load]);
 
-  const copyCode = async () => {
-    if (!referralCode) return;
-    await Clipboard.setStringAsync(referralCode);
+  async function handleCopy() {
+    if (!myCode) return;
+    Clipboard.setString(myCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
+  }
 
-  const handleShare = async () => {
-    if (!referralCode) return;
-    try {
-      await Share.share({
-        message:
-          `Yaar, ZiddiStudent app try kar — I've been using it to crush my JEE prep! 🔥\n\nSign up karte waqt mera referral code use kar: ${referralCode}\nTujhe signup par +50 XP bonus milega!\n\n👉 Download now: https://ziddistudent.app`,
-        title: 'Join ZiddiStudent with my code!',
-      });
-    } catch (err) {
-      console.log('Share error:', err);
+  async function handleShare() {
+    if (!myCode) return;
+    await Share.share({
+      message: `Join PadhAI — the focus app for serious students! 🔥\n\nUse my referral code: ${myCode}\n\nSign up and complete your first focus session to earn +50 XP bonus!\n\nDownload: https://padhai.app`,
+      title: 'Join PadhAI,Start your focused journey with my referral code',
+    });
+  }
+
+  async function claimViaInstagram() {
+    const canOpen = await Linking.canOpenURL(INSTAGRAM_URL);
+    if (canOpen) {
+      await Linking.openURL(INSTAGRAM_URL);
+    } else {
+      await Linking.openURL(`https://instagram.com/materialhubx`);
     }
-  };
+  }
 
-  const handleClaimJackpot = () => setShowJackpot(true);
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-        </View>
-      </SafeAreaView>
+  async function claimViaEmail() {
+    await Linking.openURL(
+      `mailto:${EMAIL_ADDRESS}?subject=PadhAI Referral Reward Claim&body=Hi! I have completed 5 referrals on PadhAI. My referral code is ${myCode}. Please process my reward. Thank you!`
     );
   }
 
-  const isJackpotUnlocked = completedReferrals >= MAX_REFERRALS;
+  if (loading) {
+    return (
+      <View style={styles.loader}>
+        <ActivityIndicator color="#7C5CFC" size="large" />
+      </View>
+    );
+  }
+
+  const progress = Math.min(completed / REWARD_THRESHOLD, 1);
+  const progressWidth = `${Math.round(progress * 100)}%` as any;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <JackpotModal
-        visible={showJackpot}
-        code={referralCode}
-        onClose={() => setShowJackpot(false)}
-      />
-
+    <SafeAreaView style={styles.safe} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <MaterialIcons name="arrow-back" size={24} color={Colors.textPrimary} />
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backBtn}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Text style={styles.backArrow}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Refer and earn</Text>
-        <View style={{ width: 24 }} />
+        <Text style={styles.headerTitle}>Refer & Earn</Text>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView
@@ -366,320 +97,251 @@ export default function ReferralScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View style={{ opacity: fadeAnim }}>
+        {/* Hero */}
+        <View style={styles.hero}>
+          <Text style={styles.heroEmoji}>🎁</Text>
+          <Text style={styles.heroTitle}>Invite friends. Earn XP and vouchers.</Text>
+          <Text style={styles.heroSubtitle}>
+            Share your code — you earn +25 XP for every friend who completes their first session.
+          </Text>
+        </View>
 
-          {/* Hero Banner */}
-          <View style={styles.heroBanner}>
-            <Text style={styles.heroEmoji}>🎁</Text>
-            <Text style={styles.heroTitle}>Dost ko bulao, XP paao!</Text>
-            <Text style={styles.heroDesc}>
-              Har successful invite par <Text style={styles.bold}>+25 XP</Text> tujhe milega.{'\n'}
-              Tera invited dost bhi <Text style={styles.bold}>+50 XP headstart</Text> se shuruat karega.
-            </Text>
-          </View>
-
-          {/* Referral Code Card */}
-          <View style={styles.codeCard}>
-            <Text style={styles.codeCardLabel}>TERA UNIQUE CODE</Text>
-            <View style={styles.codeRow}>
-              <Text style={styles.codeText} selectable>{referralCode || '------'}</Text>
-              <TouchableOpacity
-                style={[styles.copyBtn, copied && styles.copyBtnDone]}
-                onPress={copyCode}
-                activeOpacity={0.8}
-              >
-                <MaterialIcons
-                  name={copied ? 'check' : 'content-copy'}
-                  size={18}
-                  color={copied ? Colors.success : Colors.primary}
-                />
-                <Text style={[styles.copyBtnText, copied && styles.copyBtnTextDone]}>
-                  {copied ? 'Copied!' : 'Copy'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Share Button */}
-          <TouchableOpacity style={styles.shareBtn} onPress={handleShare} activeOpacity={0.85}>
-            <MaterialIcons name="share" size={22} color="#fff" />
-            <Text style={styles.shareBtnText}>Share on WhatsApp / Instagram</Text>
-          </TouchableOpacity>
-
-          {/* Progress Card */}
-          <View style={styles.progressCard}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressTitle}>Invite Progress</Text>
-              <View style={[styles.progressBadge, isJackpotUnlocked && styles.progressBadgeDone]}>
-                <Text style={[styles.progressBadgeText, isJackpotUnlocked && styles.progressBadgeTextDone]}>
-                  {isJackpotUnlocked ? '🎉 Jackpot!' : `${completedReferrals}/${MAX_REFERRALS}`}
-                </Text>
-              </View>
-            </View>
-            <ProgressBar current={completedReferrals} max={MAX_REFERRALS} />
-          </View>
-
-          {/* Jackpot Claim CTA (visible when unlocked) */}
-          {isJackpotUnlocked ? (
-            <TouchableOpacity style={styles.jackpotBtn} onPress={handleClaimJackpot} activeOpacity={0.85}>
-              <Text style={styles.jackpotEmoji}>🏆</Text>
-              <View style={styles.jackpotTextBlock}>
-                <Text style={styles.jackpotBtnTitle}>Reward Unlocked!</Text>
-                <Text style={styles.jackpotBtnSub}>Tap to claim your exclusive reward</Text>
-              </View>
-              <MaterialIcons name="chevron-right" size={22} color="#FFD700" />
+        {/* Referral Code Card */}
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>YOUR REFERRAL CODE</Text>
+          <View style={styles.codeRow}>
+            <Text style={styles.codeText}>{myCode ?? '——————'}</Text>
+            <TouchableOpacity
+              style={[styles.copyBtn, copied && styles.copyBtnDone]}
+              onPress={handleCopy}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.copyBtnText}>
+                {copied ? '✓ Copied' : 'Copy'}
+              </Text>
             </TouchableOpacity>
-          ) : null}
-
-          {/* How it works */}
-          <View style={styles.howCard}>
-            <Text style={styles.howTitle}>Kaise kaam karta hai?</Text>
-            {[
-              { step: '1', text: 'Apna code copy kar aur WhatsApp/Instagram par share kar', icon: 'share' as const },
-              { step: '2', text: 'Dost signup ke time tera code enter karega', icon: 'person-add' as const },
-              { step: '3', text: 'Jab woh apna pehla Focus Session complete karega, tu activate ho jaega', icon: 'timer' as const },
-              { step: '4', text: 'Tujhe +25 XP, use +50 XP milega — 5 hone par special reward!', icon: 'card-giftcard' as const },
-            ].map(item => (
-              <View key={item.step} style={styles.howRow}>
-                <View style={styles.howStep}>
-                  <MaterialIcons name={item.icon} size={16} color={Colors.primary} />
-                </View>
-                <Text style={styles.howText}>{item.text}</Text>
-              </View>
-            ))}
           </View>
 
-          {/* Reward info */}
-          <View style={styles.rewardInfo}>
-            <MaterialIcons name="info-outline" size={14} color={Colors.textTertiary} />
-            <Text style={styles.rewardInfoText}>
-              5 referrals complete hone par Admin se directly Instagram ya Email par reward claim kar sakte ho.
+          <TouchableOpacity
+            style={styles.shareBtn}
+            onPress={handleShare}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.shareBtnText}>Share Code →</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Progress */}
+        <View style={styles.card}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.cardLabel}>REFERRAL PROGRESS</Text>
+            <Text style={styles.progressCount}>
+              <Text style={styles.progressDone}>{completed}</Text>
+              <Text style={styles.progressTotal}> / {REWARD_THRESHOLD}</Text>
             </Text>
           </View>
 
-        </Animated.View>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: progressWidth }]} />
+          </View>
+
+          <Text style={styles.progressHint}>
+            {completed >= REWARD_THRESHOLD
+              ? '🎉 Reward unlocked! Claim below.'
+              : `${REWARD_THRESHOLD - completed} more referral${REWARD_THRESHOLD - completed === 1 ? '' : 's'} to unlock your reward.`
+            }
+          </Text>
+
+          {pending > 0 ? (
+            <Text style={styles.pendingText}>
+              {pending} referral{pending > 1 ? 's' : ''} pending — friend hasn't completed first session yet.
+            </Text>
+          ) : null}
+        </View>
+
+        {/* Claim Reward */}
+        {hasUnlockedReward ? (
+          <View style={[styles.card, styles.rewardCard]}>
+            <Text style={styles.rewardTitle}>🏆 Reward Unlocked!</Text>
+            <Text style={styles.rewardSubtitle}>
+              Contact us to claim your exclusive reward.
+            </Text>
+            <TouchableOpacity
+              style={styles.claimBtn}
+              onPress={claimViaInstagram}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.claimBtnText}>📸 Claim via Instagram</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.claimBtn, styles.claimBtnEmail]}
+              onPress={claimViaEmail}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.claimBtnText, styles.claimBtnEmailText]}>
+                ✉️ Claim via Email
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
+        {/* How it works */}
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>HOW IT WORKS</Text>
+          {[
+            { step: '1', text: 'Share your referral code with a friend.' },
+            { step: '2', text: 'Friend signs up using your code.' },
+            { step: '3', text: 'Friend completes their first focus session.' },
+            { step: '4', text: 'You get +25 XP. Friend gets +50 XP.' },
+            { step: '5', text: '5 successful referrals → Exclusive reward unlocked.' },
+          ].map(item => (
+            <View key={item.step} style={styles.stepRow}>
+              <View style={styles.stepBadge}>
+                <Text style={styles.stepNumber}>{item.step}</Text>
+              </View>
+              <Text style={styles.stepText}>{item.text}</Text>
+            </View>
+          ))}
+        </View>
+
       </ScrollView>
+
+      {/* Reward Popup Modal */}
+      <Modal
+        visible={showReward}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowReward(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowReward(false)}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalEmoji}>🏆</Text>
+            <Text style={styles.modalTitle}>Reward Unlocked!</Text>
+            <Text style={styles.modalSubtitle}>
+              You've successfully referred 5 friends. Claim your exclusive reward now!
+            </Text>
+            <TouchableOpacity
+              style={styles.modalInstagramBtn}
+              onPress={() => { setShowReward(false); claimViaInstagram(); }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.modalBtnText}>📸 Claim via Instagram</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalEmailBtn}
+              onPress={() => { setShowReward(false); claimViaEmail(); }}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.modalBtnText, { color: '#9CA3AF' }]}>
+                ✉️ Claim via Email
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowReward(false)}>
+              <Text style={styles.modalDismiss}>Claim later</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  safe: { flex: 1, backgroundColor: '#0A0A0F' },
+  loader: { flex: 1, backgroundColor: '#0A0A0F', justifyContent: 'center', alignItems: 'center' },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
   },
-  headerTitle: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
-    includeFontPadding: false,
-  },
+  backBtn: { width: 40, alignItems: 'flex-start' },
+  backArrow: { color: '#7C5CFC', fontSize: 22, fontWeight: '700' },
+  headerTitle: { color: '#F1F1F6', fontSize: 17, fontWeight: '700' },
   scroll: { flex: 1 },
-  content: { padding: Spacing.md, paddingBottom: 60, gap: Spacing.md },
+  content: { padding: 20, paddingBottom: 60, gap: 16 },
 
-  // Hero
-  heroBanner: {
-    backgroundColor: Colors.primary + '12',
-    borderRadius: Radius.lg,
-    padding: Spacing.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.primary + '30',
-  },
-  heroEmoji: { fontSize: 44, marginBottom: Spacing.sm },
-  heroTitle: {
-    fontSize: FontSize.xl,
-    fontWeight: FontWeight.extraBold,
-    color: Colors.textPrimary,
-    textAlign: 'center',
-    marginBottom: 8,
-    includeFontPadding: false,
-  },
-  heroDesc: {
-    fontSize: FontSize.base,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  bold: { fontWeight: FontWeight.bold, color: Colors.primary },
+  hero: { alignItems: 'center', paddingVertical: 12 },
+  heroEmoji: { fontSize: 48, marginBottom: 12 },
+  heroTitle: { color: '#F1F1F6', fontSize: 22, fontWeight: '800', marginBottom: 8, textAlign: 'center' },
+  heroSubtitle: { color: '#6B7280', fontSize: 14, textAlign: 'center', lineHeight: 20, maxWidth: 300 },
 
-  // Code card
-  codeCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
+  card: {
+    backgroundColor: '#0F0F1A', borderRadius: 16,
+    padding: 20, borderWidth: 1,
+    borderColor: 'rgba(124, 92, 252, 0.12)',
   },
-  codeCardLabel: {
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.semiBold,
-    color: Colors.textTertiary,
-    letterSpacing: 1.5,
-    marginBottom: 10,
+  cardLabel: {
+    color: '#6B7280', fontSize: 11, fontWeight: '700',
+    letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 14,
   },
-  codeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.sm,
-  },
-  codeText: {
-    fontSize: 26,
-    fontWeight: FontWeight.extraBold,
-    color: Colors.primary,
-    letterSpacing: 3,
-    includeFontPadding: false,
-  },
+  codeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  codeText: { color: '#F1F1F6', fontSize: 26, fontWeight: '900', letterSpacing: 3 },
   copyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: Colors.primary + '18',
-    borderRadius: Radius.sm,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: Colors.primary + '44',
+    backgroundColor: 'rgba(124, 92, 252, 0.15)', borderRadius: 8,
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderWidth: 1, borderColor: 'rgba(124, 92, 252, 0.3)',
   },
-  copyBtnDone: {
-    backgroundColor: Colors.success + '18',
-    borderColor: Colors.success + '44',
-  },
-  copyBtnText: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: Colors.primary },
-  copyBtnTextDone: { color: Colors.success },
-
-  // Share
+  copyBtnDone: { backgroundColor: 'rgba(46, 213, 115, 0.15)', borderColor: 'rgba(46, 213, 115, 0.3)' },
+  copyBtnText: { color: '#7C5CFC', fontSize: 13, fontWeight: '700' },
   shareBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.md,
-    paddingVertical: 16,
+    backgroundColor: '#7C5CFC', borderRadius: 12,
+    paddingVertical: 13, alignItems: 'center',
   },
-  shareBtnText: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.bold,
-    color: '#fff',
-  },
+  shareBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
 
-  // Progress
-  progressCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
+  progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  progressCount: { fontSize: 16 },
+  progressDone: { color: '#7C5CFC', fontWeight: '900', fontSize: 20 },
+  progressTotal: { color: '#6B7280', fontWeight: '600' },
+  progressTrack: {
+    height: 8, backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 4, overflow: 'hidden', marginVertical: 12,
   },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-  },
-  progressTitle: {
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semiBold,
-    color: Colors.textPrimary,
-  },
-  progressBadge: {
-    backgroundColor: Colors.surfaceVariant,
-    borderRadius: Radius.full,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  progressBadgeDone: {
-    backgroundColor: Colors.primary + '22',
-    borderColor: Colors.primary + '55',
-  },
-  progressBadgeText: {
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.semiBold,
-    color: Colors.textSecondary,
-  },
-  progressBadgeTextDone: { color: Colors.primary },
+  progressFill: { height: '100%', backgroundColor: '#7C5CFC', borderRadius: 4 },
+  progressHint: { color: '#9CA3AF', fontSize: 13, lineHeight: 18 },
+  pendingText: { color: '#F59E0B', fontSize: 12, marginTop: 8 },
 
-  // Jackpot
-  jackpotBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    backgroundColor: '#FFD70015',
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-    borderWidth: 1.5,
-    borderColor: '#FFD70055',
+  rewardCard: { borderColor: 'rgba(253, 224, 71, 0.25)', backgroundColor: 'rgba(253, 224, 71, 0.04)' },
+  rewardTitle: { color: '#FDE047', fontSize: 20, fontWeight: '800', marginBottom: 6 },
+  rewardSubtitle: { color: '#9CA3AF', fontSize: 13, marginBottom: 16 },
+  claimBtn: {
+    backgroundColor: '#7C5CFC', borderRadius: 12,
+    paddingVertical: 13, alignItems: 'center', marginBottom: 10,
   },
-  jackpotEmoji: { fontSize: 32 },
-  jackpotTextBlock: { flex: 1 },
-  jackpotBtnTitle: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.bold,
-    color: '#FFD700',
-    includeFontPadding: false,
-  },
-  jackpotBtnSub: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2 },
+  claimBtnEmail: { backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  claimBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  claimBtnEmailText: { color: '#9CA3AF' },
 
-  // How it works
-  howCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: Spacing.sm,
+  stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
+  stepBadge: {
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: 'rgba(124, 92, 252, 0.2)',
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  howTitle: {
-    fontSize: FontSize.base,
-    fontWeight: FontWeight.semiBold,
-    color: Colors.textPrimary,
-    marginBottom: 4,
-  },
-  howRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.sm,
-  },
-  howStep: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: Colors.primary + '18',
-    borderWidth: 1,
-    borderColor: Colors.primary + '33',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 1,
-  },
-  howText: {
-    flex: 1,
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    lineHeight: 20,
-  },
+  stepNumber: { color: '#7C5CFC', fontSize: 12, fontWeight: '800' },
+  stepText: { color: '#9CA3AF', fontSize: 13, lineHeight: 20, flex: 1 },
 
-  // Info
-  rewardInfo: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 6,
-    opacity: 0.7,
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center', alignItems: 'center', padding: 24,
   },
-  rewardInfoText: {
-    flex: 1,
-    fontSize: FontSize.xs,
-    color: Colors.textTertiary,
-    lineHeight: 18,
+  modalCard: {
+    backgroundColor: '#0F0F1A', borderRadius: 20,
+    padding: 28, width: '100%', alignItems: 'center',
+    borderWidth: 1, borderColor: 'rgba(253, 224, 71, 0.2)',
   },
+  modalEmoji: { fontSize: 56, marginBottom: 16 },
+  modalTitle: { color: '#FDE047', fontSize: 24, fontWeight: '900', marginBottom: 8 },
+  modalSubtitle: { color: '#9CA3AF', fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+  modalInstagramBtn: {
+    backgroundColor: '#7C5CFC', borderRadius: 12,
+    paddingVertical: 14, width: '100%', alignItems: 'center', marginBottom: 10,
+  },
+  modalEmailBtn: {
+    backgroundColor: 'transparent', borderRadius: 12, borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    paddingVertical: 14, width: '100%', alignItems: 'center', marginBottom: 16,
+  },
+  modalBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  modalDismiss: { color: '#4B5563', fontSize: 13 },
 });
