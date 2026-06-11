@@ -1,8 +1,10 @@
 import 'react-native-web';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  ScrollView, View, Text, StyleSheet, RefreshControl
+  ScrollView, View, Text, StyleSheet, RefreshControl, TouchableOpacity
 } from 'react-native';
+import { useRouter } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
 import { supabase } from '../../services/supabase';
 import GreetingCard from '../../components/dashboard/GreetingCard';
 import StatsRow from '../../components/dashboard/StatsRow';
@@ -10,6 +12,8 @@ import QuickShortcuts from '../../components/dashboard/QuickShortcuts';
 import QuoteCard from '../../components/dashboard/QuoteCard';
 
 export default function Dashboard() {
+  const router = useRouter();
+  
   const [userName, setUserName] = useState('Student');
   const [streak, setStreak] = useState(0);
   const [todayMinutes, setTodayMinutes] = useState(0);
@@ -131,12 +135,25 @@ export default function Dashboard() {
           <Text style={styles.appName}>
             पढ़<Text style={styles.ai}>AI</Text>
           </Text>
-          <Text style={styles.date}>
-            {new Date().toLocaleDateString('en-IN', {
-              weekday: 'short', day: 'numeric', month: 'short'
-            })}
-          </Text>
+          
+          {/* Header Right Actions */}
+          <View style={styles.headerRight}>
+            <Text style={styles.date}>
+              {new Date().toLocaleDateString('en-IN', {
+                weekday: 'short', day: 'numeric', month: 'short'
+              })}
+            </Text>
+            
+            <TouchableOpacity 
+              style={styles.referralBtn} 
+              onPress={() => router.push('/referral')}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="card-giftcard" size={22} color="#A855F7" />
+            </TouchableOpacity>
+          </View>
         </View>
+
         <GreetingCard name={userName} streak={streak} />
         <StatsRow
           todayMins={todayMinutes}
@@ -175,5 +192,18 @@ const styles = StyleSheet.create({
   },
   appName: { fontSize: 28, fontWeight: '900', color: '#FFFFFF' },
   ai: { color: '#A855F7' },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   date: { color: '#6B7280', fontSize: 14, fontWeight: '500' },
+  referralBtn: {
+    backgroundColor: 'rgba(168, 85, 247, 0.12)',
+    padding: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.3)',
+  },
 });
+
