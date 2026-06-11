@@ -139,8 +139,7 @@ export default function ProfileScreen() {
 
       let finalAvatarUrl = editAvatarUrl;
 
-      // 🚀 SUPABASE STORAGE UPLOAD LOGIC
-      // Agar user ne nayi photo select ki hai jo ki Supabase ka url nahi hai
+      // Agar user ne nayi photo select ki hai
       if (editAvatarUrl && editAvatarUrl !== user.avatarUrl && !editAvatarUrl.includes('supabase.co')) {
         const ext = editAvatarUrl.split('.').pop()?.toLowerCase() || 'jpeg';
         const fileName = `${authUser.id}-${Date.now()}.${ext}`;
@@ -150,7 +149,7 @@ export default function ProfileScreen() {
         const response = await fetch(editAvatarUrl);
         const blob = await response.blob();
 
-        // Supabase storage bucket 'avatars' mein upload karna
+        // Supabase upload
         const { error: uploadError } = await supabase.storage
           .from('avatars')
           .upload(filePath, blob, {
@@ -158,7 +157,11 @@ export default function ProfileScreen() {
             upsert: true,
           });
 
-        if (uploadError) throw uploadError;
+        // 🚨 EXACT ERROR CATCHING 🚨
+        if (uploadError) {
+          console.error("Supabase Upload Error:", uploadError);
+          throw new Error(`Upload rejected: ${uploadError.message}`);
+        }
 
         // Cloud Public URL fetch karna
         const { data: { publicUrl } } = supabase.storage
@@ -169,16 +172,21 @@ export default function ProfileScreen() {
       }
 
       // Update in Supabase database (Users Table)
-      await supabase
+      const { error: dbError } = await supabase
         .from('users')
         .update({
           name: editName,
           target_exam: editExam,
           class_level: editClass,
           daily_goal_minutes: mins,
-          avatar_url: finalAvatarUrl, // Saving Cloud URL instead of local URI
+          avatar_url: finalAvatarUrl,
         })
         .eq('id', authUser.id);
+
+      if (dbError) {
+        console.error("Database Update Error:", dbError);
+        throw new Error(`DB Update failed: ${dbError.message}`);
+      }
 
       // Update in Local App State
       await setUser({
@@ -191,9 +199,10 @@ export default function ProfileScreen() {
       });
 
       setEditVisible(false);
-    } catch (error) {
-      console.error(error);
-      showAlert('Error', 'Profile could not be saved. Try again.');
+    } catch (error: any) {
+      console.error("Profile Save Crash:", error);
+      // Ab screen par exact error dikhega
+      showAlert('Save Failed', error.message || 'Unknown error occurred.');
     } finally {
       setLoading(false);
     }
