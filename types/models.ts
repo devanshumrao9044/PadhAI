@@ -8,8 +8,11 @@ export interface UserProfile {
   xpTotal: number;
   streakCurrent: number;
   streakLongest: number;
-  lastStudyDate: string | null; // YYYY-MM-DD
+  lastStudyDate: string | null;
   createdAt: string;
+  myReferralCode: string | null;
+  referredBy: string | null;
+  hasUnlockedReward: boolean;
 }
 
 export interface Subject {
@@ -56,15 +59,15 @@ export interface FocusSession {
   xpEarned: number;
   xpDeducted: number;
   brokenAtPercent: number;
-  comebackBonus?: number; // +50 XP bonus after streak break
-  sessionDate: string; // YYYY-MM-DD
+  comebackBonus?: number;
+  sessionDate: string;
   createdAt: string;
 }
 
 export interface DailySummary {
   id: string;
   userId: string;
-  date: string; // YYYY-MM-DD
+  date: string;
   totalMinutes: number;
   sessionsCompleted: number;
   sessionsBroken: number;
@@ -87,4 +90,12 @@ export interface ActiveSession {
   plannedMins: number;
   subjectId: string | null;
   chapterId: string | null;
+}
+
+export interface Referral {
+  id: string;
+  referrerId: string;
+  refereeId: string;
+  status: 'pending' | 'completed';
+  createdAt: string;
 }
