@@ -10,14 +10,16 @@ A modern mobile app built with React Native Expo and Supabase to help students s
 
 ## 🔐 Critical Authentication Components (DO NOT TOUCH)
 
-> ### ⚠️ CRITICAL WARNING FOR REFACTORING / GITHUB COMMITS
-> The following authentication files are **frozen** and part of the core infrastructure. Under no circumstances should these files be **deleted**, **renamed**, or **moved** during refactor commits or feature updates. Doing so will break the dynamic authentication gates, route syncing, and session handling with Supabase.
+> ### 🔴 CRITICAL SAFETY WARNING FOR GITHUB COMMITS & REFACTORS
+> **DO NOT REMOVE OR DELETE THE `components/auth/` DIRECTORY OR ANY FILES WITHIN IT.**
+> During automated cleanups, branching operations, or git refactor commits, files like `LoginForm.tsx` are being accidentally wiped out. To prevent this, a protective `.gitkeep` file has been added. Any commit that modifies, moves, or deletes these files will immediately break session handling, Supabase endpoints, and routing checkpoints.
 
-All auth components are located strictly inside the `components/auth/` directory:
+All auth components are located strictly inside the protected `components/auth/` directory:
 
-| File Name | Path | Purpose / Responsibility |
+| File Name | Path | Purpose / Git Protection Status |
 | :--- | :--- | :--- |
-| **`LoginForm.tsx`** | `components/auth/LoginForm.tsx` | Handles user authentication via Supabase. Includes custom database check before password resets (`resetPasswordForEmail`) to block requests for non-existent accounts, inline error handling, and onboarding redirection logic. |
+| **`.gitkeep`** | `components/auth/.gitkeep` | **Git Protection Anchor.** Keeps the directory tracked in remote repositories even during heavy cleanup or branch swapping operations. **NEVER DELETE.** |
+| **`LoginForm.tsx`** | `components/auth/LoginForm.tsx` | Handles user authentication via Supabase. Includes custom database checks before password resets (`resetPasswordForEmail`) to block requests for non-existent accounts, inline error handling, and onboarding redirection logic. |
 | **`SignupForm.tsx`** | `components/auth/SignupForm.tsx` | Manages registration flow for new users, prevents duplicate registration alerts for new Gmail entries, and syncs basic user metadata seamlessly to the backend. |
 | **`AuthInput.tsx`** | `components/auth/AuthInput.tsx` | Reusable custom text input element used throughout the auth system. Handles local state focus, placeholder text colors, and highlights validation fields with strict visual indicator styles when an error is passed. |
 | **`AuthButton.tsx`** | `components/auth/AuthButton.tsx` | Reusable system button that handles loading states, dynamic label rendering, opacity adjustments during async Supabase triggers, and primary/ghost visual variants. |
@@ -37,7 +39,7 @@ PadhAI/
 │   └── index.tsx               # Main Auth screen route wrapper (loads LoginForm/SignupForm)
 ├── assets/                     # Media resources (fonts, image layers, logo mockups)
 ├── components/                 # Reusable interface components
-│   ├── auth/                   # 🔴 CRITICAL - Auth modules (LoginForm, SignupForm, etc.)
+│   ├── auth/                   # 🔴 CRITICAL STORAGE - Auth modules & .gitkeep tracking anchor
 │   ├── dashboard/              # Home page cards (GreetingCard, StatsRow, QuoteCard)
 │   ├── feature/                # Core interactive elements (ChapterItem, SubjectCard)
 │   ├── onboarding/             # New user setup workflow (StepName, StepExam, StepGoal)
