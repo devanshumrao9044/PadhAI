@@ -4,8 +4,9 @@ import {
   Platform, ScrollView, StyleSheet
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import LoginForm from '@/components/auth/LoginForm';
-import SignupForm from '@/components/auth/SignupForm';
+
+// 🚀 Yahan humne barrel export import kar liya hai
+import { LoginForm, SignupForm } from '@/components/auth';
 
 export default function AuthScreen() {
   const [showLogin, setShowLogin] = useState(true);
