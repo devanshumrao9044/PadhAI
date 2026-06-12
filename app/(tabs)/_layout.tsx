@@ -1,18 +1,25 @@
 import { Tabs } from 'expo-router';
-import { Text, View, Image, ImageSourcePropType } from 'react-native';
+import { View, Image, ImageSourcePropType } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// 🚀 Upgraded Reusable Tab Icon Component
-function TabIcon({ source, color, focused }: { source: ImageSourcePropType; color: string; focused: boolean }) {
+function TabIcon({
+  source,
+  color,
+  focused,
+}: {
+  source: ImageSourcePropType;
+  color: string;
+  focused: boolean;
+}) {
   return (
     <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 4 }}>
-      <Image 
+      <Image
         source={source}
         style={{
           width: 24,
           height: 24,
-          tintColor: color, // 🚀 MAGIC: Expo ka active/inactive color is PNG ko paint kar dega
-          transform: [{ scale: focused ? 1.1 : 1 }], // 🚀 Halkasa bounce effect active hone par
+          tintColor: color,
+          transform: [{ scale: focused ? 1.1 : 1 }],
         }}
         resizeMode="contain"
       />
@@ -50,7 +57,11 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon source={require('../../assets/images/Home.png')} color={color} focused={focused} />
+            <TabIcon
+              source={require('../../assets/images/Home.png')}
+              color={color}
+              focused={focused}
+            />
           ),
         }}
       />
@@ -59,7 +70,11 @@ export default function TabLayout() {
         options={{
           title: 'Focus',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon source={require('../../assets/images/timer.png')} color={color} focused={focused} />
+            <TabIcon
+              source={require('../../assets/images/timer.png')}
+              color={color}
+              focused={focused}
+            />
           ),
         }}
       />
@@ -68,7 +83,11 @@ export default function TabLayout() {
         options={{
           title: 'Tracker',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon source={require('../../assets/images/tracker.png')} color={color} focused={focused} />
+            <TabIcon
+              source={require('../../assets/images/tracker.png')}
+              color={color}
+              focused={focused}
+            />
           ),
         }}
       />
@@ -77,7 +96,11 @@ export default function TabLayout() {
         options={{
           title: 'Stats',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon source={require('../../assets/images/Analytics.png')} color={color} focused={focused} />
+            <TabIcon
+              source={require('../../assets/images/Analytics.png')}
+              color={color}
+              focused={focused}
+            />
           ),
         }}
       />
@@ -86,7 +109,11 @@ export default function TabLayout() {
         options={{
           title: 'Rank',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon source={require('../../assets/images/Leaderboard.png')} color={color} focused={focused} />
+            <TabIcon
+              source={require('../../assets/images/Leaderboard.png')}
+              color={color}
+              focused={focused}
+            />
           ),
         }}
       />
@@ -95,12 +122,15 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon source={require('../../assets/images/Profile.png')} color={color} focused={focused} />
+            <TabIcon
+              source={require('../../assets/images/Profile.png')}
+              color={color}
+              focused={focused}
+            />
           ),
         }}
       />
       <Tabs.Screen name="stats" options={{ href: null }} />
-      <Tabs.Screen name="index.web" options={{ href: null }} />
     </Tabs>
   );
 }
