@@ -1,0 +1,5 @@
+# These files must always be present
+components/auth/LoginForm.tsx @devanshumrao9044
+components/auth/SignupForm.tsx @devanshumrao9044
+components/auth/AuthInput.tsx @devanshumrao9044
+components/auth/AuthButton.tsx @devanshumrao9044
