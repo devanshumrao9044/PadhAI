@@ -439,7 +439,7 @@ export default function AuthScreen() {
               {signupApiSuccess ? <SuccessBox message={signupApiSuccess} /> : null}
               <AuthInput
                 label="Full Name"
-                placeholder="e.g. Devansh Rao"
+                placeholder="e.g. Devansh "
                 value={signupName}
                 onChangeText={(t: string) => { setSignupName(t); setSignupApiError(null); }}
                 autoCapitalize="words"
