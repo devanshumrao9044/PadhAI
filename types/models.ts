@@ -10,9 +10,10 @@ export interface UserProfile {
   streakLongest: number;
   lastStudyDate: string | null;
   createdAt: string;
-  myReferralCode: string | null;
-  referredBy: string | null;
-  hasUnlockedReward: boolean;
+  avatarUrl?: string | null;
+  myReferralCode?: string | null;
+  referredBy?: string | null;
+  hasUnlockedReward?: boolean;
 }
 
 export interface Subject {
@@ -97,5 +98,7 @@ export interface Referral {
   referrerId: string;
   refereeId: string;
   status: 'pending' | 'completed';
+  xpAwarded: boolean;
   createdAt: string;
+  completedAt: string | null;
 }
