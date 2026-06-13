@@ -4,7 +4,7 @@ const XP_REFEREE = 50;
 const XP_REFERRER = 25;
 const REWARD_THRESHOLD = 5;
 
-// Called during signup after account is created
+// ── Apply referral code during signup ─────────────────────────────────────────
 export async function applyReferralCode(
   refereeId: string,
   code: string
@@ -13,14 +13,13 @@ export async function applyReferralCode(
     const trimmed = code.trim().toUpperCase();
     if (!trimmed) return { success: false, message: 'Invalid code.' };
 
-    // Find referrer by code
-    const { data: referrer, error } = await supabase
+    const { data: referrer } = await supabase
       .from('users')
       .select('id, my_referral_code')
       .eq('my_referral_code', trimmed)
       .maybeSingle();
 
-    if (error || !referrer) {
+    if (!referrer) {
       return { success: false, message: 'Referral code not found.' };
     }
 
@@ -28,14 +27,12 @@ export async function applyReferralCode(
       return { success: false, message: 'You cannot use your own referral code.' };
     }
 
-    // Update referee's referred_by field
     await supabase
       .from('users')
       .update({ referred_by: trimmed })
       .eq('id', refereeId);
 
-    // Create referral record
-    await supabase
+    const { error } = await supabase
       .from('referrals')
       .insert({
         referrer_id: referrer.id,
@@ -43,29 +40,33 @@ export async function applyReferralCode(
         status: 'pending',
       });
 
-    return { success: true, message: 'Referral code applied!' };
-  } catch {
+    if (error) {
+      console.log('Referral insert error:', error.message);
+      return { success: false, message: 'Could not apply referral code.' };
+    }
+
+    return { success: true, message: 'Referral code applied! You will earn +50 XP after your first session.' };
+  } catch (err) {
+    console.log('applyReferralCode error:', err);
     return { success: false, message: 'Could not apply referral code.' };
   }
 }
 
-// Called after user completes their FIRST focus session
-export async function processReferralOnFirstSession(
-  userId: string,
-  awardXPFn: (amount: number, reason: string) => Promise<void>
-): Promise<void> {
+// ── Process referral after first completed session ────────────────────────────
+// Self-contained — no external XP function needed
+export async function processReferralOnFirstSession(userId: string): Promise<void> {
   try {
-    // Check if user has a pending referral (was referred by someone)
+    // 1. Check if this user was referred (pending referral exists)
     const { data: referral } = await supabase
       .from('referrals')
-      .select('*')
+      .select('id, referrer_id, status')
       .eq('referee_id', userId)
       .eq('status', 'pending')
       .maybeSingle();
 
-    if (!referral) return;
+    if (!referral) return; // Not referred or already processed
 
-    // Check this is truly their first completed session
+    // 2. Confirm this is truly their FIRST completed session
     const { data: sessions } = await supabase
       .from('focus_sessions')
       .select('id')
@@ -73,10 +74,11 @@ export async function processReferralOnFirstSession(
       .eq('broken', false)
       .limit(2);
 
+    // Must have exactly 1 completed session (the one just finished)
     if (!sessions || sessions.length !== 1) return;
 
-    // Complete the referral
-    await supabase
+    // 3. Mark referral as completed
+    const { error: updateError } = await supabase
       .from('referrals')
       .update({
         status: 'completed',
@@ -85,33 +87,52 @@ export async function processReferralOnFirstSession(
       })
       .eq('id', referral.id);
 
-    // Award +50 XP to referee
-    await awardXPFn(XP_REFEREE, 'referral_bonus_referee');
+    if (updateError) {
+      console.log('Referral update error:', updateError.message);
+      return;
+    }
 
-    // Award +25 XP to referrer
-    const { data: referrerUser } = await supabase
+    // 4. Award +50 XP to referee (the new user who just completed first session)
+    const { data: refereeData } = await supabase
+      .from('users')
+      .select('xp')
+      .eq('id', userId)
+      .single();
+
+    if (refereeData) {
+      await supabase
+        .from('users')
+        .update({ xp: (refereeData.xp || 0) + XP_REFEREE })
+        .eq('id', userId);
+
+      await supabase.from('xp_transactions').insert({
+        user_id: userId,
+        amount: XP_REFEREE,
+        reason: 'referral_bonus_referee',
+      });
+    }
+
+    // 5. Award +25 XP to referrer
+    const { data: referrerData } = await supabase
       .from('users')
       .select('xp')
       .eq('id', referral.referrer_id)
       .single();
 
-    if (referrerUser) {
-      const newXP = (referrerUser.xp || 0) + XP_REFERRER;
+    if (referrerData) {
       await supabase
         .from('users')
-        .update({ xp: newXP })
+        .update({ xp: (referrerData.xp || 0) + XP_REFERRER })
         .eq('id', referral.referrer_id);
 
-      await supabase
-        .from('xp_transactions')
-        .insert({
-          user_id: referral.referrer_id,
-          amount: XP_REFERRER,
-          reason: 'referral_bonus_referrer',
-        });
+      await supabase.from('xp_transactions').insert({
+        user_id: referral.referrer_id,
+        amount: XP_REFERRER,
+        reason: 'referral_bonus_referrer',
+      });
     }
 
-    // Check if referrer now has 5 completed referrals
+    // 6. Check if referrer now has 5 completed referrals → unlock reward
     const { count } = await supabase
       .from('referrals')
       .select('id', { count: 'exact', head: true })
@@ -124,12 +145,14 @@ export async function processReferralOnFirstSession(
         .update({ has_unlocked_reward: true })
         .eq('id', referral.referrer_id);
     }
+
+    console.log(`Referral processed: +${XP_REFEREE} XP to referee, +${XP_REFERRER} XP to referrer`);
   } catch (err) {
-    console.log('Referral process error:', err);
+    console.log('processReferralOnFirstSession error:', err);
   }
 }
 
-// Fetch referral stats for referral screen
+// ── Fetch referral stats for referral screen ──────────────────────────────────
 export async function fetchReferralStats(userId: string): Promise<{
   myCode: string | null;
   completed: number;
@@ -149,8 +172,10 @@ export async function fetchReferralStats(userId: string): Promise<{
         .eq('referrer_id', userId),
     ]);
 
-    const completed = referralsRes.data?.filter(r => r.status === 'completed').length ?? 0;
-    const pending = referralsRes.data?.filter(r => r.status === 'pending').length ?? 0;
+    const completed =
+      referralsRes.data?.filter(r => r.status === 'completed').length ?? 0;
+    const pending =
+      referralsRes.data?.filter(r => r.status === 'pending').length ?? 0;
 
     return {
       myCode: userRes.data?.my_referral_code ?? null,
@@ -161,4 +186,4 @@ export async function fetchReferralStats(userId: string): Promise<{
   } catch {
     return { myCode: null, completed: 0, pending: 0, hasUnlockedReward: false };
   }
-        }
+}
