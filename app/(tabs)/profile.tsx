@@ -4,6 +4,7 @@ import {
   Modal, TextInput, Alert, Platform, Image, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/services/supabase';
@@ -13,27 +14,25 @@ import { getLevelForXP, getXPProgress, LEVELS } from '@/constants/levels';
 import XPBar from '@/components/ui/XPBar';
 
 export default function ProfileScreen() {
+  const router = useRouter();
   const { user, setUser, sessions, chapters, xpLog } = useApp();
-  
-  // States for Edit Modal
+
   const [editVisible, setEditVisible] = useState(false);
   const [loading, setLoading] = useState(false);
-  
-  // 🚀 State for Rank & Zone Badge
-  const [rankInfo, setRankInfo] = useState<{ rank: number, total: number, zone: string, color: string } | null>(null);
+  const [rankInfo, setRankInfo] = useState<{
+    rank: number; total: number; zone: string; color: string;
+  } | null>(null);
 
-  // Form States
   const [editName, setEditName] = useState('');
   const [editExam, setEditExam] = useState('JEE');
   const [editClass, setEditClass] = useState('12th');
   const [editGoal, setEditGoal] = useState('');
   const [editAvatarUrl, setEditAvatarUrl] = useState('');
 
-  const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string; message: string }>({
-    visible: false, title: '', message: '',
-  });
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean; title: string; message: string;
+  }>({ visible: false, title: '', message: '' });
 
-  // 🚀 Fetch Rank & Calculate Zone (Same logic as Leaderboard)
   useEffect(() => {
     async function fetchRankInfo() {
       if (!user) return;
@@ -44,33 +43,24 @@ export default function ProfileScreen() {
           const safeTotal = Math.max(1, total);
           const myEntry = data.find((e: any) => e.id === user.id);
           const rank = myEntry?.rank ?? safeTotal + 1;
-
-          // Zone calculation identical to leaderboard
           const demotionCount = Math.floor(safeTotal * 0.4);
           const safetyCount = Math.floor(safeTotal * 0.35);
-          
           const demotionPct = (demotionCount / safeTotal) * 100;
           const safetyPct = (safetyCount / safeTotal) * 100;
           const rankPct = ((safeTotal - rank) / safeTotal) * 100;
-
           let zone = 'Demotion';
           let color = Colors.danger;
-
           if (rankPct >= demotionPct + safetyPct) {
-            zone = 'Promotion';
-            color = Colors.success;
+            zone = 'Promotion'; color = Colors.success;
           } else if (rankPct >= demotionPct) {
-            zone = 'Safety';
-            color = Colors.warning;
+            zone = 'Safety'; color = Colors.warning;
           }
-
           setRankInfo({ rank, total, zone, color });
         }
       } catch (e) {
-        console.log('Error fetching rank info for profile:', e);
+        console.log('Rank fetch error:', e);
       }
     }
-    
     fetchRankInfo();
   }, [user]);
 
@@ -78,11 +68,15 @@ export default function ProfileScreen() {
 
   const level = getLevelForXP(user.xpTotal);
   const progress = getXPProgress(user.xpTotal);
-  const totalHours = Math.floor(sessions.reduce((s, x) => s + x.durationActualMins, 0) / 60);
+  const totalHours = Math.floor(
+    sessions.reduce((s, x) => s + x.durationActualMins, 0) / 60
+  );
   const doneChapters = chapters.filter(c => !c.isDeleted && c.status === 'done').length;
-  const joinDate = new Date(user.createdAt || Date.now()).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-
-  const initials = user.fullName?.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase() || 'ST';
+  const joinDate = new Date(user.createdAt || Date.now()).toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric',
+  });
+  const initials = user.fullName?.split(' ')
+    .map((w: string) => w[0]).slice(0, 2).join('').toUpperCase() || 'ST';
   const displayAvatar = user.avatarUrl || editAvatarUrl;
 
   const showAlert = (title: string, message: string) => {
@@ -93,6 +87,33 @@ export default function ProfileScreen() {
     }
   };
 
+  // ── Sign Out ────────────────────────────────────────────────────────────────
+  const handleSignOut = async () => {
+    if (Platform.OS === 'web') {
+      setAlertConfig({
+        visible: false, title: '', message: '',
+      });
+    }
+    await supabase.auth.signOut();
+    router.replace('/');
+  };
+
+  const confirmSignOut = () => {
+    if (Platform.OS === 'web') {
+      setAlertConfig({
+        visible: true,
+        title: 'Sign Out',
+        message: 'Are you sure you want to sign out?',
+      });
+    } else {
+      Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign Out', style: 'destructive', onPress: handleSignOut },
+      ]);
+    }
+  };
+
+  // ── Edit Modal ──────────────────────────────────────────────────────────────
   const openEditModal = () => {
     setEditName(user.fullName || '');
     setEditExam(user.targetExam || 'JEE');
@@ -108,14 +129,12 @@ export default function ProfileScreen() {
       showAlert('Permission Denied', 'Gallery access is required to change photo.');
       return;
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.5,
+      quality: 0.6,
     });
-
     if (!result.canceled && result.assets[0].uri) {
       setEditAvatarUrl(result.assets[0].uri);
     }
@@ -124,84 +143,80 @@ export default function ProfileScreen() {
   const handleSaveProfile = async () => {
     const mins = parseInt(editGoal);
     if (!editName.trim()) {
-      showAlert('Error', 'Can not leave name blank !');
+      showAlert('Error', 'Name cannot be blank.');
       return;
     }
     if (isNaN(mins) || mins < 15 || mins > 720) {
-      showAlert('Invalid Goal', 'The goal must be between 15 and 720 minutes.');
+      showAlert('Invalid Goal', 'Goal must be between 15 and 720 minutes.');
       return;
     }
 
     setLoading(true);
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) throw new Error("No User Found");
+      if (!authUser) throw new Error('Not authenticated.');
 
       let finalAvatarUrl = editAvatarUrl;
 
-      // Agar user ne nayi photo select ki hai
-      if (editAvatarUrl && editAvatarUrl !== user.avatarUrl && !editAvatarUrl.includes('supabase.co')) {
-        const ext = editAvatarUrl.split('.').pop()?.toLowerCase() || 'jpeg';
+      // ✅ Fix: Use ArrayBuffer instead of blob() — works on Android/iOS
+      const isNewLocalImage =
+        editAvatarUrl &&
+        editAvatarUrl !== user.avatarUrl &&
+        !editAvatarUrl.startsWith('http');
+
+      if (isNewLocalImage) {
+        const uriParts = editAvatarUrl.split('.');
+        const ext = (uriParts[uriParts.length - 1] || 'jpg').toLowerCase();
+        const mimeType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
         const fileName = `${authUser.id}-${Date.now()}.${ext}`;
-        const filePath = `public/${fileName}`;
+        const filePath = `${authUser.id}/${fileName}`;
 
-        // Local image ko blob mein convert karna
         const response = await fetch(editAvatarUrl);
-        const blob = await response.blob();
+        const arrayBuffer = await response.arrayBuffer();
 
-        // Supabase upload
         const { error: uploadError } = await supabase.storage
           .from('avatars')
-          .upload(filePath, blob, {
-            contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}`,
+          .upload(filePath, arrayBuffer, {
+            contentType: mimeType,
             upsert: true,
           });
 
-        // 🚨 EXACT ERROR CATCHING 🚨
         if (uploadError) {
-          console.error("Supabase Upload Error:", uploadError);
-          throw new Error(`Upload rejected: ${uploadError.message}`);
+          throw new Error(`Photo upload failed: ${uploadError.message}`);
         }
 
-        // Cloud Public URL fetch karna
-        const { data: { publicUrl } } = supabase.storage
+        const { data: urlData } = supabase.storage
           .from('avatars')
           .getPublicUrl(filePath);
 
-        finalAvatarUrl = publicUrl;
+        finalAvatarUrl = urlData.publicUrl;
       }
 
-      // Update in Supabase database (Users Table)
+      // ✅ Fix: column name is 'class' not 'class_level'
       const { error: dbError } = await supabase
         .from('users')
         .update({
-          name: editName,
+          name: editName.trim(),
           target_exam: editExam,
-          class_level: editClass,
+          class: editClass,
           daily_goal_minutes: mins,
           avatar_url: finalAvatarUrl,
         })
         .eq('id', authUser.id);
 
-      if (dbError) {
-        console.error("Database Update Error:", dbError);
-        throw new Error(`DB Update failed: ${dbError.message}`);
-      }
+      if (dbError) throw new Error(`Save failed: ${dbError.message}`);
 
-      // Update in Local App State
       await setUser({
         ...user,
-        fullName: editName,
-        targetExam: editExam,
-        classLevel: editClass,
+        fullName: editName.trim(),
+        targetExam: editExam as any,
+        classLevel: editClass as any,
         dailyGoalMinutes: mins,
-        avatarUrl: finalAvatarUrl, 
+        avatarUrl: finalAvatarUrl,
       });
 
       setEditVisible(false);
     } catch (error: any) {
-      console.error("Profile Save Crash:", error);
-      // Ab screen par exact error dikhega
       showAlert('Save Failed', error.message || 'Unknown error occurred.');
     } finally {
       setLoading(false);
@@ -212,9 +227,12 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-
-        {/* 🚀 CENTERED PROFILE HEADER */}
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+      >
+        {/* Profile Header */}
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
             {displayAvatar ? (
@@ -225,24 +243,31 @@ export default function ProfileScreen() {
               </View>
             )}
           </View>
-          
+
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{user.fullName}</Text>
             <Text style={styles.profileSub}>@{user.username || 'student'}</Text>
-            
-            {/* Info Row: Exam Badge & Rank Badge */}
             <View style={styles.badgesRow}>
               <View style={styles.examBadge}>
-                <Text style={styles.examBadgeText}>{user.targetExam || 'JEE'} • Class {user.classLevel || '12th'}</Text>
+                <Text style={styles.examBadgeText}>
+                  {user.targetExam || 'JEE'} • Class {user.classLevel || '12th'}
+                </Text>
               </View>
-
-              {/* 🚀 NEW RANK BADGE IN HERO SECTION */}
               {rankInfo && (
-                <View style={[styles.rankBadge, { backgroundColor: rankInfo.color + '22', borderColor: rankInfo.color + '55' }]}>
-                  <MaterialIcons 
-                    name={rankInfo.zone === 'Promotion' ? 'trending-up' : rankInfo.zone === 'Safety' ? 'trending-flat' : 'trending-down'} 
-                    size={14} 
-                    color={rankInfo.color} 
+                <View style={[
+                  styles.rankBadge,
+                  { backgroundColor: rankInfo.color + '22', borderColor: rankInfo.color + '55' }
+                ]}>
+                  <MaterialIcons
+                    name={
+                      rankInfo.zone === 'Promotion'
+                        ? 'trending-up'
+                        : rankInfo.zone === 'Safety'
+                        ? 'trending-flat'
+                        : 'trending-down'
+                    }
+                    size={14}
+                    color={rankInfo.color}
                   />
                   <Text style={[styles.rankBadgeText, { color: rankInfo.color }]}>
                     Rank {rankInfo.rank} • {rankInfo.zone}
@@ -262,7 +287,9 @@ export default function ProfileScreen() {
         <View style={styles.levelCard}>
           <View style={styles.levelHeader}>
             <View>
-              <Text style={[styles.levelTitle, { color: level.color }]}>{level.realisticTitle}</Text>
+              <Text style={[styles.levelTitle, { color: level.color }]}>
+                {level.realisticTitle}
+              </Text>
               <Text style={styles.levelExam}>{level.examTitle}</Text>
             </View>
             <View style={styles.xpBadge}>
@@ -304,24 +331,33 @@ export default function ProfileScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>LEVEL ROADMAP</Text>
           {LEVELS.map(l => (
-            <View key={l.rank} style={[styles.levelRow, user.xpTotal >= l.minXP ? styles.levelRowUnlocked : null]}>
-              <View style={[styles.levelDot, { backgroundColor: user.xpTotal >= l.minXP ? l.color : Colors.textTertiary }]} />
+            <View
+              key={l.rank}
+              style={[styles.levelRow, user.xpTotal >= l.minXP ? styles.levelRowUnlocked : null]}
+            >
+              <View style={[styles.levelDot, {
+                backgroundColor: user.xpTotal >= l.minXP ? l.color : Colors.textTertiary,
+              }]} />
               <View style={styles.levelRowInfo}>
-                <Text style={[styles.levelRowTitle, { color: user.xpTotal >= l.minXP ? l.color : Colors.textTertiary }]}>
+                <Text style={[styles.levelRowTitle, {
+                  color: user.xpTotal >= l.minXP ? l.color : Colors.textTertiary,
+                }]}>
                   {l.realisticTitle}
                 </Text>
                 <Text style={styles.levelRowSub}>{l.examTitle} • {l.minXP}+ XP</Text>
               </View>
-              {user.xpTotal >= l.minXP ? (
-                <MaterialIcons name="check-circle" size={18} color={l.color} />
-              ) : null}
+              {user.xpTotal >= l.minXP
+                ? <MaterialIcons name="check-circle" size={18} color={l.color} />
+                : null
+              }
             </View>
           ))}
         </View>
 
-        {/* Settings */}
+        {/* Account Info */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>ACCOUNT INFO</Text>
+
           <View style={styles.settingRow}>
             <MaterialIcons name="flag" size={20} color={Colors.primary} />
             <View style={styles.settingInfo}>
@@ -329,6 +365,7 @@ export default function ProfileScreen() {
               <Text style={styles.settingValue}>{user.dailyGoalMinutes} minutes</Text>
             </View>
           </View>
+
           <View style={styles.settingRow}>
             <MaterialIcons name="calendar-today" size={20} color={Colors.textSecondary} />
             <View style={styles.settingInfo}>
@@ -336,9 +373,28 @@ export default function ProfileScreen() {
               <Text style={styles.settingValue}>{joinDate}</Text>
             </View>
           </View>
+
+          {user.myReferralCode ? (
+            <View style={styles.settingRow}>
+              <MaterialIcons name="card-giftcard" size={20} color={Colors.primary} />
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>Your Referral Code</Text>
+                <Text style={styles.settingValue}>{user.myReferralCode}</Text>
+              </View>
+            </View>
+          ) : null}
+
+          {/* ✅ Sign Out Button */}
+          <TouchableOpacity style={styles.signOutRow} onPress={confirmSignOut}>
+            <MaterialIcons name="logout" size={20} color={Colors.danger} />
+            <View style={styles.settingInfo}>
+              <Text style={styles.signOutLabel}>Sign Out</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color={Colors.danger} />
+          </TouchableOpacity>
         </View>
 
-        {/* Recent XP log */}
+        {/* Recent XP */}
         {recentXP.length > 0 ? (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>RECENT XP</Text>
@@ -349,8 +405,12 @@ export default function ProfileScreen() {
                   size={16}
                   color={tx.amount > 0 ? Colors.success : Colors.danger}
                 />
-                <Text style={styles.xpReason}>{tx.reason.replace(/_/g, ' ')}</Text>
-                <Text style={[styles.xpAmount, { color: tx.amount > 0 ? Colors.success : Colors.danger }]}>
+                <Text style={styles.xpReason}>
+                  {tx.reason.replace(/_/g, ' ')}
+                </Text>
+                <Text style={[styles.xpAmount, {
+                  color: tx.amount > 0 ? Colors.success : Colors.danger,
+                }]}>
                   {tx.amount > 0 ? '+' : ''}{tx.amount} XP
                 </Text>
               </View>
@@ -360,17 +420,21 @@ export default function ProfileScreen() {
 
       </ScrollView>
 
-      {/* Full Edit Profile Modal Code... */}
+      {/* Edit Modal */}
       <Modal visible={editVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}>
             <View style={styles.modalSheet}>
               <Text style={styles.modalTitle}>Edit Profile</Text>
+
               <TouchableOpacity style={styles.modalAvatarEdit} onPress={pickImage}>
                 {editAvatarUrl ? (
                   <Image source={{ uri: editAvatarUrl }} style={styles.avatarImageSmall} />
                 ) : (
-                  <View style={[styles.avatarInitials, { width: 64, height: 64, borderRadius: 32, backgroundColor: Colors.surfaceVariant }]}>
+                  <View style={[styles.avatarInitials, {
+                    width: 64, height: 64, borderRadius: 32,
+                    backgroundColor: Colors.surfaceVariant,
+                  }]}>
                     <MaterialIcons name="person" size={30} color={Colors.textSecondary} />
                   </View>
                 )}
@@ -380,13 +444,25 @@ export default function ProfileScreen() {
               </TouchableOpacity>
 
               <Text style={styles.inputLabel}>FULL NAME</Text>
-              <TextInput style={styles.input} value={editName} onChangeText={setEditName} placeholder="Enter your name" placeholderTextColor={Colors.textTertiary} />
+              <TextInput
+                style={styles.input}
+                value={editName}
+                onChangeText={setEditName}
+                placeholder="Enter your name"
+                placeholderTextColor={Colors.textTertiary}
+              />
 
               <Text style={styles.inputLabel}>TARGET EXAM</Text>
               <View style={styles.chipRow}>
                 {['JEE', 'NEET', 'BOARDS'].map(exam => (
-                  <TouchableOpacity key={exam} style={[styles.chip, editExam === exam && styles.chipActive]} onPress={() => setEditExam(exam)}>
-                    <Text style={[styles.chipText, editExam === exam && styles.chipTextActive]}>{exam}</Text>
+                  <TouchableOpacity
+                    key={exam}
+                    style={[styles.chip, editExam === exam && styles.chipActive]}
+                    onPress={() => setEditExam(exam)}
+                  >
+                    <Text style={[styles.chipText, editExam === exam && styles.chipTextActive]}>
+                      {exam}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -394,21 +470,44 @@ export default function ProfileScreen() {
               <Text style={styles.inputLabel}>CLASS</Text>
               <View style={styles.chipRow}>
                 {['11th', '12th', 'Dropper'].map(cls => (
-                  <TouchableOpacity key={cls} style={[styles.chip, editClass === cls && styles.chipActive]} onPress={() => setEditClass(cls)}>
-                    <Text style={[styles.chipText, editClass === cls && styles.chipTextActive]}>{cls}</Text>
+                  <TouchableOpacity
+                    key={cls}
+                    style={[styles.chip, editClass === cls && styles.chipActive]}
+                    onPress={() => setEditClass(cls)}
+                  >
+                    <Text style={[styles.chipText, editClass === cls && styles.chipTextActive]}>
+                      {cls}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
               <Text style={styles.inputLabel}>DAILY GOAL (MINUTES)</Text>
-              <TextInput style={styles.input} value={editGoal} onChangeText={setEditGoal} keyboardType="number-pad" placeholder="e.g. 120" placeholderTextColor={Colors.textTertiary} />
+              <TextInput
+                style={styles.input}
+                value={editGoal}
+                onChangeText={setEditGoal}
+                keyboardType="number-pad"
+                placeholder="e.g. 120"
+                placeholderTextColor={Colors.textTertiary}
+              />
 
               <View style={styles.modalBtns}>
-                <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditVisible(false)}>
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  onPress={() => setEditVisible(false)}
+                >
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.saveBtn} onPress={handleSaveProfile} disabled={loading}>
-                  {loading ? <ActivityIndicator color={Colors.background} /> : <Text style={styles.saveBtnText}>Save</Text>}
+                <TouchableOpacity
+                  style={styles.saveBtn}
+                  onPress={handleSaveProfile}
+                  disabled={loading}
+                >
+                  {loading
+                    ? <ActivityIndicator color={Colors.background} />
+                    : <Text style={styles.saveBtnText}>Save</Text>
+                  }
                 </TouchableOpacity>
               </View>
             </View>
@@ -416,15 +515,38 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
+      {/* Web Alert Modal */}
       {Platform.OS === 'web' ? (
         <Modal visible={alertConfig.visible} transparent animationType="fade">
           <View style={styles.alertOverlay}>
             <View style={styles.alertBox}>
               <Text style={styles.alertTitle}>{alertConfig.title}</Text>
               <Text style={styles.alertMsg}>{alertConfig.message}</Text>
-              <TouchableOpacity style={styles.alertBtn} onPress={() => setAlertConfig(p => ({ ...p, visible: false }))}>
-                <Text style={styles.saveBtnText}>OK</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                {alertConfig.title === 'Sign Out' ? (
+                  <>
+                    <TouchableOpacity
+                      style={[styles.alertBtn, { backgroundColor: Colors.surfaceVariant, flex: 1 }]}
+                      onPress={() => setAlertConfig(p => ({ ...p, visible: false }))}
+                    >
+                      <Text style={{ color: Colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.alertBtn, { backgroundColor: Colors.danger, flex: 1 }]}
+                      onPress={handleSignOut}
+                    >
+                      <Text style={styles.saveBtnText}>Sign Out</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.alertBtn, { flex: 1 }]}
+                    onPress={() => setAlertConfig(p => ({ ...p, visible: false }))}
+                  >
+                    <Text style={styles.saveBtnText}>OK</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           </View>
         </Modal>
@@ -437,7 +559,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   scrollView: { flex: 1 },
   scroll: { padding: Spacing.md, paddingBottom: 100 },
-  
   profileHeader: { alignItems: 'center', marginBottom: Spacing.xl, paddingTop: Spacing.md },
   avatarContainer: { position: 'relative', marginBottom: Spacing.sm },
   avatarImage: { width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderColor: Colors.primary },
@@ -446,40 +567,38 @@ const styles = StyleSheet.create({
   profileInfo: { alignItems: 'center', marginBottom: Spacing.md },
   profileName: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.textPrimary },
   profileSub: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
-  
-  // 🚀 Badges Row (Exam + Rank)
-  badgesRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  badgesRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' },
   examBadge: {
     backgroundColor: Colors.primary + '22', borderRadius: Radius.full,
     paddingHorizontal: 12, paddingVertical: 4,
     borderWidth: 1, borderColor: Colors.primary + '55',
   },
-  examBadgeText: { fontSize: FontSize.xs, color: Colors.primaryGlow, fontWeight: FontWeight.semiBold },
-  
-  // 🚀 New Rank Badge Styles
+  examBadgeText: { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.semiBold },
   rankBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 4,
-    borderWidth: 1,
+    borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1,
   },
   rankBadgeText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold },
-
-  editProfileBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.full },
+  editProfileBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: Colors.primary, paddingHorizontal: 16, paddingVertical: 8,
+    borderRadius: Radius.full,
+  },
   editProfileBtnText: { color: Colors.background, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
-
-  levelCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, padding: Spacing.md, marginBottom: Spacing.md },
+  levelCard: {
+    backgroundColor: Colors.surface, borderRadius: Radius.lg,
+    borderWidth: 1, borderColor: Colors.border, padding: Spacing.md, marginBottom: Spacing.md,
+  },
   levelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.sm },
   levelTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, includeFontPadding: false },
   levelExam: { fontSize: FontSize.sm, color: Colors.textSecondary },
   xpBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.warning + '22', borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 4 },
   xpBadgeText: { fontSize: FontSize.base, color: Colors.warning, fontWeight: FontWeight.semiBold },
   xpNeeded: { fontSize: FontSize.xs, color: Colors.textTertiary, marginTop: 6 },
-  
   statsGrid: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, padding: Spacing.md, marginBottom: Spacing.md },
   statItem: { alignItems: 'center', flex: 1, gap: 4 },
   statVal: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.textPrimary, includeFontPadding: false },
   statLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'center' },
-  
   card: { backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, padding: Spacing.md, marginBottom: Spacing.md },
   cardTitle: { fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, color: Colors.textTertiary, letterSpacing: 1.2, marginBottom: Spacing.sm, textTransform: 'uppercase' },
   levelRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, opacity: 0.4 },
@@ -488,15 +607,15 @@ const styles = StyleSheet.create({
   levelRowInfo: { flex: 1 },
   levelRowTitle: { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
   levelRowSub: { fontSize: FontSize.xs, color: Colors.textTertiary },
-  
   settingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.border },
   settingInfo: { flex: 1 },
   settingLabel: { fontSize: FontSize.base, color: Colors.textPrimary },
   settingValue: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
+  signOutRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: Spacing.sm, marginTop: 4 },
+  signOutLabel: { fontSize: FontSize.base, color: Colors.danger, fontWeight: FontWeight.semiBold },
   xpRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
   xpReason: { flex: 1, fontSize: FontSize.sm, color: Colors.textSecondary, textTransform: 'capitalize' },
   xpAmount: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
-  
   modalOverlay: { flex: 1, backgroundColor: Colors.overlay },
   modalSheet: { backgroundColor: Colors.surface, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.lg, paddingBottom: Spacing.xxl, marginTop: 'auto', borderWidth: 1, borderColor: Colors.border },
   modalTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.textPrimary, marginBottom: Spacing.lg, textAlign: 'center' },
@@ -515,11 +634,9 @@ const styles = StyleSheet.create({
   cancelBtnText: { color: Colors.textSecondary, fontSize: FontSize.md, fontWeight: FontWeight.semiBold },
   saveBtn: { flex: 1, backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center' },
   saveBtnText: { color: Colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
-  
   alertOverlay: { flex: 1, backgroundColor: Colors.overlay, justifyContent: 'center' },
   alertBox: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, margin: Spacing.xl },
   alertTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.textPrimary, marginBottom: 8 },
   alertMsg: { fontSize: FontSize.base, color: Colors.textSecondary, marginBottom: Spacing.md },
   alertBtn: { backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center' },
 });
-
