@@ -4,7 +4,6 @@ const XP_REFEREE = 50;
 const XP_REFERRER = 25;
 const REWARD_THRESHOLD = 5;
 
-// ── Apply referral code during signup ─────────────────────────────────────────
 export async function applyReferralCode(
   refereeId: string,
   code: string
@@ -41,22 +40,22 @@ export async function applyReferralCode(
       });
 
     if (error) {
-      console.log('Referral insert error:', error.message);
       return { success: false, message: 'Could not apply referral code.' };
     }
 
-    return { success: true, message: 'Referral code applied! You will earn +50 XP after your first session.' };
-  } catch (err) {
-    console.log('applyReferralCode error:', err);
+    return {
+      success: true,
+      message: 'Referral code applied! You will earn +50 XP after your first session.',
+    };
+  } catch {
     return { success: false, message: 'Could not apply referral code.' };
   }
 }
 
-// ── Process referral after first completed session ────────────────────────────
-// Self-contained — no external XP function needed
-export async function processReferralOnFirstSession(userId: string): Promise<void> {
+export async function processReferralOnFirstSession(
+  userId: string
+): Promise<void> {
   try {
-    // 1. Check if this user was referred (pending referral exists)
     const { data: referral } = await supabase
       .from('referrals')
       .select('id, referrer_id, status')
@@ -64,9 +63,8 @@ export async function processReferralOnFirstSession(userId: string): Promise<voi
       .eq('status', 'pending')
       .maybeSingle();
 
-    if (!referral) return; // Not referred or already processed
+    if (!referral) return;
 
-    // 2. Confirm this is truly their FIRST completed session
     const { data: sessions } = await supabase
       .from('focus_sessions')
       .select('id')
@@ -74,11 +72,9 @@ export async function processReferralOnFirstSession(userId: string): Promise<voi
       .eq('broken', false)
       .limit(2);
 
-    // Must have exactly 1 completed session (the one just finished)
     if (!sessions || sessions.length !== 1) return;
 
-    // 3. Mark referral as completed
-    const { error: updateError } = await supabase
+    await supabase
       .from('referrals')
       .update({
         status: 'completed',
@@ -87,22 +83,16 @@ export async function processReferralOnFirstSession(userId: string): Promise<voi
       })
       .eq('id', referral.id);
 
-    if (updateError) {
-      console.log('Referral update error:', updateError.message);
-      return;
-    }
-
-    // 4. Award +50 XP to referee (the new user who just completed first session)
-    const { data: refereeData } = await supabase
+    const { data: referee } = await supabase
       .from('users')
       .select('xp')
       .eq('id', userId)
       .single();
 
-    if (refereeData) {
+    if (referee) {
       await supabase
         .from('users')
-        .update({ xp: (refereeData.xp || 0) + XP_REFEREE })
+        .update({ xp: (referee.xp || 0) + XP_REFEREE })
         .eq('id', userId);
 
       await supabase.from('xp_transactions').insert({
@@ -112,17 +102,16 @@ export async function processReferralOnFirstSession(userId: string): Promise<voi
       });
     }
 
-    // 5. Award +25 XP to referrer
-    const { data: referrerData } = await supabase
+    const { data: referrer } = await supabase
       .from('users')
       .select('xp')
       .eq('id', referral.referrer_id)
       .single();
 
-    if (referrerData) {
+    if (referrer) {
       await supabase
         .from('users')
-        .update({ xp: (referrerData.xp || 0) + XP_REFERRER })
+        .update({ xp: (referrer.xp || 0) + XP_REFERRER })
         .eq('id', referral.referrer_id);
 
       await supabase.from('xp_transactions').insert({
@@ -132,7 +121,6 @@ export async function processReferralOnFirstSession(userId: string): Promise<voi
       });
     }
 
-    // 6. Check if referrer now has 5 completed referrals → unlock reward
     const { count } = await supabase
       .from('referrals')
       .select('id', { count: 'exact', head: true })
@@ -146,13 +134,12 @@ export async function processReferralOnFirstSession(userId: string): Promise<voi
         .eq('id', referral.referrer_id);
     }
 
-    console.log(`Referral processed: +${XP_REFEREE} XP to referee, +${XP_REFERRER} XP to referrer`);
+    console.log(`Referral done: +${XP_REFEREE} to referee, +${XP_REFERRER} to referrer`);
   } catch (err) {
     console.log('processReferralOnFirstSession error:', err);
   }
 }
 
-// ── Fetch referral stats for referral screen ──────────────────────────────────
 export async function fetchReferralStats(userId: string): Promise<{
   myCode: string | null;
   completed: number;
