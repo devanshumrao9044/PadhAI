@@ -79,6 +79,9 @@ const mapUser = (u: any): UserProfile => ({
   streakLongest: u.longest_streak ?? 0,
   lastStudyDate: u.last_study_date ?? null,
   createdAt: u.created_at ?? new Date().toISOString(),
+  avatarUrl: u.avatar_url ?? null,          
+  myReferralCode: u.my_referral_code ?? null, 
+  hasUnlockedReward: u.has_unlocked_reward ?? false, 
 });
 
 const mapSubject = (s: any): Subject => ({
