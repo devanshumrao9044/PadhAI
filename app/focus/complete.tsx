@@ -76,22 +76,19 @@ export default function FocusCompleteScreen() {
 
   // Referral hook processing on component mount
   useEffect(() => {
-    async function triggerReferralCheck() {
-      try {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (authUser) {
-          // Define standard callback to trigger if your service requires it locally
-          const awardXP = async (uid: string, amount: number, reason: string) => {
-            await supabase.rpc('add_xp_transaction', { target_user_id: uid, xp_amount: amount, xp_reason: reason });
-          };
-          await processReferralOnFirstSession(authUser.id, awardXP);
-        }
-      } catch (err) {
-        console.log('Referral execution hook error:', err);
+  async function triggerReferralCheck() {
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        
+        await processReferralOnFirstSession(authUser.id);
       }
+    } catch (err) {
+      console.log('Referral hook error:', err);
     }
-    triggerReferralCheck();
-  }, []);
+  }
+  triggerReferralCheck();
+}, []);
 
   useEffect(() => {
     // Base animations
