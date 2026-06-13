@@ -30,7 +30,7 @@ export default function ProfileScreen() {
   const [editAvatarUrl, setEditAvatarUrl] = useState('');
 
   const [alertConfig, setAlertConfig] = useState<{
-    visible: boolean; title: string; message: string;
+    visible: boolean; title: string; message: string; isSignOut?: boolean;
   }>({ visible: false, title: '', message: '' });
 
   useEffect(() => {
@@ -50,11 +50,8 @@ export default function ProfileScreen() {
           const rankPct = ((safeTotal - rank) / safeTotal) * 100;
           let zone = 'Demotion';
           let color = Colors.danger;
-          if (rankPct >= demotionPct + safetyPct) {
-            zone = 'Promotion'; color = Colors.success;
-          } else if (rankPct >= demotionPct) {
-            zone = 'Safety'; color = Colors.warning;
-          }
+          if (rankPct >= demotionPct + safetyPct) { zone = 'Promotion'; color = Colors.success; }
+          else if (rankPct >= demotionPct) { zone = 'Safety'; color = Colors.warning; }
           setRankInfo({ rank, total, zone, color });
         }
       } catch (e) {
@@ -77,49 +74,33 @@ export default function ProfileScreen() {
   });
   const initials = user.fullName?.split(' ')
     .map((w: string) => w[0]).slice(0, 2).join('').toUpperCase() || 'ST';
-  const displayAvatar = user.avatarUrl || editAvatarUrl;
+  const displayAvatar = (user as any).avatarUrl || editAvatarUrl;
 
-  const showAlert = (title: string, message: string) => {
+  const showAlert = (title: string, message: string, isSignOut = false) => {
     if (Platform.OS === 'web') {
-      setAlertConfig({ visible: true, title, message });
+      setAlertConfig({ visible: true, title, message, isSignOut });
+    } else if (isSignOut) {
+      Alert.alert(title, message, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign Out', style: 'destructive', onPress: handleSignOut },
+      ]);
     } else {
       Alert.alert(title, message);
     }
   };
 
-  // ── Sign Out ────────────────────────────────────────────────────────────────
   const handleSignOut = async () => {
-    if (Platform.OS === 'web') {
-      setAlertConfig({
-        visible: false, title: '', message: '',
-      });
-    }
+    setAlertConfig(p => ({ ...p, visible: false }));
     await supabase.auth.signOut();
     router.replace('/');
   };
 
-  const confirmSignOut = () => {
-    if (Platform.OS === 'web') {
-      setAlertConfig({
-        visible: true,
-        title: 'Sign Out',
-        message: 'Are you sure you want to sign out?',
-      });
-    } else {
-      Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign Out', style: 'destructive', onPress: handleSignOut },
-      ]);
-    }
-  };
-
-  // ── Edit Modal ──────────────────────────────────────────────────────────────
   const openEditModal = () => {
     setEditName(user.fullName || '');
     setEditExam(user.targetExam || 'JEE');
     setEditClass(user.classLevel || '12th');
     setEditGoal(String(user.dailyGoalMinutes || 120));
-    setEditAvatarUrl(user.avatarUrl || '');
+    setEditAvatarUrl((user as any).avatarUrl || '');
     setEditVisible(true);
   };
 
@@ -142,15 +123,11 @@ export default function ProfileScreen() {
 
   const handleSaveProfile = async () => {
     const mins = parseInt(editGoal);
-    if (!editName.trim()) {
-      showAlert('Error', 'Name cannot be blank.');
-      return;
-    }
+    if (!editName.trim()) { showAlert('Error', 'Name cannot be blank.'); return; }
     if (isNaN(mins) || mins < 15 || mins > 720) {
       showAlert('Invalid Goal', 'Goal must be between 15 and 720 minutes.');
       return;
     }
-
     setLoading(true);
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -158,32 +135,26 @@ export default function ProfileScreen() {
 
       let finalAvatarUrl = editAvatarUrl;
 
-      // ✅ Fix: Use ArrayBuffer instead of blob() — works on Android/iOS
       const isNewLocalImage =
         editAvatarUrl &&
-        editAvatarUrl !== user.avatarUrl &&
+        editAvatarUrl !== (user as any).avatarUrl &&
         !editAvatarUrl.startsWith('http');
 
       if (isNewLocalImage) {
         const uriParts = editAvatarUrl.split('.');
         const ext = (uriParts[uriParts.length - 1] || 'jpg').toLowerCase();
         const mimeType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
-        const fileName = `${authUser.id}-${Date.now()}.${ext}`;
-        const filePath = `${authUser.id}/${fileName}`;
+        const filePath = `${authUser.id}/${authUser.id}-${Date.now()}.${ext}`;
 
+        // ✅ arrayBuffer — works on Android/iOS/Web
         const response = await fetch(editAvatarUrl);
         const arrayBuffer = await response.arrayBuffer();
 
         const { error: uploadError } = await supabase.storage
           .from('avatars')
-          .upload(filePath, arrayBuffer, {
-            contentType: mimeType,
-            upsert: true,
-          });
+          .upload(filePath, arrayBuffer, { contentType: mimeType, upsert: true });
 
-        if (uploadError) {
-          throw new Error(`Photo upload failed: ${uploadError.message}`);
-        }
+        if (uploadError) throw new Error(`Photo upload failed: ${uploadError.message}`);
 
         const { data: urlData } = supabase.storage
           .from('avatars')
@@ -192,7 +163,7 @@ export default function ProfileScreen() {
         finalAvatarUrl = urlData.publicUrl;
       }
 
-      // ✅ Fix: column name is 'class' not 'class_level'
+      // ✅ column is 'class' not 'class_level'
       const { error: dbError } = await supabase
         .from('users')
         .update({
@@ -213,7 +184,7 @@ export default function ProfileScreen() {
         classLevel: editClass as any,
         dailyGoalMinutes: mins,
         avatarUrl: finalAvatarUrl,
-      });
+      } as any);
 
       setEditVisible(false);
     } catch (error: any) {
@@ -256,15 +227,13 @@ export default function ProfileScreen() {
               {rankInfo && (
                 <View style={[
                   styles.rankBadge,
-                  { backgroundColor: rankInfo.color + '22', borderColor: rankInfo.color + '55' }
+                  { backgroundColor: rankInfo.color + '22', borderColor: rankInfo.color + '55' },
                 ]}>
                   <MaterialIcons
                     name={
-                      rankInfo.zone === 'Promotion'
-                        ? 'trending-up'
-                        : rankInfo.zone === 'Safety'
-                        ? 'trending-flat'
-                        : 'trending-down'
+                      rankInfo.zone === 'Promotion' ? 'trending-up'
+                      : rankInfo.zone === 'Safety' ? 'trending-flat'
+                      : 'trending-down'
                     }
                     size={14}
                     color={rankInfo.color}
@@ -283,7 +252,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Level + XP Card */}
+        {/* Level + XP */}
         <View style={styles.levelCard}>
           <View style={styles.levelHeader}>
             <View>
@@ -303,28 +272,20 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
-        {/* Stats Grid */}
+        {/* Stats */}
         <View style={styles.statsGrid}>
-          <View style={styles.statItem}>
-            <MaterialIcons name="local-fire-department" size={22} color={Colors.danger} />
-            <Text style={styles.statVal}>{user.streakCurrent}</Text>
-            <Text style={styles.statLabel}>Current Streak</Text>
-          </View>
-          <View style={styles.statItem}>
-            <MaterialIcons name="emoji-events" size={22} color={Colors.warning} />
-            <Text style={styles.statVal}>{user.streakLongest}</Text>
-            <Text style={styles.statLabel}>Best Streak</Text>
-          </View>
-          <View style={styles.statItem}>
-            <MaterialIcons name="schedule" size={22} color={Colors.accent} />
-            <Text style={styles.statVal}>{totalHours}h</Text>
-            <Text style={styles.statLabel}>Total Study</Text>
-          </View>
-          <View style={styles.statItem}>
-            <MaterialIcons name="check-circle" size={22} color={Colors.success} />
-            <Text style={styles.statVal}>{doneChapters}</Text>
-            <Text style={styles.statLabel}>Chapters Done</Text>
-          </View>
+          {[
+            { icon: 'local-fire-department', color: Colors.danger, val: user.streakCurrent, label: 'Current Streak' },
+            { icon: 'emoji-events', color: Colors.warning, val: user.streakLongest, label: 'Best Streak' },
+            { icon: 'schedule', color: Colors.accent, val: `${totalHours}h`, label: 'Total Study' },
+            { icon: 'check-circle', color: Colors.success, val: doneChapters, label: 'Chapters Done' },
+          ].map(item => (
+            <View key={item.label} style={styles.statItem}>
+              <MaterialIcons name={item.icon as any} size={22} color={item.color} />
+              <Text style={styles.statVal}>{item.val}</Text>
+              <Text style={styles.statLabel}>{item.label}</Text>
+            </View>
+          ))}
         </View>
 
         {/* Level Roadmap */}
@@ -348,13 +309,12 @@ export default function ProfileScreen() {
               </View>
               {user.xpTotal >= l.minXP
                 ? <MaterialIcons name="check-circle" size={18} color={l.color} />
-                : null
-              }
+                : null}
             </View>
           ))}
         </View>
 
-        {/* Account Info */}
+        {/* Account Info + Sign Out */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>ACCOUNT INFO</Text>
 
@@ -374,18 +334,22 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {user.myReferralCode ? (
+          {(user as any).myReferralCode ? (
             <View style={styles.settingRow}>
               <MaterialIcons name="card-giftcard" size={20} color={Colors.primary} />
               <View style={styles.settingInfo}>
                 <Text style={styles.settingLabel}>Your Referral Code</Text>
-                <Text style={styles.settingValue}>{user.myReferralCode}</Text>
+                <Text style={styles.settingValue}>{(user as any).myReferralCode}</Text>
               </View>
             </View>
           ) : null}
 
-          {/* ✅ Sign Out Button */}
-          <TouchableOpacity style={styles.signOutRow} onPress={confirmSignOut}>
+          {/* ✅ Sign Out */}
+          <TouchableOpacity
+            style={styles.signOutRow}
+            onPress={() => showAlert('Sign Out', 'Are you sure you want to sign out?', true)}
+            activeOpacity={0.7}
+          >
             <MaterialIcons name="logout" size={20} color={Colors.danger} />
             <View style={styles.settingInfo}>
               <Text style={styles.signOutLabel}>Sign Out</Text>
@@ -405,9 +369,7 @@ export default function ProfileScreen() {
                   size={16}
                   color={tx.amount > 0 ? Colors.success : Colors.danger}
                 />
-                <Text style={styles.xpReason}>
-                  {tx.reason.replace(/_/g, ' ')}
-                </Text>
+                <Text style={styles.xpReason}>{tx.reason.replace(/_/g, ' ')}</Text>
                 <Text style={[styles.xpAmount, {
                   color: tx.amount > 0 ? Colors.success : Colors.danger,
                 }]}>
@@ -417,7 +379,6 @@ export default function ProfileScreen() {
             ))}
           </View>
         ) : null}
-
       </ScrollView>
 
       {/* Edit Modal */}
@@ -506,8 +467,7 @@ export default function ProfileScreen() {
                 >
                   {loading
                     ? <ActivityIndicator color={Colors.background} />
-                    : <Text style={styles.saveBtnText}>Save</Text>
-                  }
+                    : <Text style={styles.saveBtnText}>Save</Text>}
                 </TouchableOpacity>
               </View>
             </View>
@@ -515,15 +475,15 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* Web Alert Modal */}
-      {Platform.OS === 'web' ? (
+      {/* Web Alert */}
+      {Platform.OS === 'web' && (
         <Modal visible={alertConfig.visible} transparent animationType="fade">
           <View style={styles.alertOverlay}>
             <View style={styles.alertBox}>
               <Text style={styles.alertTitle}>{alertConfig.title}</Text>
               <Text style={styles.alertMsg}>{alertConfig.message}</Text>
               <View style={{ flexDirection: 'row', gap: 10 }}>
-                {alertConfig.title === 'Sign Out' ? (
+                {alertConfig.isSignOut ? (
                   <>
                     <TouchableOpacity
                       style={[styles.alertBtn, { backgroundColor: Colors.surfaceVariant, flex: 1 }]}
@@ -550,7 +510,7 @@ export default function ProfileScreen() {
             </View>
           </View>
         </Modal>
-      ) : null}
+      )}
     </SafeAreaView>
   );
 }
@@ -568,27 +528,13 @@ const styles = StyleSheet.create({
   profileName: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.textPrimary },
   profileSub: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
   badgesRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' },
-  examBadge: {
-    backgroundColor: Colors.primary + '22', borderRadius: Radius.full,
-    paddingHorizontal: 12, paddingVertical: 4,
-    borderWidth: 1, borderColor: Colors.primary + '55',
-  },
+  examBadge: { backgroundColor: Colors.primary + '22', borderRadius: Radius.full, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: Colors.primary + '55' },
   examBadgeText: { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.semiBold },
-  rankBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1,
-  },
+  rankBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1 },
   rankBadgeText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold },
-  editProfileBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: Colors.primary, paddingHorizontal: 16, paddingVertical: 8,
-    borderRadius: Radius.full,
-  },
+  editProfileBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.full },
   editProfileBtnText: { color: Colors.background, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
-  levelCard: {
-    backgroundColor: Colors.surface, borderRadius: Radius.lg,
-    borderWidth: 1, borderColor: Colors.border, padding: Spacing.md, marginBottom: Spacing.md,
-  },
+  levelCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, padding: Spacing.md, marginBottom: Spacing.md },
   levelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.sm },
   levelTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, includeFontPadding: false },
   levelExam: { fontSize: FontSize.sm, color: Colors.textSecondary },
