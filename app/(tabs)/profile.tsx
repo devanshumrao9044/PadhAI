@@ -114,10 +114,17 @@ export default function ProfileScreen() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.6,
+      quality: 0.5,
+      base64: true, 
     });
-    if (!result.canceled && result.assets[0].uri) {
-      setEditAvatarUrl(result.assets[0].uri);
+    
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      if (Platform.OS === 'web' && asset.base64) {
+        setEditAvatarUrl(`data:image/jpeg;base64,${asset.base64}`);
+      } else {
+        setEditAvatarUrl(asset.uri);
+      }
     }
   };
 
@@ -141,18 +148,30 @@ export default function ProfileScreen() {
         !editAvatarUrl.startsWith('http');
 
       if (isNewLocalImage) {
-        const uriParts = editAvatarUrl.split('.');
-        const ext = (uriParts[uriParts.length - 1] || 'jpg').toLowerCase();
-        const mimeType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
+        const ext = 'jpeg';
+        const mimeType = 'image/jpeg';
         const filePath = `${authUser.id}/${authUser.id}-${Date.now()}.${ext}`;
 
-        // ✅ arrayBuffer — works on Android/iOS/Web
-        const response = await fetch(editAvatarUrl);
-        const arrayBuffer = await response.arrayBuffer();
+        let fileBody: ArrayBuffer | Uint8Array;
+
+        // ✅ Web/Onspace data-uri bypass logic to prevent "Failed to fetch"
+        if (Platform.OS === 'web' || editAvatarUrl.startsWith('data:image')) {
+          const base64Data = editAvatarUrl.split(',')[1];
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          fileBody = new Uint8Array(byteNumbers);
+        } else {
+          // Pure mobile raw data buffers
+          const response = await fetch(editAvatarUrl);
+          fileBody = await response.arrayBuffer();
+        }
 
         const { error: uploadError } = await supabase.storage
           .from('avatars')
-          .upload(filePath, arrayBuffer, { contentType: mimeType, upsert: true });
+          .upload(filePath, fileBody, { contentType: mimeType, upsert: true });
 
         if (uploadError) throw new Error(`Photo upload failed: ${uploadError.message}`);
 
@@ -163,7 +182,6 @@ export default function ProfileScreen() {
         finalAvatarUrl = urlData.publicUrl;
       }
 
-      // ✅ column is 'class' not 'class_level'
       const { error: dbError } = await supabase
         .from('users')
         .update({
@@ -344,7 +362,6 @@ export default function ProfileScreen() {
             </View>
           ) : null}
 
-          {/* ✅ Sign Out */}
           <TouchableOpacity
             style={styles.signOutRow}
             onPress={() => showAlert('Sign Out', 'Are you sure you want to sign out?', true)}
@@ -586,3 +603,4 @@ const styles = StyleSheet.create({
   alertMsg: { fontSize: FontSize.base, color: Colors.textSecondary, marginBottom: Spacing.md },
   alertBtn: { backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center' },
 });
+
