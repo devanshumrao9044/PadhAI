@@ -12,6 +12,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const segments = useSegments();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [checking, setChecking] = useState(true);
+  const [authKey, setAuthKey] = useState(0); 
   const streakCheckedRef = useRef(false);
   const appCtx = useContext(AppContext);
 
@@ -23,6 +24,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
+      setAuthKey(prev => prev + 1); 
+      
+      if (_event === 'SIGNED_OUT') {
+        streakCheckedRef.current = false;
+        router.replace('/'); 
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -41,11 +48,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const isProtected = inAuthGroup || inOnboarding || inFocus || inTracker || inStreakBroken || inReferral;
 
     if (!session && isProtected) {
+      streakCheckedRef.current = false;
       router.replace('/');
     } else if (session && !streakCheckedRef.current) {
       streakCheckedRef.current = true;
       const uid = session.user.id;
-      if (segments[0] === 'index' && !inAuthGroup) {
+      
+      if (segments[0] === 'index' || segments.length === 0) {
         (async () => {
           await checkStreakOnLaunch(uid);
           checkAndRedirect(uid);
@@ -114,7 +123,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return <View key={authKey} style={{flex: 1}}>{children}</View>;
 }
 
 export default function RootLayout() {
