@@ -195,6 +195,7 @@ export default function ProfileScreen() {
 
       if (dbError) throw new Error(`Save failed: ${dbError.message}`);
 
+      // Update local context state immediately — no stale DB re-fetch needed
       await setUser({
         ...user,
         fullName: editName.trim(),

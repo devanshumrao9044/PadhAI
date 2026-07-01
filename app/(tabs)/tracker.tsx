@@ -84,8 +84,8 @@ export default function TrackerScreen() {
               activeOpacity={0.7}
             >
               <View style={styles.cardInfo}>
-                <View style={[styles.subjectDot, { backgroundColor: item.colorHex || item.color || Colors.primary }]}>
-                  <MaterialIcons name={(item.icon as any) || 'book'} size={14} color={Colors.background} />
+                <View style={[styles.subjectDot, { backgroundColor: item.colorHex || Colors.primary }]}>
+                  <MaterialIcons name={(item.iconName as any) || 'book'} size={14} color={Colors.background} />
                 </View>
                 <Text style={styles.subjectName}>{item.name}</Text>
               </View>

@@ -25,7 +25,10 @@ export default function FocusActiveScreen() {
   const [showExit, setShowExit] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const startTimeRef = useRef(Date.now());
+  // Use the actual session start time so the timer survives hot reloads / brief backgrounding
+  const startTimeRef = useRef(
+    activeSession?.startedAt ? new Date(activeSession.startedAt).getTime() : Date.now()
+  );
   const elapsedRef = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const appStateRef = useRef(AppState.currentState);
@@ -119,8 +122,15 @@ export default function FocusActiveScreen() {
       return;
     }
     
-    setRemaining(plannedSecs);
-    startTimeRef.current = Date.now();
+    // Restore elapsed time based on when the session actually started
+    startTimeRef.current = activeSession.startedAt
+      ? new Date(activeSession.startedAt).getTime()
+      : Date.now();
+    const alreadyElapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+    const initialRemaining = Math.max(0, plannedSecs - alreadyElapsed);
+    elapsedRef.current = alreadyElapsed;
+    setElapsed(alreadyElapsed);
+    setRemaining(initialRemaining);
     intervalRef.current = setInterval(tick, 500);
 
     const appStateSub = AppState.addEventListener('change', next => {

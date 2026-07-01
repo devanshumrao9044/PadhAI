@@ -327,13 +327,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) return;
-      const payload = {
+      // Sync all updatable profile fields to DB
+      const payload: any = {
         xp: u.xpTotal,
         streak: u.streakCurrent,
         longest_streak: u.streakLongest,
         last_study_date: u.lastStudyDate,
         daily_goal_minutes: u.dailyGoalMinutes,
       };
+      // Only include profile fields if they were passed
+      if (u.fullName) payload.name = u.fullName;
+      if ((u as any).targetExam) payload.target_exam = (u as any).targetExam;
+      if ((u as any).classLevel) payload.class = (u as any).classLevel;
+      if ((u as any).avatarUrl !== undefined) payload.avatar_url = (u as any).avatarUrl;
       const { error } = await supabase.from('users').update(payload).eq('id', authUser.id);
       if (error) throw error;
     } catch {
@@ -543,65 +549,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           await addToSyncQueue({ table: 'focus_sessions', action: 'insert', payload: sessionPayload });
         }
       }
-      // ── Referral Validation Trigger ────────────────────────────────────
-      try {
-        if (activeUser?.id) {
-          const { data: pendingRef } = await supabase
-            .from('referrals')
-            .select('id, referrer_id')
-            .eq('referee_id', activeUser.id)
-            .eq('status', 'pending')
-            .maybeSingle();
-
-          if (pendingRef) {
-            // Mark referral as completed
-            await supabase
-              .from('referrals')
-              .update({ status: 'completed' })
-              .eq('id', pendingRef.id);
-
-            // Award +50 XP to current user (referee headstart)
-            await awardXP(50, 'referral_headstart');
-
-            // Award +25 XP to referrer via DB function or direct update
-            const { data: referrerProfile } = await supabase
-              .from('users')
-              .select('xp')
-              .eq('id', pendingRef.referrer_id)
-              .single();
-            if (referrerProfile) {
-              await supabase
-                .from('users')
-                .update({ xp: (referrerProfile.xp ?? 0) + 25 })
-                .eq('id', pendingRef.referrer_id);
-              await supabase.from('xp_transactions').insert([{
-                user_id: pendingRef.referrer_id,
-                amount: 25,
-                reason: 'referral_invite_completed',
-                created_at: new Date().toISOString(),
-              }]);
-            }
-
-            // Check jackpot for referrer
-            const { count: newCount } = await supabase
-              .from('referrals')
-              .select('id', { count: 'exact', head: true })
-              .eq('referrer_id', pendingRef.referrer_id)
-              .eq('status', 'completed');
-
-            // If current user IS the referrer, update local state
-            if (pendingRef.referrer_id === activeUser.id) {
-              const rCount = newCount ?? 0;
-              setReferralCount(rCount);
-              if (rCount >= 5) setHasUnlockedRewardState(true);
-            }
-          }
-        }
-      } catch (refErr) {
-        console.log('Referral trigger error (non-fatal):', refErr);
-      }
-      // ── End Referral Trigger ───────────────────────────────────────────
-
       processSyncQueue();
       return { ...sessionObj, leveledUp, newLevelRank };
     } catch {

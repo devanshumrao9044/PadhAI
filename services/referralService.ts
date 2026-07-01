@@ -78,8 +78,6 @@ export async function processReferralOnFirstSession(
       .from('referrals')
       .update({
         status: 'completed',
-        xp_awarded: true,
-        completed_at: new Date().toISOString(),
       })
       .eq('id', referral.id);
 

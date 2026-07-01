@@ -8,9 +8,6 @@ import { BarChart, LineChart } from 'react-native-chart-kit';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CHART_WIDTH = SCREEN_WIDTH - Spacing.md * 2 - 2; // card padding
-
 const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function formatMins(mins: number): string {
@@ -57,6 +54,17 @@ const LINE_CHART_CONFIG = {
 
 export default function AnalyticsScreen() {
   const { user, sessions, getLast7Days, getLast90Days, chapters, getDailySummary } = useApp();
+
+  // SSR-safe dimensions
+  const [screenWidth, setScreenWidth] = useState(() => Math.max(320, Dimensions.get('window').width));
+  useEffect(() => {
+    const sub = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenWidth(Math.max(320, window.width));
+    });
+    return () => sub?.remove();
+  }, []);
+  const CHART_WIDTH = Math.max(1, screenWidth - Spacing.md * 2 - 2);
+
   const today = new Date().toISOString().split('T')[0];
   const last7 = getLast7Days();
   const last90 = getLast90Days();
