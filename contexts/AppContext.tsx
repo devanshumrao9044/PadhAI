@@ -320,14 +320,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [load]);
 
-  // ── setUser: sync to Supabase ─────────────────────────────────────────────
+  // ── setUser: sync XP/streak fields to Supabase (profile fields saved separately in profile.tsx) ─────────────────────────────────────────────
   const setUser = async (u: UserProfile) => {
     setUserState(u);
     await setItem(StorageKeys.USER, u);
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) return;
-      // Sync all updatable profile fields to DB
+      // Sync XP, streak, and goal fields — profile fields (name/exam/class/avatar)
+      // are already persisted by the caller (profile.tsx handleSaveProfile)
       const payload: any = {
         xp: u.xpTotal,
         streak: u.streakCurrent,
@@ -335,11 +336,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         last_study_date: u.lastStudyDate,
         daily_goal_minutes: u.dailyGoalMinutes,
       };
-      // Only include profile fields if they were passed
-      if (u.fullName) payload.name = u.fullName;
-      if ((u as any).targetExam) payload.target_exam = (u as any).targetExam;
-      if ((u as any).classLevel) payload.class = (u as any).classLevel;
-      if ((u as any).avatarUrl !== undefined) payload.avatar_url = (u as any).avatarUrl;
       const { error } = await supabase.from('users').update(payload).eq('id', authUser.id);
       if (error) throw error;
     } catch {
@@ -518,6 +514,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const newXPTotal = (activeUser?.xpTotal ?? 0) + xp;
       const newLevelRank = getLevelForXP(newXPTotal).rank;
       const leveledUp = newLevelRank > oldLevelRank;
+      // NOTE: comeback_bonus is NOT a DB column — omit it from the DB payload
       const sessionPayload = {
         id: sessionId,
         user_id: activeUser?.id ?? '',
@@ -527,9 +524,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         actual_minutes: actualMins,
         broken: false,
         xp_earned: xp,
-        comeback_bonus: bonusFromComeback > 0 ? bonusFromComeback : undefined,
         xp_deducted: 0,
-        broken_at_percent: 100,
         started_at: activeSession?.startedAt ?? new Date().toISOString(),
         ended_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
