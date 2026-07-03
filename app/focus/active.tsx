@@ -17,7 +17,7 @@ function formatTime(secs: number): string {
 
 export default function FocusActiveScreen() {
   const router = useRouter();
-  const { activeSession, completeSession, breakSession, subjects } = useApp();
+  const { activeSession, completeSession, breakSession, subjects, streakRecoveryPending, lostStreakCount, setStreakRecoveryPending } = useApp();
   
   const [remaining, setRemaining] = useState(0);
   const [elapsed, setElapsed] = useState(0);
@@ -58,8 +58,14 @@ export default function FocusActiveScreen() {
     try {
       const actualMins = Math.floor(elapsedRef.current / 60);
       const session = await completeSession(activeSession.sessionId, actualMins);
+      const isRecovery = streakRecoveryPending;
+      const recoveredStreak = lostStreakCount;
+
       const comebackParam = (session as any)?.comebackBonus > 0 ? '1' : '0';
       const xpEarned = session?.xpEarned ?? 0;
+
+      // Clear streak recovery flag regardless of outcome
+      if (isRecovery) setStreakRecoveryPending(false, 0);
       
       // If leveled up, go to levelup screen first
       if (session?.leveledUp && session?.newLevelRank) {
@@ -69,10 +75,10 @@ export default function FocusActiveScreen() {
         // Read total XP from session's post-completion state via the xpEarned + fallback
         const totalXPAfter = xpEarned; // approximate; dashboard will show real value
         router.replace(
-          `/focus/levelup?newLevel=${session.newLevelRank}&title=${encodeURIComponent(levelDef?.realisticTitle ?? '')}&examTitle=${encodeURIComponent(levelDef?.examTitle ?? '')}&color=${encodeURIComponent(levelDef?.color ?? '#A855F7')}&totalXP=${totalXPAfter}&xpEarned=${xpEarned}`
+          `/focus/levelup?newLevel=${session.newLevelRank}&title=${encodeURIComponent(levelDef?.realisticTitle ?? '')}&examTitle=${encodeURIComponent(levelDef?.examTitle ?? '')}&color=${encodeURIComponent(levelDef?.color ?? '#A855F7')}&totalXP=${totalXPAfter}&xpEarned=${xpEarned}&recovery=${isRecovery ? '1' : '0'}&lostStreak=${recoveredStreak}`
         );
       } else {
-        router.replace(`/focus/complete?xp=${xpEarned}&comeback=${comebackParam}`);
+        router.replace(`/focus/complete?xp=${xpEarned}&comeback=${comebackParam}&recovery=${isRecovery ? '1' : '0'}&lostStreak=${recoveredStreak}`);
       }
     } catch (error) {
       console.error("Silent Complete Error:", error);

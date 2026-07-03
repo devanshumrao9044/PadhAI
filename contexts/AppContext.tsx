@@ -25,6 +25,9 @@ export type AppContextType = {
   hasUnlockedReward: boolean;
   setHasUnlockedReward: (v: boolean) => void;
   referralCount: number;
+  streakRecoveryPending: boolean;
+  lostStreakCount: number;
+  setStreakRecoveryPending: (v: boolean, lostStreak?: number) => void;
   user: UserProfile | null;
   isOnboarded: boolean;
   setUser: (u: UserProfile) => Promise<void>;
@@ -169,6 +172,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [comebackPending, setComebackPendingState] = useState(false);
   const [hasUnlockedReward, setHasUnlockedRewardState] = useState(false);
   const [referralCount, setReferralCount] = useState(0);
+  const [streakRecoveryPending, setStreakRecoveryPendingState] = useState(false);
+  const [lostStreakCount, setLostStreakCount] = useState(0);
 
   const addToSyncQueue = async (task: Omit<SyncTask, 'id'>) => {
     const existingQueue = (await getItem<SyncTask[]>(OFFLINE_QUEUE_KEY)) || [];
@@ -596,6 +601,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const setComebackPending = (v: boolean) => setComebackPendingState(v);
   const setHasUnlockedReward = (v: boolean) => setHasUnlockedRewardState(v);
+  const setStreakRecoveryPending = (v: boolean, lostStreak?: number) => {
+    setStreakRecoveryPendingState(v);
+    if (lostStreak !== undefined) setLostStreakCount(lostStreak);
+  };
 
   const processPostSessionData = async (mins: number, xpDelta: number, isCompleted: boolean, activeUser: UserProfile) => {
     try {
@@ -679,6 +688,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       xpLog, awardXP, deductXP, checkStreak,
       comebackPending, setComebackPending,
       hasUnlockedReward, setHasUnlockedReward, referralCount,
+      streakRecoveryPending, lostStreakCount, setStreakRecoveryPending,
       isLoading, reload: load,
     }}>
       {children}

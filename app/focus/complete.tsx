@@ -61,13 +61,19 @@ const CONFETTI_COLORS = [
 
 export default function FocusCompleteScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ xp: string; comeback: string }>();
-  const { user } = useApp();
+  const params = useLocalSearchParams<{
+    xp: string; comeback: string; recovery: string; lostStreak: string;
+  }>();
+  const { user, setUser } = useApp();
 
   const xp = parseInt(params.xp ?? '0', 10);
   const isComeback = params.comeback === '1';
+  const isRecovery = params.recovery === '1';
+  const lostStreak = parseInt(params.lostStreak ?? '0', 10);
+  const recoveredStreak = Math.max(1, Math.ceil(lostStreak / 2));
   const COMEBACK_BONUS = 50;
 
+  // Animated values
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
@@ -75,20 +81,27 @@ export default function FocusCompleteScreen() {
   const comebackOpacity = useRef(new Animated.Value(0)).current;
   const comebackScale = useRef(new Animated.Value(0.7)).current;
   const shimmerAnim = useRef(new Animated.Value(0)).current;
+  const recoverySlide = useRef(new Animated.Value(-50)).current;
+  const recoveryOpacity = useRef(new Animated.Value(0)).current;
+  const recoveryScale = useRef(new Animated.Value(0.85)).current;
 
   const messageRef = useRef(
     COMPLETION_MESSAGES[Math.floor(Math.random() * COMPLETION_MESSAGES.length)]
   );
   const level = user ? getLevelForXP(user.xpTotal) : null;
 
-  // ✅ Fixed — no callback param
+  // ✅ Restore half-streak when this is a recovery session
+  useEffect(() => {
+    if (!isRecovery || !user || lostStreak <= 0) return;
+    setUser({ ...user, streakCurrent: recoveredStreak });
+  }, []);
+
+  // Referral check
   useEffect(() => {
     async function triggerReferralCheck() {
       try {
         const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (authUser) {
-          await processReferralOnFirstSession(authUser.id);
-        }
+        if (authUser) await processReferralOnFirstSession(authUser.id);
       } catch (err) {
         console.log('Referral hook error:', err);
       }
@@ -127,9 +140,21 @@ export default function FocusCompleteScreen() {
         ).start();
       }, 600);
     }
+
+    // Recovery badge animation (always shown if isRecovery)
+    if (isRecovery) {
+      setTimeout(() => {
+        Animated.parallel([
+          Animated.spring(recoverySlide, { toValue: 0, tension: 55, friction: 8, useNativeDriver: true }),
+          Animated.timing(recoveryOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.spring(recoveryScale, { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
+        ]).start();
+      }, isComeback ? 1000 : 700);
+    }
   }, []);
 
-  const confettiParticles = isComeback
+  const showConfetti = isComeback || isRecovery;
+  const confettiParticles = showConfetti
     ? Array.from({ length: 18 }, (_, i) => ({
         id: i,
         color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
@@ -138,9 +163,24 @@ export default function FocusCompleteScreen() {
       }))
     : [];
 
+  const screenTitle = isRecovery
+    ? 'Wapas Aa Gaye!'
+    : isComeback
+    ? 'Wapas Aa Gaye!'
+    : 'Session Complete!';
+
+  const screenMessage = isRecovery
+    ? `${recoveredStreak} din ki streak recover ho gayi!\nZiddi student waisa hi karta hai.`
+    : isComeback
+    ? 'Streak toot gayi thi — par aaj tune wapas shuruat ki.\nYahi asli ziddi student hota hai.'
+    : messageRef.current;
+
+  const heroIcon = isRecovery ? 'local-fire-department' : isComeback ? 'whatshot' : 'emoji-events';
+  const heroColor = isRecovery ? Colors.success : isComeback ? '#F97316' : Colors.warning;
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {isComeback && (
+      {showConfetti && (
         <View style={styles.confettiLayer} pointerEvents="none">
           {confettiParticles.map(p => (
             <ConfettiDot key={p.id} color={p.color} delay={p.delay} startX={p.startX} />
@@ -153,39 +193,63 @@ export default function FocusCompleteScreen() {
           <Animated.View
             style={[
               styles.trophyGlow,
-              isComeback && styles.trophyGlowComeback,
+              (isComeback || isRecovery) && styles.trophyGlowComeback,
               {
                 opacity: glowAnim.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [0.3, isComeback ? 1 : 0.8],
+                  outputRange: [0.3, (isComeback || isRecovery) ? 1 : 0.8],
                 }),
+                backgroundColor: heroColor + (isRecovery ? '44' : '33'),
               },
             ]}
           />
-          <MaterialIcons
-            name={isComeback ? 'whatshot' : 'emoji-events'}
-            size={96}
-            color={isComeback ? '#F97316' : Colors.warning}
-          />
+          <MaterialIcons name={heroIcon} size={96} color={heroColor} />
         </Animated.View>
 
         <Animated.View style={[styles.textSection, { opacity: fadeAnim }]}>
-          <Text style={[styles.completeTitle, isComeback && styles.completeTitleComeback]}>
-            {isComeback ? 'Wapas Aa Gaye!' : 'Session Complete!'}
+          <Text style={[
+            styles.completeTitle,
+            (isComeback || isRecovery) && { color: heroColor, fontSize: 28 },
+          ]}>
+            {screenTitle}
           </Text>
-          <Text style={styles.message}>
-            {isComeback
-              ? 'Streak toot gayi thi — par aaj tune wapas shuruat ki.\nYahi asli ziddi student hota hai.'
-              : messageRef.current}
-          </Text>
+          <Text style={styles.message}>{screenMessage}</Text>
 
-          <View style={[styles.xpCard, isComeback && styles.xpCardComeback]}>
+          <View style={[styles.xpCard, (isComeback || isRecovery) && { backgroundColor: heroColor + '22', borderColor: heroColor + '55' }]}>
             <MaterialIcons name="bolt" size={28} color={Colors.warning} />
             <Text style={styles.xpAmount}>+{xp} XP</Text>
             <Text style={styles.xpLabel}>earned</Text>
           </View>
 
-          {isComeback && (
+          {/* ── Streak Recovery Badge ── */}
+          {isRecovery ? (
+            <Animated.View
+              style={[
+                styles.recoveryBanner,
+                {
+                  opacity: recoveryOpacity,
+                  transform: [{ translateY: recoverySlide }, { scale: recoveryScale }],
+                },
+              ]}
+            >
+              <View style={styles.recoveryBannerInner}>
+                <Text style={styles.recoveryEmoji}>🔥</Text>
+                <View style={styles.recoveryTextBlock}>
+                  <Text style={styles.recoveryTitle}>STREAK RECOVERED</Text>
+                  <Text style={styles.recoverySub}>
+                    {lostStreak} din gayi thi — {recoveredStreak} din wapas mili
+                  </Text>
+                </View>
+                <View style={styles.recoveryStreakBadge}>
+                  <Text style={styles.recoveryStreakNum}>{recoveredStreak}</Text>
+                  <Text style={styles.recoveryStreakLabel}>days</Text>
+                </View>
+              </View>
+            </Animated.View>
+          ) : null}
+
+          {/* ── Comeback Banner (existing, shown when isComeback without recovery) ── */}
+          {isComeback && !isRecovery ? (
             <Animated.View
               style={[
                 styles.comebackBanner,
@@ -217,26 +281,30 @@ export default function FocusCompleteScreen() {
                 </View>
               </View>
             </Animated.View>
-          )}
+          ) : null}
 
-          {level && (
+          {level ? (
             <View style={styles.levelRow}>
               <Text style={[styles.levelName, { color: level.color }]}>
                 {level.realisticTitle}
               </Text>
               <Text style={styles.levelTotal}>{user?.xpTotal ?? 0} XP total</Text>
             </View>
-          )}
+          ) : null}
         </Animated.View>
 
         <Animated.View style={[styles.actions, { opacity: fadeAnim }]}>
           <TouchableOpacity
-            style={[styles.continueBtn, isComeback && styles.continueBtnComeback]}
+            style={[
+              styles.continueBtn,
+              isRecovery && { backgroundColor: Colors.success },
+              !isRecovery && isComeback && styles.continueBtnComeback,
+            ]}
             onPress={() => router.replace('/(tabs)')}
             activeOpacity={0.85}
           >
             <Text style={styles.continueBtnText}>
-              {isComeback ? 'Ghar Chalo — Hero ' : 'Return Home '}
+              {isRecovery ? 'Ghar Chalo — Hero ' : isComeback ? 'Ghar Chalo — Hero ' : 'Return Home '}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -268,16 +336,13 @@ const styles = StyleSheet.create({
     position: 'absolute', width: 160, height: 160,
     borderRadius: 80, backgroundColor: Colors.warning + '33',
   },
-  trophyGlowComeback: {
-    backgroundColor: '#F97316' + '44', width: 180, height: 180, borderRadius: 90,
-  },
+  trophyGlowComeback: { width: 180, height: 180, borderRadius: 90 },
   textSection: { alignItems: 'center', width: '100%', marginBottom: Spacing.xl },
   completeTitle: {
     fontSize: FontSize.xxl, fontWeight: FontWeight.extraBold,
     color: Colors.textPrimary, textAlign: 'center',
     includeFontPadding: false, marginBottom: Spacing.sm,
   },
-  completeTitleComeback: { color: '#F97316', fontSize: 30 },
   message: {
     fontSize: FontSize.md, color: Colors.textSecondary,
     textAlign: 'center', lineHeight: 26, marginBottom: Spacing.lg,
@@ -288,12 +353,43 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md,
     borderWidth: 1, borderColor: Colors.warning + '44', marginBottom: Spacing.sm,
   },
-  xpCardComeback: { backgroundColor: '#F97316' + '22', borderColor: '#F97316' + '55' },
   xpAmount: {
     fontSize: 40, fontWeight: FontWeight.extraBold,
     color: Colors.warning, includeFontPadding: false,
   },
   xpLabel: { fontSize: FontSize.base, color: Colors.warning + 'AA' },
+
+  // ── Streak Recovery Banner ──
+  recoveryBanner: {
+    width: '100%', borderRadius: Radius.lg, overflow: 'hidden',
+    marginBottom: Spacing.md, borderWidth: 1.5,
+    borderColor: Colors.success + '66', backgroundColor: Colors.success + '18',
+  },
+  recoveryBannerInner: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: Spacing.md, gap: Spacing.sm,
+  },
+  recoveryEmoji: { fontSize: 30 },
+  recoveryTextBlock: { flex: 1 },
+  recoveryTitle: {
+    fontSize: FontSize.xs, fontWeight: FontWeight.extraBold,
+    color: Colors.success, letterSpacing: 1.5, marginBottom: 2, textTransform: 'uppercase',
+  },
+  recoverySub: { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 18 },
+  recoveryStreakBadge: {
+    alignItems: 'center', backgroundColor: Colors.success,
+    borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 6, minWidth: 52,
+  },
+  recoveryStreakNum: {
+    fontSize: FontSize.lg, fontWeight: FontWeight.extraBold,
+    color: '#FFFFFF', includeFontPadding: false,
+  },
+  recoveryStreakLabel: {
+    fontSize: 10, fontWeight: FontWeight.semiBold,
+    color: '#FFFFFFCC', letterSpacing: 1, textTransform: 'uppercase',
+  },
+
+  // ── Comeback Banner ──
   comebackBanner: {
     width: '100%', borderRadius: Radius.lg, overflow: 'hidden',
     marginBottom: Spacing.md, borderWidth: 1.5,
@@ -326,6 +422,7 @@ const styles = StyleSheet.create({
     fontSize: 10, fontWeight: FontWeight.semiBold,
     color: '#FFFFFF' + 'CC', letterSpacing: 1, textTransform: 'uppercase',
   },
+
   levelRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: 4 },
   levelName: { fontSize: FontSize.md, fontWeight: FontWeight.semiBold },
   levelTotal: { fontSize: FontSize.sm, color: Colors.textTertiary },
