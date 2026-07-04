@@ -92,11 +92,23 @@ export default function Dashboard() {
 
   useEffect(() => { loadAll(); }, []);
 
+  const channelIdRef = useRef(0);
+
   useEffect(() => {
     if (!userId) return;
-    if (channelRef.current) supabase.removeChannel(channelRef.current);
+
+    // Remove any existing channel first
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    // Use a unique channel name each time to prevent "subscribe multiple times" error
+    channelIdRef.current += 1;
+    const channelName = `dashboard-${userId}-${channelIdRef.current}`;
+
     const channel = supabase
-      .channel(`dashboard-${userId}`)
+      .channel(channelName)
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'focus_sessions', filter: `user_id=eq.${userId}` },
         () => { loadTodayStats(); loadUserData(); }
@@ -106,8 +118,13 @@ export default function Dashboard() {
         () => loadChaptersStats()
       )
       .subscribe();
+
     channelRef.current = channel;
-    return () => { supabase.removeChannel(channel); channelRef.current = null; };
+
+    return () => {
+      supabase.removeChannel(channel);
+      channelRef.current = null;
+    };
   }, [userId]);
 
   const onRefresh = useCallback(async () => {
