@@ -35,6 +35,7 @@ export default function FocusActiveScreen() {
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isCompletingRef = useRef(false);
   const rtChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const rtChannelIdRef = useRef(0);
 
   const plannedMins = activeSession?.plannedMins ?? 25;
   const plannedSecs = plannedMins * 60;
@@ -171,8 +172,11 @@ export default function FocusActiveScreen() {
       supabase.removeChannel(rtChannelRef.current);
     }
 
+    rtChannelIdRef.current += 1;
+    const channelName = `focus-active-${activeSession.sessionId}-${rtChannelIdRef.current}`;
+
     const channel = supabase
-      .channel(`focus-active-${activeSession.sessionId}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
