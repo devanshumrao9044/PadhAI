@@ -168,8 +168,10 @@ export default function FocusActiveScreen() {
   useEffect(() => {
     if (!activeSession?.sessionId) return;
 
+    // ✅ Remove old channel BEFORE creating new one — prevents channel leaks
     if (rtChannelRef.current) {
       supabase.removeChannel(rtChannelRef.current);
+      rtChannelRef.current = null;
     }
 
     rtChannelIdRef.current += 1;
@@ -189,8 +191,8 @@ export default function FocusActiveScreen() {
           if (isCompletingRef.current) return;
           const updated = payload.new;
 
-          // Session completed from another device
-          if (updated?.completed === true) {
+          // ✅ Fix: DB mein 'completed' column nahi — broken=false means completed
+          if (updated?.broken === false && updated?.ended_at) {
             isCompletingRef.current = true;
             if (intervalRef.current) clearInterval(intervalRef.current);
             router.replace(`/focus/complete?xp=${updated.xp_earned ?? 0}`);
@@ -272,23 +274,23 @@ export default function FocusActiveScreen() {
         <View style={styles.exitOverlay}>
           <View style={styles.exitCard}>
             <MaterialIcons name="warning" size={36} color={Colors.danger} />
-            <Text style={styles.exitTitle}>Session Todna Hai?</Text>
+            <Text style={styles.exitTitle}>Do you want to break the session? </Text>
             <Text style={styles.exitSub}>
-              Streak reset ho jayega.{'\n'}XP kata jayega.{'\n'}Ye hi problem hai tera.
+              The streak will be reset.{'\n'}XP will be deducted.{'\n'} There is a need to focus well 
             </Text>
             <TouchableOpacity 
               style={[styles.exitConfirm, isProcessing && { opacity: 0.5 }]} 
               onPress={handleBreak}
               disabled={isProcessing}
             >
-              <Text style={styles.exitConfirmText}>{isProcessing ? 'Processing...' : 'Haan, tod do'}</Text>
+              <Text style={styles.exitConfirmText}>{isProcessing ? 'Processing...' : 'Yes Break it.'}</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.exitCancel} 
               onPress={() => setShowExit(false)}
               disabled={isProcessing}
             >
-              <Text style={styles.exitCancelText}>Wapas Focus Karo</Text>
+              <Text style={styles.exitCancelText}>Regain your Focus</Text>
             </TouchableOpacity>
           </View>
         </View>
