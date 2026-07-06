@@ -260,14 +260,38 @@ export default function AuthScreen() {
     setSignupApiSuccess(null);
     if (Object.keys(getSignupErrors(signupName, signupEmail, signupPassword)).length > 0) return;
     setSignupLoading(true);
+    
     try {
       const trimmedEmail = signupEmail.trim().toLowerCase();
       const trimmedPassword = signupPassword.trim();
+      const referralCode = signupReferral.trim().toUpperCase();
+      
+      let referrerId = null;
+
+      // ✅ FIX: PRE-FLIGHT REFERRAL CHECK
+      // Agar user ne code daala hai, toh account banane se pehle check karo ki code asli hai ya nahi
+      if (referralCode) {
+        const { data: referrer, error: refError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('my_referral_code', referralCode)
+          .maybeSingle();
+
+        if (!referrer || refError) {
+          setSignupApiError('Invalid referral code. Please check and try again.');
+          setSignupLoading(false);
+          return; // 🛑 Yahan account banne se pehle hi function rok diya
+        }
+        referrerId = referrer.id;
+      }
+
+      // ✅ Abhi validation pass ho gayi, account bana sakte hain
       const { data, error } = await supabase.auth.signUp({
         email: trimmedEmail,
         password: trimmedPassword,
         options: { data: { name: signupName.trim() } },
       });
+
       if (error) {
         const msg = error.message.toLowerCase();
         if (msg.includes('already registered') || msg.includes('already exists')) {
@@ -278,26 +302,21 @@ export default function AuthScreen() {
         return;
       }
 
-      // Apply referral code if entered
-      if (signupReferral.trim() && data?.user) {
-        const { data: referrer } = await supabase
-          .from('users')
-          .select('id')
-          .eq('my_referral_code', signupReferral.trim().toUpperCase())
-          .maybeSingle();
-        if (referrer && referrer.id !== data.user.id) {
-          await supabase.from('users')
-            .update({ referred_by: signupReferral.trim().toUpperCase() })
-            .eq('id', data.user.id);
-          await supabase.from('referrals').insert({
-            referrer_id: referrer.id,
-            referee_id: data.user.id,
-            status: 'pending',
-          });
-        }
+      // ✅ Apply referral code (humne pehle hi ID fetch kar li thi, dobara query ki zaroorat nahi)
+      if (referrerId && data?.user && referrerId !== data.user.id) {
+        await supabase.from('users')
+          .update({ referred_by: referralCode })
+          .eq('id', data.user.id);
+        
+        await supabase.from('referrals').insert({
+          referrer_id: referrerId,
+          referee_id: data.user.id,
+          status: 'pending',
+        });
       }
 
       if (data?.session) { router.replace('/onboarding'); return; }
+      
       if (data?.user) {
         const { data: signInData, error: signInError } =
           await supabase.auth.signInWithPassword({
@@ -313,6 +332,7 @@ export default function AuthScreen() {
         setSignupApiSuccess('Account created! Please sign in.');
         return;
       }
+      
       setSignupApiError('Something went wrong. Please try again.');
     } catch (err: any) {
       setSignupApiError(err?.message ?? 'An unexpected error occurred.');
@@ -600,3 +620,4 @@ const s = StyleSheet.create({
   switchText: { color: '#6B7280', fontSize: 13 },
   switchLink: { color: '#7C5CFC', fontSize: 13, fontWeight: '700' },
 });
+
