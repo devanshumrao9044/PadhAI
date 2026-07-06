@@ -268,24 +268,20 @@ export default function AuthScreen() {
       
       let referrerId = null;
 
-      // ✅ FIX: PRE-FLIGHT REFERRAL CHECK
-      // Agar user ne code daala hai, toh account banane se pehle check karo ki code asli hai ya nahi
+      // ✅ FIX: SECURE PRE-FLIGHT CHECK (Bypasses RLS via RPC)
+      // Account banane se pehle code verify karo
       if (referralCode) {
-        const { data: referrer, error: refError } = await supabase
-          .from('users')
-          .select('id')
-          .eq('my_referral_code', referralCode)
-          .maybeSingle();
+        const { data: refId, error: rpcError } = await supabase.rpc('get_referrer_id', { code: referralCode });
 
-        if (!referrer || refError) {
+        if (!refId || rpcError) {
           setSignupApiError('Invalid referral code. Please check and try again.');
           setSignupLoading(false);
-          return; // 🛑 Yahan account banne se pehle hi function rok diya
+          return; // 🛑 Galat code par account banne se turant rok diya
         }
-        referrerId = referrer.id;
+        referrerId = refId;
       }
 
-      // ✅ Abhi validation pass ho gayi, account bana sakte hain
+      // ✅ Validation pass! Ab account banao
       const { data, error } = await supabase.auth.signUp({
         email: trimmedEmail,
         password: trimmedPassword,
@@ -302,7 +298,7 @@ export default function AuthScreen() {
         return;
       }
 
-      // ✅ Apply referral code (humne pehle hi ID fetch kar li thi, dobara query ki zaroorat nahi)
+      // ✅ Apply referral code (referrerId already secure function se mil chuka hai)
       if (referrerId && data?.user && referrerId !== data.user.id) {
         await supabase.from('users')
           .update({ referred_by: referralCode })
