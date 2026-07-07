@@ -90,7 +90,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       if (isBroken) {
         await supabase.from('users').update({ streak: 0 }).eq('id', userId);
         appCtx?.setComebackPending(true);
-        router.replace('/streak-broken');
+        router.replace({ pathname: '/streak-broken', params: { lost: profile.streak } });
       }
     } catch (err) {
       console.log('Streak guard error:', err);
