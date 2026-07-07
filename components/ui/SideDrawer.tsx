@@ -151,7 +151,7 @@ export default function SideDrawer({ visible, onClose }: Props) {
             </View>
             <View style={styles.referTextBlock}>
               <Text style={styles.referLabel}>Refer and earn</Text>
-              <Text style={styles.referSub}>Invite friends, earn XP + rewards</Text>
+              <Text style={styles.referSub}>Invite friends, earn rewards</Text>
             </View>
             <View style={styles.referBadge}>
               <Text style={styles.referBadgeText}>NEW</Text>
@@ -161,7 +161,7 @@ export default function SideDrawer({ visible, onClose }: Props) {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>ZiddiStudent • Har din padhna hai</Text>
+          <Text style={styles.footerText}>PadhAI • Focus Your Mind</Text>
         </View>
       </Animated.View>
     </View>
