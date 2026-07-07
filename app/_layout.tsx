@@ -25,7 +25,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       setSession(s);
       if (_event === 'SIGNED_OUT') {
         streakCheckedRef.current = false;
-        router.replace('/');
+        // ✅ FIX: setTimeout lagaya taaki state update (setSession) poora ho sake pehle
+        setTimeout(() => {
+          router.replace('/');
+        }, 0);
       }
     });
 
