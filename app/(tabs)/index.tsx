@@ -13,7 +13,6 @@ import SideDrawer from '../../components/ui/SideDrawer';
 
 export default function Dashboard() {
   const [userName, setUserName] = useState('Student');
-  const [userCode, setUserCode] = useState<string | null>(null);
   const [streak, setStreak] = useState(0);
   const [todayMinutes, setTodayMinutes] = useState(0);
   const [xpTotal, setXpTotal] = useState(0);
@@ -30,14 +29,13 @@ export default function Dashboard() {
       if (!user) return;
       const { data } = await supabase
         .from('users')
-        .select('name, streak, daily_goal_minutes, xp, my_referral_code')
+        .select('name, streak, daily_goal_minutes, xp')
         .eq('id', user.id)
         .single();
       if (data) {
         setUserName(data.name || 'Student');
         setStreak(data.streak || 0);
         setXpTotal(data.xp || 0);
-        setUserCode(data.my_referral_code || null);
       }
       setUserId(user.id);
     } catch (e) {
@@ -183,12 +181,10 @@ export default function Dashboard() {
         <QuoteCard />
       </ScrollView>
 
-      {/* Side Drawer */}
+      {/*  FIX: Removed unnecessary props from SideDrawer */}
       <SideDrawer
         visible={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        userName={userName}
-        userCode={userCode}
       />
     </SafeAreaView>
   );
