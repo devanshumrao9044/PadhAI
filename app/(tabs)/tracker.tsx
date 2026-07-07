@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, TextInput, ActivityIndicator, FlatList
+  Modal, TextInput, ActivityIndicator, FlatList, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -22,7 +22,7 @@ export default function TrackerScreen() {
   const [selectedIcon, setSelectedIcon] = useState(ICON_OPTIONS[0]);
   const [saving, setSaving] = useState(false);
 
-  // 🚀 Infinite Loading ko todne wala core function
+  // 🚀 Cleaned & Fixed handleCreateSubject
   const handleCreateSubject = async () => {
     if (!subjectName.trim()) return;
     
@@ -32,20 +32,17 @@ export default function TrackerScreen() {
         await addSubject(subjectName.trim(), selectedColor, selectedIcon);
       }
       
+      // ✅ Success hone par reset aur close
       setModalVisible(false);
       setSubjectName('');
       setSelectedColor(COLOR_OPTIONS[0]);
       setSelectedIcon(ICON_OPTIONS[0]);
     } catch (error: any) {
-      console.error("Error creating subject, trying object format:", error);
-      try {
-        // @ts-ignore
-        await addSubject({ name: subjectName.trim(), colorHex: selectedColor, icon: selectedIcon });
-        setModalVisible(false);
-        setSubjectName('');
-      } catch (innerError) {
-        alert("Subject save nahi ho paya. Database policy check karein.");
-      }
+      console.error("Error creating subject:", error);
+      Alert.alert(
+        "Error", 
+        "Subject save nahi ho paya. Please try again."
+      );
     } finally {
       setSaving(false);
     }
@@ -128,7 +125,7 @@ export default function TrackerScreen() {
               ))}
             </View>
 
-            {/* 🚀 Icon Selection Added Here */}
+            {/* Icon Selection */}
             <Text style={styles.sectionLabel}>Select Icon</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.iconScrollRow}>
               {ICON_OPTIONS.map(icon => (
@@ -191,7 +188,7 @@ const styles = StyleSheet.create({
   colorCircle: { width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: 'transparent' },
   circleSelected: { borderColor: Colors.textPrimary },
   
-  // 🚀 New Styles for Icon Picker
+  // 🚀 Styles for Icon Picker
   iconScrollRow: { gap: 12, marginBottom: Spacing.xl },
   iconBox: { width: 48, height: 48, borderRadius: Radius.md, backgroundColor: Colors.surfaceVariant, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.border },
   
