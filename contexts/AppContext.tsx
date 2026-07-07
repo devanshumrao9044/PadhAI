@@ -652,12 +652,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } else if (!isCompleted) {
         newStreak = 0;
       }
+      
+      // FIX: Streak tooti toh lastStudyDate null kardo
       await setUser({
         ...activeUser,
         xpTotal: Math.max(0, activeUser.xpTotal + finalXP),
         streakCurrent: newStreak,
         streakLongest: Math.max(newStreak, activeUser.streakLongest),
-        lastStudyDate: isCompleted ? today : activeUser.lastStudyDate,
+        lastStudyDate: !isCompleted ? null : today, 
       });
     } catch (e) {
       console.error('Failed to process post session data', e);
@@ -695,3 +697,4 @@ export function AppProvider({ children }: { children: ReactNode }) {
     </AppContext.Provider>
   );
 }
+
