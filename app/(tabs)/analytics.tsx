@@ -247,8 +247,8 @@ export default function AnalyticsScreen() {
             showValuesOnTopOfBars
             fromZero
             withInnerLines
-            yAxisLabel=""
-            yAxisSuffix="m"
+            yAxisLabel={""}
+            yAxisSuffix={"m"}
             verticalLabelRotation={0}
           />
         </View>
@@ -269,8 +269,8 @@ export default function AnalyticsScreen() {
             fromZero
             withInnerLines
             withShadow={false}
-            yAxisLabel=""
-            yAxisSuffix=""
+            yAxisLabel={""}
+            yAxisSuffix={""}
           />
           <View style={styles.legendRow}>
             <View style={[styles.legendDot, { backgroundColor: Colors.accent }]} />
@@ -296,8 +296,8 @@ export default function AnalyticsScreen() {
             showValuesOnTopOfBars
             fromZero
             withInnerLines
-            yAxisLabel=""
-            yAxisSuffix=""
+            yAxisLabel={""}
+            yAxisSuffix={""}
           />
         </View>
 
