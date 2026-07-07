@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { STREAK_BROKEN_MESSAGES } from '@/constants/messages';
@@ -13,7 +13,9 @@ const RECOVERY_MINS = 30;
 
 export default function StreakBrokenScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ lost?: string }>();
   const { user, startSession, setStreakRecoveryPending } = useApp();
+  
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const challengeSlide = useRef(new Animated.Value(40)).current;
@@ -22,9 +24,10 @@ export default function StreakBrokenScreen() {
 
   const [starting, setStarting] = useState(false);
 
-  const lostStreak = user?.streakCurrent ?? 0;
-  // Streak was already reset to 0 by AuthGate — read from streakLongest for display
-  const displayLost = user?.streakLongest ?? 0;
+  // FIX: Read lost streak from params first. Agar params nahi hai, tab fallback to current streak.
+  // Isse kabhi bhi 'streakLongest' galti se lost streak ki jagah nahi dikhega.
+  const passedLost = params.lost ? parseInt(params.lost, 10) : 0;
+  const displayLost = passedLost > 0 ? passedLost : (user?.streakCurrent ?? 0);
 
   const message =
     STREAK_BROKEN_MESSAGES[Math.floor(Math.random() * STREAK_BROKEN_MESSAGES.length)];
@@ -302,3 +305,4 @@ const styles = StyleSheet.create({
   },
   homeBtnText: { color: Colors.textTertiary, fontSize: FontSize.sm, fontWeight: FontWeight.medium },
 });
+
