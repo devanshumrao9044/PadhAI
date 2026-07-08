@@ -10,20 +10,23 @@ import StepName from '../components/onboarding/StepName';
 import StepExam from '../components/onboarding/StepExam';
 import StepGoal from '../components/onboarding/StepGoal';
 
-const TOTAL_STEPS = 3;
+
+const TOTAL_STEPS = 4;
 
 export default function OnboardingScreen() {
   const [step, setStep] = useState(1);
   const [name, setName] = useState('');
   const [exam, setExam] = useState('JEE');
+  const [studentClass, setStudentClass] = useState('12th'); 
   const [goalMinutes, setGoalMinutes] = useState(120);
   const [loading, setLoading] = useState(false);
 
   // Safe validation check taaki navigation tute nahi
   function canProceed() {
     if (step === 1) return name.trim().length >= 2;
-    if (step === 2) return true; // Fail-safe: Exam step ko freeze nahi hone dega
-    if (step === 3) return goalMinutes > 0;
+    if (step === 2) return true; 
+    if (step === 3) return !!studentClass; 
+    if (step === 4) return goalMinutes > 0;
     return false;
   }
 
@@ -33,12 +36,13 @@ export default function OnboardingScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user) {
-        // Agar user authenticated hai toh data silently update hoga
+        
         await supabase
           .from('users')
           .update({
             name: name.trim(),
             target_exam: exam,
+            class: studentClass, 
             daily_goal_minutes: goalMinutes,
           })
           .eq('id', user.id);
@@ -65,7 +69,7 @@ export default function OnboardingScreen() {
 
       {/* Progress Bar */}
       <View style={styles.progressContainer}>
-        {[1, 2, 3].map((s) => (
+        {[1, 2, 3, 4].map((s) => (
           <View
             key={s}
             style={[
@@ -86,10 +90,41 @@ export default function OnboardingScreen() {
         {step === 1 && (
           <StepName value={name} onChange={setName} />
         )}
+        
         {step === 2 && (
           <StepExam value={exam} onChange={setExam} />
         )}
+
+      
         {step === 3 && (
+          <View style={styles.classContainer}>
+            <Text style={styles.classTitle}>Which is your class? </Text>
+            <Text style={styles.classSubtitle}>This will help to understand your syllabus better. </Text>
+            
+            <View style={styles.classOptionsGrid}>
+              {['11th', '12th', 'Dropper'].map(c => (
+                <TouchableOpacity
+                  key={c}
+                  style={[
+                    styles.classOption,
+                    studentClass === c && styles.classOptionActive
+                  ]}
+                  onPress={() => setStudentClass(c)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[
+                    styles.classOptionText,
+                    studentClass === c && styles.classOptionTextActive
+                  ]}>
+                    {c}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {step === 4 && (
           <StepGoal value={goalMinutes} onChange={setGoalMinutes} />
         )}
       </View>
@@ -137,13 +172,14 @@ const styles = StyleSheet.create({
   },
   progressContainer: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
     justifyContent: 'center',
     marginBottom: 8,
   },
   progressDot: {
     height: 6,
-    width: 60,
+    flex: 1, 
+    maxWidth: 60,
     borderRadius: 3,
     backgroundColor: '#2D2D2D',
   },
@@ -198,4 +234,48 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  
+  classContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  classTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#F1F1F6',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  classSubtitle: {
+    fontSize: 15,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginBottom: 40,
+    lineHeight: 22,
+  },
+  classOptionsGrid: {
+    gap: 16,
+  },
+  classOption: {
+    backgroundColor: '#1C1C1E',
+    borderWidth: 2,
+    borderColor: '#2D2D2D',
+    borderRadius: 16,
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  classOptionActive: {
+    backgroundColor: 'rgba(107, 33, 168, 0.15)',
+    borderColor: '#6B21A8',
+  },
+  classOptionText: {
+    fontSize: 18,
+    color: '#9CA3AF',
+    fontWeight: '600',
+  },
+  classOptionTextActive: {
+    color: '#7C5CFC',
+    fontWeight: '700',
+  },
 });
+
