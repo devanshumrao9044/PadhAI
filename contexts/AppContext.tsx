@@ -112,7 +112,8 @@ const mapChapter = (c: any): Chapter => ({
 });
 
 const mapSession = (s: any): FocusSession => ({
-  comebackBonus: s.comeback_bonus ?? 0,
+  //FIX: Cleaned up. Now using explicit camelCase since this is NOT a DB column
+  comebackBonus: s.comebackBonus ?? 0,
   id: s.id,
   userId: s.user_id,
   subjectId: s.subject_id,
@@ -519,7 +520,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const newXPTotal = (activeUser?.xpTotal ?? 0) + xp;
       const newLevelRank = getLevelForXP(newXPTotal).rank;
       const leveledUp = newLevelRank > oldLevelRank;
-      // NOTE: comeback_bonus is NOT a DB column — omit it from the DB payload
+      
+      // ✅ FIX: Clean Database Payload (No fake comeback_bonus field here)
       const sessionPayload = {
         id: sessionId,
         user_id: activeUser?.id ?? '',
@@ -534,7 +536,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ended_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
       };
-      const sessionObj = mapSession(sessionPayload);
+      
+      // ✅ Inject comebackBonus only into the local UI object
+      const sessionObj = mapSession({ ...sessionPayload, comebackBonus: bonusFromComeback });
+      
       const newSessions = [sessionObj, ...sessions];
       setSessions(newSessions);
       await setItem(StorageKeys.SESSIONS, newSessions);
@@ -562,6 +567,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const planned = activeSession?.plannedMins ?? 1;
       const brokenAt = Math.floor((actualMins / planned) * 100);
       const penalty = Math.floor(calculateSessionXP(planned) * XP_REWARDS.sessionBrokenMultiplier);
+      
+      // Clean Database Payload
       const sessionPayload = {
         id: sessionId,
         user_id: activeUser?.id ?? '',
@@ -577,7 +584,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ended_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
       };
+      
       const sessionObj = mapSession(sessionPayload);
+      
       const newSessions = [sessionObj, ...sessions];
       setSessions(newSessions);
       await setItem(StorageKeys.SESSIONS, newSessions);
@@ -653,7 +662,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         newStreak = 0;
       }
       
-      // FIX: Streak tooti toh lastStudyDate null kardo
       await setUser({
         ...activeUser,
         xpTotal: Math.max(0, activeUser.xpTotal + finalXP),
