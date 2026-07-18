@@ -112,8 +112,9 @@ const mapChapter = (c: any): Chapter => ({
 });
 
 const mapSession = (s: any): FocusSession => ({
-  //FIX: Cleaned up. Now using explicit camelCase since this is NOT a DB column
-  comebackBonus: s.comebackBonus ?? 0,
+  // ✅ Accept either casing — in-memory objects use camelCase,
+  // DB-loaded rows would use snake_case if the column existed
+  comebackBonus: s.comebackBonus ?? s.comeback_bonus ?? 0,
   id: s.id,
   userId: s.user_id,
   subjectId: s.subject_id,
@@ -531,6 +532,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         broken: false,
         xp_earned: xp,
         xp_deducted: 0,
+        comeback_bonus: bonusFromComeback, // ✅ ADDED THIS LINE to save in DB
         started_at: activeSession?.startedAt ?? new Date().toISOString(),
         ended_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
@@ -659,8 +661,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         newStreak = 0;
       }
       
-      // ✅ Fix: broken session pe lastStudyDate untouched rehna chahiye
-      // Streak reset ho jaata hai (newStreak=0) but history preserve hoti hai
+      
       await setUser({
         ...activeUser,
         xpTotal: Math.max(0, activeUser.xpTotal + finalXP),
