@@ -4,54 +4,7 @@ const XP_REFEREE = 50;
 const XP_REFERRER = 25;
 const REWARD_THRESHOLD = 5;
 
-export async function applyReferralCode(
-  refereeId: string,
-  code: string
-): Promise<{ success: boolean; message: string }> {
-  try {
-    const trimmed = code.trim().toUpperCase();
-    if (!trimmed) return { success: false, message: 'Invalid code.' };
-
-    const { data: referrer } = await supabase
-      .from('users')
-      .select('id, my_referral_code')
-      .eq('my_referral_code', trimmed)
-      .maybeSingle();
-
-    if (!referrer) {
-      return { success: false, message: 'Referral code not found.' };
-    }
-
-    if (referrer.id === refereeId) {
-      return { success: false, message: 'You cannot use your own referral code.' };
-    }
-
-    await supabase
-      .from('users')
-      .update({ referred_by: trimmed })
-      .eq('id', refereeId);
-
-    const { error } = await supabase
-      .from('referrals')
-      .insert({
-        referrer_id: referrer.id,
-        referee_id: refereeId,
-        status: 'pending',
-      });
-
-    if (error) {
-      return { success: false, message: 'Could not apply referral code.' };
-    }
-
-    return {
-      success: true,
-      message: 'Referral code applied! You will earn +50 XP after your first session.',
-    };
-  } catch {
-    return { success: false, message: 'Could not apply referral code.' };
-  }
-}
-
+// ── processReferralOnFirstSession: Awards XP on first successful focus session ──
 export async function processReferralOnFirstSession(
   userId: string
 ): Promise<void> {
@@ -138,6 +91,7 @@ export async function processReferralOnFirstSession(
   }
 }
 
+// ── fetchReferralStats: Retrieves referral counts and code for the user ────────
 export async function fetchReferralStats(userId: string): Promise<{
   myCode: string | null;
   completed: number;
