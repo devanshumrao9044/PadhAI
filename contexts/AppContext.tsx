@@ -521,7 +521,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const newLevelRank = getLevelForXP(newXPTotal).rank;
       const leveledUp = newLevelRank > oldLevelRank;
       
-      // ✅ FIX: Clean Database Payload (No fake comeback_bonus field here)
       const sessionPayload = {
         id: sessionId,
         user_id: activeUser?.id ?? '',
@@ -537,7 +536,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         created_at: new Date().toISOString(),
       };
       
-      // ✅ Inject comebackBonus only into the local UI object
       const sessionObj = mapSession({ ...sessionPayload, comebackBonus: bonusFromComeback });
       
       const newSessions = [sessionObj, ...sessions];
@@ -568,7 +566,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const brokenAt = Math.floor((actualMins / planned) * 100);
       const penalty = Math.floor(calculateSessionXP(planned) * XP_REWARDS.sessionBrokenMultiplier);
       
-      // Clean Database Payload
       const sessionPayload = {
         id: sessionId,
         user_id: activeUser?.id ?? '',
@@ -662,12 +659,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         newStreak = 0;
       }
       
+      // ✅ Fix: broken session pe lastStudyDate untouched rehna chahiye
+      // Streak reset ho jaata hai (newStreak=0) but history preserve hoti hai
       await setUser({
         ...activeUser,
         xpTotal: Math.max(0, activeUser.xpTotal + finalXP),
         streakCurrent: newStreak,
         streakLongest: Math.max(newStreak, activeUser.streakLongest),
-        lastStudyDate: !isCompleted ? null : today, 
+        lastStudyDate: isCompleted ? today : activeUser.lastStudyDate, 
       });
     } catch (e) {
       console.error('Failed to process post session data', e);
