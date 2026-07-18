@@ -32,12 +32,28 @@ export default function ReferralScreen() {
     setPending(stats.pending);
     setHasUnlockedReward(stats.hasUnlockedReward);
     setLoading(false);
-    if (stats.hasUnlockedReward) setShowReward(true);
+    
+    
+    if (stats.hasUnlockedReward) {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('reward_popup_seen')
+        .eq('id', user.id)
+        .single();
+
+      if (!userData?.reward_popup_seen) {
+        setShowReward(true);
+        await supabase
+          .from('users')
+          .update({ reward_popup_seen: true })
+          .eq('id', user.id);
+      }
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  // ✅ FIX: Using expo-clipboard with async function
+  // Using expo-clipboard with async function
   async function handleCopy() {
     if (!myCode) return;
     await Clipboard.setStringAsync(myCode);
