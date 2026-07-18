@@ -3,7 +3,7 @@ export interface UserProfile {
   username: string;
   fullName: string;
   targetExam: 'JEE' | 'NEET' | 'BOARDS' | 'OTHER';
-  classLevel: '11' | '12' | 'Dropper';
+  classLevel: '11th' | '12th' | 'Dropper';
   dailyGoalMinutes: number;
   xpTotal: number;
   streakCurrent: number;
@@ -15,6 +15,7 @@ export interface UserProfile {
   referredBy?: string | null;
   hasUnlockedReward?: boolean;
 }
+
 
 export interface Subject {
   id: string;
