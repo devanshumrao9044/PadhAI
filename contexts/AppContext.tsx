@@ -58,7 +58,6 @@ export type AppContextType = {
   xpLog: XPTransaction[];
   awardXP: (amount: number, reason: string) => Promise<void>;
   deductXP: (amount: number, reason: string) => Promise<void>;
-  checkStreak: () => Promise<{ wasStreakBroken: boolean }>;
   isLoading: boolean;
   reload: () => Promise<void>;
 };
@@ -488,16 +487,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const checkStreak = async (): Promise<{ wasStreakBroken: boolean }> => {
-    if (!user) return { wasStreakBroken: false };
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-    if (user.lastStudyDate && user.lastStudyDate < yesterday) {
-      await setUser({ ...user, streakCurrent: 0 });
-      return { wasStreakBroken: true };
-    }
-    return { wasStreakBroken: false };
-  };
-
   // ── Sessions ──────────────────────────────────────────────────────────────
   const startSession = async (plannedMins: number, subjectId: string | null, chapterId: string | null): Promise<string> => {
     const sessionId = uuidv4();
@@ -532,7 +521,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         broken: false,
         xp_earned: xp,
         xp_deducted: 0,
-        comeback_bonus: bonusFromComeback, // ✅ ADDED THIS LINE to save in DB
+        comeback_bonus: bonusFromComeback,
         started_at: activeSession?.startedAt ?? new Date().toISOString(),
         ended_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
@@ -661,7 +650,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         newStreak = 0;
       }
       
-      
       await setUser({
         ...activeUser,
         xpTotal: Math.max(0, activeUser.xpTotal + finalXP),
@@ -695,7 +683,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       topics, getTopicsForChapter, addTopic, toggleTopic, deleteTopic,
       sessions, activeSession, startSession, completeSession, breakSession,
       getDailySummary, getLast7Days, getLast90Days,
-      xpLog, awardXP, deductXP, checkStreak,
+      xpLog, awardXP, deductXP,
       comebackPending, setComebackPending,
       hasUnlockedReward, setHasUnlockedReward, referralCount,
       streakRecoveryPending, lostStreakCount, setStreakRecoveryPending,
