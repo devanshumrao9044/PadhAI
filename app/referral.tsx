@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Share, Clipboard, ScrollView, ActivityIndicator,
+  Share, ScrollView, ActivityIndicator,
   Linking, Modal, Pressable
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
@@ -36,9 +37,10 @@ export default function ReferralScreen() {
 
   useEffect(() => { load(); }, [load]);
 
+  // ✅ FIX: Using expo-clipboard with async function
   async function handleCopy() {
     if (!myCode) return;
-    Clipboard.setString(myCode);
+    await Clipboard.setStringAsync(myCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -345,3 +347,4 @@ const styles = StyleSheet.create({
   modalBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
   modalDismiss: { color: '#4B5563', fontSize: 13 },
 });
+
