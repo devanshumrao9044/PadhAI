@@ -25,14 +25,18 @@ export default function ReferralScreen() {
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      // ✅ Fix: stop the spinner even when there's no user yet —
+      // previously this left `loading: true` forever, showing an infinite spinner
+      setLoading(false);
+      return;
+    }
     const stats = await fetchReferralStats(user.id);
     setMyCode(stats.myCode);
     setCompleted(stats.completed);
     setPending(stats.pending);
     setHasUnlockedReward(stats.hasUnlockedReward);
     setLoading(false);
-    
     
     if (stats.hasUnlockedReward) {
       const { data: userData } = await supabase
@@ -363,4 +367,3 @@ const styles = StyleSheet.create({
   modalBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
   modalDismiss: { color: '#4B5563', fontSize: 13 },
 });
-
