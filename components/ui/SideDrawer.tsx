@@ -61,8 +61,9 @@ export default function SideDrawer({ visible, onClose }: Props) {
   }, [visible]);
 
   const navigate = (route: string) => {
+  
+    router.push(route as any);
     onClose();
-    setTimeout(() => router.push(route as any), 180);
   };
 
   if (!mounted) return null;
@@ -305,3 +306,4 @@ const styles = StyleSheet.create({
   footer: { paddingHorizontal: Spacing.md, paddingTop: Spacing.sm },
   footerText: { fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'center' },
 });
+
