@@ -18,14 +18,13 @@ function formatTime(secs: number): string {
 export default function FocusActiveScreen() {
   const router = useRouter();
   const { activeSession, completeSession, breakSession, subjects, streakRecoveryPending, lostStreakCount, setStreakRecoveryPending } = useApp();
-  
+
   const [remaining, setRemaining] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [tapCount, setTapCount] = useState(0);
   const [showExit, setShowExit] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Use the actual session start time so the timer survives hot reloads / brief backgrounding
   const startTimeRef = useRef(
     activeSession?.startedAt ? new Date(activeSession.startedAt).getTime() : Date.now()
   );
@@ -36,6 +35,10 @@ export default function FocusActiveScreen() {
   const isCompletingRef = useRef(false);
   const rtChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const rtChannelIdRef = useRef(0);
+
+  // ✅ Store subscription objects in refs so cleanup always has latest reference
+  const appStateSubRef = useRef<{ remove?: () => void } | null>(null);
+  const backSubRef = useRef<{ remove?: () => void } | null>(null);
 
   const plannedMins = activeSession?.plannedMins ?? 25;
   const plannedSecs = plannedMins * 60;
@@ -48,14 +51,13 @@ export default function FocusActiveScreen() {
     ? subjects.find(s => s.id === activeSession.subjectId)?.colorHex ?? Colors.primary
     : Colors.primary;
 
-  // 🚀 Silent & Bulletproof Complete Handler
   const handleComplete = async () => {
     if (isCompletingRef.current || !activeSession) return;
     isCompletingRef.current = true;
     setIsProcessing(true);
-    
+
     if (intervalRef.current) clearInterval(intervalRef.current);
-    
+
     try {
       const actualMins = Math.floor(elapsedRef.current / 60);
       const session = await completeSession(activeSession.sessionId, actualMins);
@@ -65,16 +67,12 @@ export default function FocusActiveScreen() {
       const comebackParam = (session as any)?.comebackBonus > 0 ? '1' : '0';
       const xpEarned = session?.xpEarned ?? 0;
 
-      // Clear streak recovery flag regardless of outcome
       if (isRecovery) setStreakRecoveryPending(false, 0);
-      
-      // If leveled up, go to levelup screen first
+
       if (session?.leveledUp && session?.newLevelRank) {
         const { LEVELS } = await import('@/constants/levels');
         const levelDef = LEVELS.find(l => l.rank === session.newLevelRank);
-        const { useApp: _useApp } = await import('@/hooks/useApp');
-        // Read total XP from session's post-completion state via the xpEarned + fallback
-        const totalXPAfter = xpEarned; // approximate; dashboard will show real value
+        const totalXPAfter = xpEarned;
         router.replace(
           `/focus/levelup?newLevel=${session.newLevelRank}&title=${encodeURIComponent(levelDef?.realisticTitle ?? '')}&examTitle=${encodeURIComponent(levelDef?.examTitle ?? '')}&color=${encodeURIComponent(levelDef?.color ?? '#A855F7')}&totalXP=${totalXPAfter}&xpEarned=${xpEarned}&recovery=${isRecovery ? '1' : '0'}&lostStreak=${recoveredStreak}`
         );
@@ -83,28 +81,23 @@ export default function FocusActiveScreen() {
       }
     } catch (error) {
       console.error("Silent Complete Error:", error);
-      // Fallback route so user never gets stuck
       router.replace(`/focus/complete?xp=0&comeback=0`);
     }
   };
 
-  // 🚀 Silent & Bulletproof Break Handler
   const handleBreak = async () => {
     if (isCompletingRef.current || !activeSession) return;
     isCompletingRef.current = true;
     setIsProcessing(true);
-    
+
     if (intervalRef.current) clearInterval(intervalRef.current);
-    
+
     try {
       const actualMins = Math.max(0, Math.floor(elapsedRef.current / 60));
       const session = await breakSession(activeSession.sessionId, actualMins);
-      
-      // Navigate smoothly
       router.replace(`/focus/broken?penalty=${session?.xpDeducted || 0}`);
     } catch (error) {
       console.error("Silent Break Error:", error);
-      // Fallback route so user never gets stuck
       router.replace('/focus/broken?penalty=0');
     }
   };
@@ -113,78 +106,82 @@ export default function FocusActiveScreen() {
     if (isCompletingRef.current) return;
     const currentElapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
     const currentRemaining = Math.max(0, plannedSecs - currentElapsed);
-    
+
     elapsedRef.current = currentElapsed;
     setElapsed(currentElapsed);
     setRemaining(currentRemaining);
-    
+
     if (currentRemaining <= 0) {
       handleComplete();
     }
   };
 
-useEffect(() => {
-  if (!activeSession) {
-    router.replace('/(tabs)/focus');
-    return;
-  }
-  
-  startTimeRef.current = activeSession.startedAt
-    ? new Date(activeSession.startedAt).getTime()
-    : Date.now();
-  const alreadyElapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-  const initialRemaining = Math.max(0, plannedSecs - alreadyElapsed);
-  elapsedRef.current = alreadyElapsed;
-  setElapsed(alreadyElapsed);
-  setRemaining(initialRemaining);
-  intervalRef.current = setInterval(tick, 500);
+  useEffect(() => {
+    if (!activeSession) {
+      router.replace('/(tabs)/focus');
+      return;
+    }
 
-  // ✅ Bulletproof: try-catch + typeof check, kabhi crash nahi karega
-  let appStateSubscription: { remove?: () => void } | null = null;
-  try {
-    const result = AppState.addEventListener('change', next => {
-      if (appStateRef.current === 'active' && next !== 'active') {
-        if (intervalRef.current) clearInterval(intervalRef.current);
-      } else if (appStateRef.current !== 'active' && next === 'active') {
-        intervalRef.current = setInterval(tick, 500);
-      }
-      appStateRef.current = next;
-    });
-    appStateSubscription = result;
-  } catch (e) {
-    console.log('AppState listener setup failed:', e);
-  }
+    startTimeRef.current = activeSession.startedAt
+      ? new Date(activeSession.startedAt).getTime()
+      : Date.now();
+    const alreadyElapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+    const initialRemaining = Math.max(0, plannedSecs - alreadyElapsed);
+    elapsedRef.current = alreadyElapsed;
+    setElapsed(alreadyElapsed);
+    setRemaining(initialRemaining);
+    intervalRef.current = setInterval(tick, 500);
 
-  let backSubscription: { remove?: () => void } | null = null;
-  if (Platform.OS === 'android') {
+    // ✅ Bulletproof AppState listener setup
     try {
-      const handler = () => { setShowExit(true); return true; };
-      BackHandler.addEventListener('hardwareBackPress', handler);
-      backSubscription = { remove: () => BackHandler.removeEventListener('hardwareBackPress', handler) };
+      const sub = AppState.addEventListener('change', next => {
+        if (appStateRef.current === 'active' && next !== 'active') {
+          if (intervalRef.current) clearInterval(intervalRef.current);
+        } else if (appStateRef.current !== 'active' && next === 'active') {
+          intervalRef.current = setInterval(tick, 500);
+        }
+        appStateRef.current = next;
+      });
+      appStateSubRef.current = sub ?? null;
     } catch (e) {
-      console.log('BackHandler setup failed:', e);
+      console.log('AppState setup failed:', e);
+      appStateSubRef.current = null;
     }
-  }
 
-  return () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    if (tapTimer.current) clearTimeout(tapTimer.current);
-
-    // ✅ typeof check — crash kabhi nahi hoga chahe kuch bhi return ho
-    if (appStateSubscription && typeof appStateSubscription.remove === 'function') {
-      appStateSubscription.remove();
+    // ✅ Bulletproof BackHandler setup
+    if (Platform.OS === 'android') {
+      try {
+        const handler = () => { setShowExit(true); return true; };
+        const sub = BackHandler.addEventListener('hardwareBackPress', handler);
+        backSubRef.current = sub ?? { remove: () => BackHandler.removeEventListener('hardwareBackPress', handler) };
+      } catch (e) {
+        console.log('BackHandler setup failed:', e);
+        backSubRef.current = null;
+      }
     }
-    if (backSubscription && typeof backSubscription.remove === 'function') {
-      backSubscription.remove();
-    }
-  };
-}, []);
 
-  // Real-time subscription: sync session state from another device
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (tapTimer.current) clearTimeout(tapTimer.current);
+
+      // ✅ Absolute safe cleanup — checks existence AND type before calling
+      const asub = appStateSubRef.current;
+      if (asub && typeof asub.remove === 'function') {
+        asub.remove();
+      }
+      appStateSubRef.current = null;
+
+      const bsub = backSubRef.current;
+      if (bsub && typeof bsub.remove === 'function') {
+        bsub.remove();
+      }
+      backSubRef.current = null;
+    };
+  }, []);
+
   useEffect(() => {
     if (!activeSession?.sessionId) return;
 
-    // ✅ Remove old channel BEFORE creating new one — prevents channel leaks
     if (rtChannelRef.current) {
       supabase.removeChannel(rtChannelRef.current);
       rtChannelRef.current = null;
@@ -207,7 +204,6 @@ useEffect(() => {
           if (isCompletingRef.current) return;
           const updated = payload.new;
 
-          // ✅ Fix: DB mein 'completed' column nahi — broken=false means completed
           if (updated?.broken === false && updated?.ended_at) {
             isCompletingRef.current = true;
             if (intervalRef.current) clearInterval(intervalRef.current);
@@ -215,7 +211,6 @@ useEffect(() => {
             return;
           }
 
-          // Session broken from another device
           if (updated?.broken === true) {
             isCompletingRef.current = true;
             if (intervalRef.current) clearInterval(intervalRef.current);
@@ -242,9 +237,9 @@ useEffect(() => {
     if (isProcessing) return;
     const newCount = tapCount + 1;
     setTapCount(newCount);
-    
+
     if (tapTimer.current) clearTimeout(tapTimer.current);
-    
+
     if (newCount >= 3) {
       setTapCount(0);
       setShowExit(true);
@@ -292,17 +287,17 @@ useEffect(() => {
             <MaterialIcons name="warning" size={36} color={Colors.danger} />
             <Text style={styles.exitTitle}>Do you want to break the session? </Text>
             <Text style={styles.exitSub}>
-              The streak will be reset.{'\n'}XP will be deducted.{'\n'} There is a need to focus well 
+              The streak will be reset.{'\n'}XP will be deducted.{'\n'} There is a need to focus well
             </Text>
-            <TouchableOpacity 
-              style={[styles.exitConfirm, isProcessing && { opacity: 0.5 }]} 
+            <TouchableOpacity
+              style={[styles.exitConfirm, isProcessing && { opacity: 0.5 }]}
               onPress={handleBreak}
               disabled={isProcessing}
             >
               <Text style={styles.exitConfirmText}>{isProcessing ? 'Processing...' : 'Yes Break it.'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.exitCancel} 
+            <TouchableOpacity
+              style={styles.exitCancel}
               onPress={() => setShowExit(false)}
               disabled={isProcessing}
             >
@@ -341,4 +336,3 @@ const styles = StyleSheet.create({
   exitCancel: { width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center' },
   exitCancelText: { color: Colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
 });
-
