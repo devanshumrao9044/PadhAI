@@ -123,24 +123,26 @@ export default function FocusActiveScreen() {
     }
   };
 
-  useEffect(() => {
-    if (!activeSession) {
-      router.replace('/(tabs)/focus');
-      return;
-    }
-    
-    // Restore elapsed time based on when the session actually started
-    startTimeRef.current = activeSession.startedAt
-      ? new Date(activeSession.startedAt).getTime()
-      : Date.now();
-    const alreadyElapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-    const initialRemaining = Math.max(0, plannedSecs - alreadyElapsed);
-    elapsedRef.current = alreadyElapsed;
-    setElapsed(alreadyElapsed);
-    setRemaining(initialRemaining);
-    intervalRef.current = setInterval(tick, 500);
+useEffect(() => {
+  if (!activeSession) {
+    router.replace('/(tabs)/focus');
+    return;
+  }
+  
+  startTimeRef.current = activeSession.startedAt
+    ? new Date(activeSession.startedAt).getTime()
+    : Date.now();
+  const alreadyElapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+  const initialRemaining = Math.max(0, plannedSecs - alreadyElapsed);
+  elapsedRef.current = alreadyElapsed;
+  setElapsed(alreadyElapsed);
+  setRemaining(initialRemaining);
+  intervalRef.current = setInterval(tick, 500);
 
-    const appStateSub = AppState.addEventListener('change', next => {
+  // ✅ Bulletproof: try-catch + typeof check, kabhi crash nahi karega
+  let appStateSubscription: { remove?: () => void } | null = null;
+  try {
+    const result = AppState.addEventListener('change', next => {
       if (appStateRef.current === 'active' && next !== 'active') {
         if (intervalRef.current) clearInterval(intervalRef.current);
       } else if (appStateRef.current !== 'active' && next === 'active') {
@@ -148,21 +150,35 @@ export default function FocusActiveScreen() {
       }
       appStateRef.current = next;
     });
+    appStateSubscription = result;
+  } catch (e) {
+    console.log('AppState listener setup failed:', e);
+  }
 
-    let backSub: { remove: () => void } | null = null;
-    if (Platform.OS === 'android') {
+  let backSubscription: { remove?: () => void } | null = null;
+  if (Platform.OS === 'android') {
+    try {
       const handler = () => { setShowExit(true); return true; };
       BackHandler.addEventListener('hardwareBackPress', handler);
-      backSub = { remove: () => BackHandler.removeEventListener('hardwareBackPress', handler) };
+      backSubscription = { remove: () => BackHandler.removeEventListener('hardwareBackPress', handler) };
+    } catch (e) {
+      console.log('BackHandler setup failed:', e);
     }
+  }
 
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (tapTimer.current) clearTimeout(tapTimer.current);
-      appStateSub?.remove();
-      backSub?.remove();
-    };
-  }, []);
+  return () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+
+    // ✅ typeof check — crash kabhi nahi hoga chahe kuch bhi return ho
+    if (appStateSubscription && typeof appStateSubscription.remove === 'function') {
+      appStateSubscription.remove();
+    }
+    if (backSubscription && typeof backSubscription.remove === 'function') {
+      backSubscription.remove();
+    }
+  };
+}, []);
 
   // Real-time subscription: sync session state from another device
   useEffect(() => {
