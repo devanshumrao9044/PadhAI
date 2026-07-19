@@ -159,7 +159,7 @@ export default function FocusActiveScreen() {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (tapTimer.current) clearTimeout(tapTimer.current);
-      appStateSub.remove();
+      appStateSub?.remove();
       backSub?.remove();
     };
   }, []);
