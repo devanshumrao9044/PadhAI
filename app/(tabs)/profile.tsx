@@ -91,8 +91,10 @@ export default function ProfileScreen() {
 
   const handleSignOut = async () => {
     setAlertConfig(p => ({ ...p, visible: false }));
+    // ✅ Fix: don't navigate here — AuthGate's onAuthStateChange listener
+    // in _layout.tsx already handles SIGNED_OUT navigation. Two competing
+    // router.replace('/') calls were racing and causing an unpredictable landing screen.
     await supabase.auth.signOut();
-    router.replace('/');
   };
 
   const openEditModal = () => {
