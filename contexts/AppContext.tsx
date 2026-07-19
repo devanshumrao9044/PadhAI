@@ -111,20 +111,21 @@ const mapChapter = (c: any): Chapter => ({
 });
 
 const mapSession = (s: any): FocusSession => ({
-  // ✅ FIX 3: Removed invalid columns (chapterId, brokenAtPercent mapped safely, createdAt fallback)
-  comebackBonus: s.comeback_bonus ?? 0,
+  // ✅ Accept either casing — in-memory objects use camelCase,
+  // DB-loaded rows would use snake_case if the column existed
+  comebackBonus: s.comebackBonus ?? s.comeback_bonus ?? 0,
   id: s.id,
   userId: s.user_id,
   subjectId: s.subject_id,
-  chapterId: null,   // ✅ Column exist nahi karta DB mein
+  chapterId: s.chapter_id ?? null,
   durationPlannedMins: s.planned_minutes,
   durationActualMins: s.actual_minutes,
-  completed: s.completed ?? !s.broken,
+  completed: !s.broken,
   xpEarned: s.xp_earned,
   xpDeducted: s.xp_deducted,
-  brokenAtPercent: s.broken ? 0 : 100,   // ✅ break_reason text hai, percent nahi
+  brokenAtPercent: s.broken_at_percent ?? (s.broken ? 0 : 100),
   sessionDate: s.started_at ? s.started_at.split('T')[0] : todayStr(),
-  createdAt: s.started_at ?? todayStr(),   // ✅ created_at column bhi exist nahi karta
+  createdAt: s.created_at,
 });
 
 const mapSummary = (s: any): DailySummary => ({
@@ -214,9 +215,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      // ✅ One-time cleanup — purani corrupt queue clear karo (App chalne ke baad hata sakte ho)
-      await removeItem('@app_offline_sync_queue');
-
       const [savedTopics, savedActive, savedSessions, savedSummaries, savedXP] = await Promise.all([
         getItem<Topic[]>(StorageKeys.TOPICS),
         getItem<ActiveSession>(StorageKeys.ACTIVE_SESSION),
@@ -513,20 +511,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const newLevelRank = getLevelForXP(newXPTotal).rank;
       const leveledUp = newLevelRank > oldLevelRank;
       
-      // ✅ FIX 1: Cleaned payload (removed chapter_id, broken_at_percent, created_at. added completed)
       const sessionPayload = {
         id: sessionId,
         user_id: activeUser?.id ?? '',
         subject_id: activeSession?.subjectId ?? null,
+        chapter_id: activeSession?.chapterId ?? null,
         planned_minutes: activeSession?.plannedMins ?? actualMins,
         actual_minutes: actualMins,
-        completed: true,
         broken: false,
         xp_earned: xp,
-        comeback_bonus: bonusFromComeback || 0,
         xp_deducted: 0,
+        comeback_bonus: bonusFromComeback,
         started_at: activeSession?.startedAt ?? new Date().toISOString(),
         ended_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
       };
       
       const sessionObj = mapSession({ ...sessionPayload, comebackBonus: bonusFromComeback });
@@ -559,21 +557,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const brokenAt = Math.floor((actualMins / planned) * 100);
       const penalty = Math.floor(calculateSessionXP(planned) * XP_REWARDS.sessionBrokenMultiplier);
       
-      // ✅ FIX 2: Cleaned payload (removed chapter_id, broken_at_percent, created_at. added completed, break_reason)
       const sessionPayload = {
         id: sessionId,
         user_id: activeUser?.id ?? '',
         subject_id: activeSession?.subjectId ?? null,
+        chapter_id: activeSession?.chapterId ?? null,
         planned_minutes: planned,
         actual_minutes: actualMins,
-        completed: false,
         broken: true,
         xp_earned: 0,
-        comeback_bonus: 0,
         xp_deducted: penalty,
-        break_reason: `Broke at ${brokenAt}%`,
+        broken_at_percent: brokenAt,
         started_at: activeSession?.startedAt ?? new Date().toISOString(),
         ended_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
       };
       
       const sessionObj = mapSession(sessionPayload);
