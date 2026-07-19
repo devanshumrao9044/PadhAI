@@ -25,10 +25,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       setSession(s);
       if (_event === 'SIGNED_OUT') {
         streakCheckedRef.current = false;
-        // ✅ FIX: setTimeout lagaya taaki state update (setSession) poora ho sake pehle
-        setTimeout(() => {
-          router.replace('/');
-        }, 0);
+        // ✅ Fix: removed the duplicate router.replace('/') call here.
+        // The segments-effect below (driven by [session, segments, checking])
+        // already handles redirecting to '/' whenever session is null and the
+        // current route is protected. Having BOTH this listener AND that effect
+        // call router.replace('/') independently caused a race — whichever fired
+        // last would "win," producing an unstable landing screen right after sign-out.
+        // Now there's exactly one place that decides where to send you on sign-out.
       }
     });
 
@@ -44,10 +47,16 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const inTracker = segments[0] === 'tracker';
     const inStreakBroken = segments[0] === 'streak-broken';
     const inReferral = segments[0] === 'referral';
+    const inIndex = segments[0] === 'index' || segments.length === 0;
 
     const isProtected = inAuthGroup || inOnboarding || inFocus || inTracker || inStreakBroken || inReferral;
 
-    if (!session && isProtected) {
+    // ✅ Fix: this is now the ONLY place that redirects on sign-out.
+    // Runs whenever session OR segments change — so it catches the sign-out
+    // immediately (session becomes null) without needing to wait for a
+    // navigation to happen first. No longer requires visiting another
+    // screen to "trigger" the redirect.
+    if (!session && isProtected && !inIndex) {
       streakCheckedRef.current = false;
       router.replace('/');
     } else if (session && !streakCheckedRef.current) {
