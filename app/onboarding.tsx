@@ -10,7 +10,6 @@ import StepName from '../components/onboarding/StepName';
 import StepExam from '../components/onboarding/StepExam';
 import StepGoal from '../components/onboarding/StepGoal';
 
-
 const TOTAL_STEPS = 4;
 
 export default function OnboardingScreen() {
@@ -21,7 +20,7 @@ export default function OnboardingScreen() {
   const [goalMinutes, setGoalMinutes] = useState(120);
   const [loading, setLoading] = useState(false);
 
-  // Safe validation check taaki navigation tute nahi
+  
   function canProceed() {
     if (step === 1) return name.trim().length >= 2;
     if (step === 2) return true; 
@@ -30,30 +29,49 @@ export default function OnboardingScreen() {
     return false;
   }
 
+  
   async function handleFinish() {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user) {
-        
-        await supabase
-          .from('users')
-          .update({
-            name: name.trim(),
-            target_exam: exam,
-            class: studentClass, 
-            daily_goal_minutes: goalMinutes,
-          })
-          .eq('id', user.id);
+
+      if (!user) {
+        Alert.alert('Session Expired', 'Please sign in again.');
+        setLoading(false);
+        router.replace('/');
+        return;
       }
+
+      const { error } = await supabase
+        .from('users')
+        .update({
+          name: name.trim(),
+          target_exam: exam,
+          class: studentClass,
+          daily_goal_minutes: goalMinutes,
+        })
+        .eq('id', user.id);
+
+      if (error) {
+        
+        setLoading(false);
+        Alert.alert(
+          'Could Not Save Profile',
+          'Something went wrong saving your details. Please check your connection and try again.'
+        );
+        return;
+      }
+
+      setLoading(false);
+      router.replace('/(tabs)/focus');
+
     } catch (error: any) {
-      console.log('Database operation bypassed:', error.message);
+      setLoading(false);
+      Alert.alert(
+        'Could Not Save Profile',
+        error?.message || 'Something went wrong. Please try again.'
+      );
     }
-    setLoading(false);
-    
-    // Direct explicit route target use kiya hai taaki router confuse na ho
-    router.replace('/(tabs)/focus');
   }
 
   function handleNext() {
