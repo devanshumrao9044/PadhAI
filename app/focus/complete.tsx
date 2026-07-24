@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -73,6 +73,9 @@ export default function FocusCompleteScreen() {
   const recoveredStreak = Math.max(1, Math.ceil(lostStreak / 2));
   const COMEBACK_BONUS = 50;
 
+  // ✅ Naya Guard State: Navigation double click rokne ke liye
+  const [isNavigating, setIsNavigating] = useState(false);
+
   // Animated values
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -90,13 +93,11 @@ export default function FocusCompleteScreen() {
   );
   const level = user ? getLevelForXP(user.xpTotal) : null;
 
-  // ✅ Restore half-streak when this is a recovery session
   useEffect(() => {
     if (!isRecovery || !user || lostStreak <= 0) return;
     setUser({ ...user, streakCurrent: recoveredStreak });
   }, []);
 
-  // Referral check
   useEffect(() => {
     async function triggerReferralCheck() {
       try {
@@ -141,7 +142,6 @@ export default function FocusCompleteScreen() {
       }, 600);
     }
 
-    // Recovery badge animation (always shown if isRecovery)
     if (isRecovery) {
       setTimeout(() => {
         Animated.parallel([
@@ -152,6 +152,19 @@ export default function FocusCompleteScreen() {
       }, isComeback ? 1000 : 700);
     }
   }, []);
+  
+  // ✅ Navigation Handlers
+  const handleGoHome = () => {
+    if (isNavigating) return;
+    setIsNavigating(true);
+    router.replace('/(tabs)');
+  };
+
+  const handleOneMore = () => {
+    if (isNavigating) return;
+    setIsNavigating(true);
+    router.replace('/(tabs)/focus');
+  };
 
   const showConfetti = isComeback || isRecovery;
   const confettiParticles = showConfetti
@@ -221,7 +234,7 @@ export default function FocusCompleteScreen() {
             <Text style={styles.xpLabel}>earned</Text>
           </View>
 
-          {/* ── Streak Recovery Badge ── */}
+          {/* ── Streak Recovery Banner ── */}
           {isRecovery ? (
             <Animated.View
               style={[
@@ -248,7 +261,7 @@ export default function FocusCompleteScreen() {
             </Animated.View>
           ) : null}
 
-          {/* ── Comeback Banner (existing, shown when isComeback without recovery) ── */}
+          {/* ── Comeback Banner ── */}
           {isComeback && !isRecovery ? (
             <Animated.View
               style={[
@@ -299,8 +312,10 @@ export default function FocusCompleteScreen() {
               styles.continueBtn,
               isRecovery && { backgroundColor: Colors.success },
               !isRecovery && isComeback && styles.continueBtnComeback,
+              isNavigating && { opacity: 0.5 } // ✅ Visual feedback
             ]}
-            onPress={() => router.replace('/(tabs)')}
+            onPress={handleGoHome} // ✅ Changed
+            disabled={isNavigating} // ✅ Disabled property added
             activeOpacity={0.85}
           >
             <Text style={styles.continueBtnText}>
@@ -308,8 +323,9 @@ export default function FocusCompleteScreen() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.anotherBtn}
-            onPress={() => router.replace('/(tabs)/focus')}
+            style={[styles.anotherBtn, isNavigating && { opacity: 0.5 }]}
+            onPress={handleOneMore} // ✅ Changed
+            disabled={isNavigating} // ✅ Disabled property added
             activeOpacity={0.85}
           >
             <MaterialIcons name="replay" size={18} color={Colors.primary} />
