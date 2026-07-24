@@ -111,8 +111,6 @@ const mapChapter = (c: any): Chapter => ({
 });
 
 const mapSession = (s: any): FocusSession => ({
-  // ✅ Accept either casing — in-memory objects use camelCase,
-  // DB-loaded rows would use snake_case if the column existed
   comebackBonus: s.comebackBonus ?? s.comeback_bonus ?? 0,
   id: s.id,
   userId: s.user_id,
@@ -364,13 +362,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addSubject = async (name: string, colorHex: string, iconName: string): Promise<Subject> => {
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (!authUser) throw new Error('Not authenticated');
-    const { data, error } = await supabase.from('subjects').insert([{
-      user_id: authUser.id, name: name.trim(), color_hex: colorHex,
-      icon_name: iconName, display_order: subjects.length,
-    }]).select().single();
-    if (error) throw error;
-    const newSubject = mapSubject(data);
+    
+    const subjectPayload = {
+      id: uuidv4(),
+      user_id: authUser.id,
+      name: name.trim(),
+      color_hex: colorHex,
+      icon_name: iconName,
+      display_order: subjects.length,
+      is_deleted: false,
+      created_at: new Date().toISOString()
+    };
+
+    // Optimistic Update
+    const newSubject = mapSubject(subjectPayload);
     setSubjects(prev => [...prev, newSubject]);
+
+    try {
+      // ✅ FIX 3: Added offline queue logic for addSubject
+      const { error } = await supabase.from('subjects').insert([subjectPayload]);
+      if (error) throw error;
+    } catch (e) {
+      await addToSyncQueue({ table: 'subjects', action: 'insert', payload: subjectPayload });
+    }
+    
     return newSubject;
   };
 
@@ -397,14 +412,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addChapter = async (subjectId: string, name: string, plannedDate?: string | null): Promise<Chapter> => {
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (!authUser) throw new Error('Not authenticated');
+    
     const existing = chapters.filter(c => c.subjectId === subjectId && !c.isDeleted);
-    const { data, error } = await supabase.from('chapters').insert([{
-      subject_id: subjectId, user_id: authUser.id, name: name.trim(),
-      status: 'not_started', planned_date: plannedDate || null, display_order: existing.length,
-    }]).select().single();
-    if (error) throw error;
-    const newChapter = mapChapter(data);
+    const chapterPayload = {
+      id: uuidv4(),
+      subject_id: subjectId,
+      user_id: authUser.id,
+      name: name.trim(),
+      status: 'not_started',
+      planned_date: plannedDate || null,
+      display_order: existing.length,
+      is_deleted: false,
+      created_at: new Date().toISOString()
+    };
+
+    // Optimistic Update
+    const newChapter = mapChapter(chapterPayload);
     setChapters(prev => [...prev, newChapter]);
+
+    try {
+      // ✅ FIX 3: Added offline queue logic for addChapter
+      const { error } = await supabase.from('chapters').insert([chapterPayload]);
+      if (error) throw error;
+    } catch (e) {
+      await addToSyncQueue({ table: 'chapters', action: 'insert', payload: chapterPayload });
+    }
+    
     return newChapter;
   };
 
@@ -647,7 +680,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (isCompleted && activeUser.lastStudyDate !== today) {
         newStreak = (activeUser.lastStudyDate === yesterday || activeUser.lastStudyDate === null) ? newStreak + 1 : 1;
       } else if (!isCompleted) {
-        newStreak = 0;
+        // ✅ BUG 2 FIX: Streak ko 0 nahi karenge, wahi rakhenge jo thi.
+        newStreak = activeUser.streakCurrent;
       }
       
       await setUser({
@@ -693,4 +727,3 @@ export function AppProvider({ children }: { children: ReactNode }) {
     </AppContext.Provider>
   );
 }
-
