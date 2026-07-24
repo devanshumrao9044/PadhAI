@@ -36,7 +36,13 @@ export default function FocusActiveScreen() {
   const rtChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const rtChannelIdRef = useRef(0);
 
-  // ✅ Store subscription objects in refs so cleanup always has latest reference
+  //  Fix: Keep latest context values safe from setInterval closure trap
+  const latestContext = useRef({ streakRecoveryPending, lostStreakCount });
+  useEffect(() => {
+    latestContext.current = { streakRecoveryPending, lostStreakCount };
+  }, [streakRecoveryPending, lostStreakCount]);
+
+  // Store subscription objects in refs so cleanup always has latest reference
   const appStateSubRef = useRef<{ remove?: () => void } | null>(null);
   const backSubRef = useRef<{ remove?: () => void } | null>(null);
 
@@ -61,8 +67,10 @@ export default function FocusActiveScreen() {
     try {
       const actualMins = Math.floor(elapsedRef.current / 60);
       const session = await completeSession(activeSession.sessionId, actualMins);
-      const isRecovery = streakRecoveryPending;
-      const recoveredStreak = lostStreakCount;
+      
+      //  Fix: Read from ref instead of stale closure
+      const isRecovery = latestContext.current.streakRecoveryPending;
+      const recoveredStreak = latestContext.current.lostStreakCount;
 
       const comebackParam = (session as any)?.comebackBonus > 0 ? '1' : '0';
       const xpEarned = session?.xpEarned ?? 0;
@@ -132,10 +140,10 @@ export default function FocusActiveScreen() {
     setRemaining(initialRemaining);
     intervalRef.current = setInterval(tick, 500);
 
-    // ✅ Bulletproof AppState listener setup with UX Fix
+    // Bulletproof AppState listener setup with UX Fix
     try {
       const sub = AppState.addEventListener('change', next => {
-        // ✅ BUG 1 FIX: Only penalize when going strictly to 'background'. 
+        // BUG 1 FIX: Only penalize when going strictly to 'background'. 
         // 'inactive' (iOS notification center/battery popup) will just safely pause.
         if (appStateRef.current === 'active' && next === 'background') {
           if (!isCompletingRef.current) {
@@ -172,7 +180,7 @@ export default function FocusActiveScreen() {
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (tapTimer.current) clearTimeout(tapTimer.current);
 
-      // ✅ Absolute safe cleanup
+      // Absolute safe cleanup
       const asub = appStateSubRef.current;
       if (asub && typeof asub.remove === 'function') {
         asub.remove();
