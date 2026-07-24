@@ -132,9 +132,17 @@ export default function FocusActiveScreen() {
     setRemaining(initialRemaining);
     intervalRef.current = setInterval(tick, 500);
 
-    // ✅ Bulletproof AppState listener setup
+    // ✅ Bulletproof AppState listener setup with UX Fix
     try {
       const sub = AppState.addEventListener('change', next => {
+        // ✅ BUG 1 FIX: Only penalize when going strictly to 'background'. 
+        // 'inactive' (iOS notification center/battery popup) will just safely pause.
+        if (appStateRef.current === 'active' && next === 'background') {
+          if (!isCompletingRef.current) {
+            handleBreak();
+          }
+        }
+
         if (appStateRef.current === 'active' && next !== 'active') {
           if (intervalRef.current) clearInterval(intervalRef.current);
         } else if (appStateRef.current !== 'active' && next === 'active') {
@@ -164,7 +172,7 @@ export default function FocusActiveScreen() {
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (tapTimer.current) clearTimeout(tapTimer.current);
 
-      // ✅ Absolute safe cleanup — checks existence AND type before calling
+      // ✅ Absolute safe cleanup
       const asub = appStateSubRef.current;
       if (asub && typeof asub.remove === 'function') {
         asub.remove();
@@ -336,3 +344,4 @@ const styles = StyleSheet.create({
   exitCancel: { width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center' },
   exitCancelText: { color: Colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
 });
+
