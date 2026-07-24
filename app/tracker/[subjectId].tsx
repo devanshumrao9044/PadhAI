@@ -309,6 +309,13 @@ export default function SubjectDetailScreen() {
                     chapter={chapter}
                     onStatusChange={(status) => handleStatusChange(chapter.id, status)}
                     onPress={() => isSelectionMode ? toggleSelection(chapter.id) : router.push(`/tracker/chapters/${chapter.id}` as any)}
+                    // ✅ Fixed: Added onLongPress to enable selection mode
+                    onLongPress={() => {
+                      if (!isSelectionMode) {
+                        setIsSelectionMode(true);
+                        toggleSelection(chapter.id);
+                      }
+                    }}
                     onDelete={() => handleSingleDelete(chapter.id)} 
                   />
                 </View>
