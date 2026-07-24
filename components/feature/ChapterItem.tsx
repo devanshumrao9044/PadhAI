@@ -31,10 +31,11 @@ interface ChapterItemProps {
   chapter: Chapter;
   onStatusChange: (status: Chapter['status']) => void;
   onPress: () => void;
+  onLongPress?: () => void; // Added support for long press
   onDelete: () => void;
 }
 
-export default function ChapterItem({ chapter, onStatusChange, onPress, onDelete }: ChapterItemProps) {
+export default function ChapterItem({ chapter, onStatusChange, onPress, onLongPress, onDelete }: ChapterItemProps) {
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const color = STATUS_COLORS[chapter.status];
   const isOverdue = chapter.plannedDate && chapter.status !== 'done' && chapter.plannedDate < new Date().toISOString().split('T')[0];
@@ -44,6 +45,8 @@ export default function ChapterItem({ chapter, onStatusChange, onPress, onDelete
       <Pressable
         style={({ pressed }) => [styles.row, pressed ? styles.rowPressed : null]}
         onPress={onPress}
+        onLongPress={onLongPress} // Attached gesture
+        delayLongPress={200}
       >
         <TouchableOpacity
           onPress={() => setShowStatusMenu(true)}
@@ -158,3 +161,4 @@ const styles = StyleSheet.create({
   menuItemActive: { backgroundColor: Colors.surfaceVariant },
   menuItemText: { flex: 1, fontSize: FontSize.md, fontWeight: FontWeight.medium },
 });
+
