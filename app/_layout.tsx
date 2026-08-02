@@ -58,6 +58,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     // screen to "trigger" the redirect.
     if (!session && isProtected && !inIndex) {
       streakCheckedRef.current = false;
+      try { router.dismissAll(); } catch (_) {}
       router.replace('/');
     } else if (session && !streakCheckedRef.current) {
       streakCheckedRef.current = true;
