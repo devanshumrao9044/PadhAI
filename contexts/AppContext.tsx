@@ -1,23 +1,16 @@
 import React, { createContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { AppState } from 'react-native';
-
-//  Stronger Pure JS UUID generator 
+// Cross-platform UUID generator (no native crypto dependency)
 function uuidv4(): string {
-  let d = new Date().getTime();
-  let d2 = ((typeof performance !== 'undefined') && performance.now && (performance.now() * 1000)) || 0;
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    let r = Math.random() * 16;
-    if (d > 0) {
-      r = (d + r) % 16 | 0;
-      d = Math.floor(d / 16);
-    } else {
-      r = (d2 + r) % 16 | 0;
-      d2 = Math.floor(d2 / 16);
-    }
-    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
   });
 }
-
 import { getItem, setItem, removeItem, StorageKeys } from '@/services/storage';
 import { supabase } from '@/services/supabase';
 import {
@@ -71,16 +64,8 @@ export type AppContextType = {
 
 export const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// FIX 1: UTC ki jagah Local Timezone format set kiya (YYYY-MM-DD)
-function getLocalDateStr(date: Date = new Date()): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 function todayStr() {
-  return getLocalDateStr(new Date());
+  return new Date().toISOString().split('T')[0];
 }
 
 // ── Data Mappers ──────────────────────────────────────────────────────────────
@@ -126,6 +111,8 @@ const mapChapter = (c: any): Chapter => ({
 });
 
 const mapSession = (s: any): FocusSession => ({
+  // ✅ Accept either casing — in-memory objects use camelCase,
+  // DB-loaded rows would use snake_case if the column existed
   comebackBonus: s.comebackBonus ?? s.comeback_bonus ?? 0,
   id: s.id,
   userId: s.user_id,
@@ -339,12 +326,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [load]);
 
+  // ── setUser: sync XP/streak fields to Supabase (profile fields saved separately in profile.tsx) ─────────────────────────────────────────────
   const setUser = async (u: UserProfile) => {
     setUserState(u);
     await setItem(StorageKeys.USER, u);
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) return;
+      // Sync XP, streak, and goal fields — profile fields (name/exam/class/avatar)
+      // are already persisted by the caller (profile.tsx handleSaveProfile)
       const payload: any = {
         xp: u.xpTotal,
         streak: u.streakCurrent,
@@ -374,55 +364,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addSubject = async (name: string, colorHex: string, iconName: string): Promise<Subject> => {
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (!authUser) throw new Error('Not authenticated');
-    
-    const subjectPayload = {
-      id: uuidv4(),
-      user_id: authUser.id,
-      name: name.trim(),
-      color_hex: colorHex,
-      icon_name: iconName,
-      display_order: subjects.length,
-      is_deleted: false,
-      created_at: new Date().toISOString()
-    };
-
-    const newSubject = mapSubject(subjectPayload);
+    const { data, error } = await supabase.from('subjects').insert([{
+      user_id: authUser.id, name: name.trim(), color_hex: colorHex,
+      icon_name: iconName, display_order: subjects.length,
+    }]).select().single();
+    if (error) throw error;
+    const newSubject = mapSubject(data);
     setSubjects(prev => [...prev, newSubject]);
-
-    try {
-      const { error } = await supabase.from('subjects').insert([subjectPayload]);
-      if (error) throw error;
-    } catch (e) {
-      await addToSyncQueue({ table: 'subjects', action: 'insert', payload: subjectPayload });
-    }
-    
     return newSubject;
   };
 
   const updateSubject = async (id: string, data: Partial<Subject>) => {
     const payload: any = {};
-    if (data.name !== undefined) payload.name = data.name;
-    if (data.colorHex !== undefined) payload.color_hex = data.colorHex;
-    if (data.iconName !== undefined) payload.icon_name = data.iconName;
-    
+    if (data.name) payload.name = data.name;
+    if (data.colorHex) payload.color_hex = data.colorHex;
+    if (data.iconName) payload.icon_name = data.iconName;
+    const { error } = await supabase.from('subjects').update(payload).eq('id', id);
+    if (error) throw error;
     setSubjects(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
-    
-    try {
-      const { error } = await supabase.from('subjects').update(payload).eq('id', id);
-      if (error) throw error;
-    } catch (e) {
-      await addToSyncQueue({ table: 'subjects', action: 'update', matchKey: 'id', matchValue: id, payload });
-    }
   };
 
   const deleteSubject = async (id: string) => {
+    const { error } = await supabase.from('subjects').update({ is_deleted: true }).eq('id', id);
+    if (error) throw error;
     setSubjects(prev => prev.filter(s => s.id !== id));
-    try {
-      const { error } = await supabase.from('subjects').update({ is_deleted: true }).eq('id', id);
-      if (error) throw error;
-    } catch (e) {
-      await addToSyncQueue({ table: 'subjects', action: 'update', matchKey: 'id', matchValue: id, payload: { is_deleted: true } });
-    }
   };
 
   // ── Chapters ──────────────────────────────────────────────────────────────
@@ -432,30 +397,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addChapter = async (subjectId: string, name: string, plannedDate?: string | null): Promise<Chapter> => {
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (!authUser) throw new Error('Not authenticated');
-    
     const existing = chapters.filter(c => c.subjectId === subjectId && !c.isDeleted);
-    const chapterPayload = {
-      id: uuidv4(),
-      subject_id: subjectId,
-      user_id: authUser.id,
-      name: name.trim(),
-      status: 'not_started',
-      planned_date: plannedDate || null,
-      display_order: existing.length,
-      is_deleted: false,
-      created_at: new Date().toISOString()
-    };
-
-    const newChapter = mapChapter(chapterPayload);
+    const { data, error } = await supabase.from('chapters').insert([{
+      subject_id: subjectId, user_id: authUser.id, name: name.trim(),
+      status: 'not_started', planned_date: plannedDate || null, display_order: existing.length,
+    }]).select().single();
+    if (error) throw error;
+    const newChapter = mapChapter(data);
     setChapters(prev => [...prev, newChapter]);
-
-    try {
-      const { error } = await supabase.from('chapters').insert([chapterPayload]);
-      if (error) throw error;
-    } catch (e) {
-      await addToSyncQueue({ table: 'chapters', action: 'insert', payload: chapterPayload });
-    }
-    
     return newChapter;
   };
 
@@ -464,39 +413,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (data.name !== undefined) payload.name = data.name.trim();
     if (data.plannedDate !== undefined) payload.planned_date = data.plannedDate;
     if (data.status !== undefined) payload.status = data.status;
-    if (data.completedDate !== undefined) payload.completed_date = data.completedDate; 
-
+    const { error } = await supabase.from('chapters').update(payload).eq('id', id);
+    if (error) throw error;
     setChapters(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
-    
-    try {
-      const { error } = await supabase.from('chapters').update(payload).eq('id', id);
-      if (error) throw error;
-    } catch (e) {
-      await addToSyncQueue({ table: 'chapters', action: 'update', matchKey: 'id', matchValue: id, payload });
-    }
   };
 
   const deleteChapter = async (id: string) => {
+    const { error } = await supabase.from('chapters').update({ is_deleted: true }).eq('id', id);
+    if (error) throw error;
     setChapters(prev => prev.filter(c => c.id !== id));
-    try {
-      const { error } = await supabase.from('chapters').update({ is_deleted: true }).eq('id', id);
-      if (error) throw error;
-    } catch (e) {
-      await addToSyncQueue({ table: 'chapters', action: 'update', matchKey: 'id', matchValue: id, payload: { is_deleted: true } });
-    }
   };
 
   const bulkDeleteChapters = async (ids: string[]) => {
     if (!ids.length) return;
+    const { error } = await supabase.from('chapters').update({ is_deleted: true }).in('id', ids);
+    if (error) throw error;
     setChapters(prev => prev.filter(c => !ids.includes(c.id)));
-    try {
-      const { error } = await supabase.from('chapters').update({ is_deleted: true }).in('id', ids);
-      if (error) throw error;
-    } catch (e) {
-      for (const id of ids) {
-        await addToSyncQueue({ table: 'chapters', action: 'update', matchKey: 'id', matchValue: id, payload: { is_deleted: true } });
-      }
-    }
   };
 
   // ── Topics (local only) ───────────────────────────────────────────────────
@@ -573,6 +505,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const xp = calculateSessionXP(actualMins) + bonusFromComeback;
       if (comebackPending) setComebackPendingState(false);
 
+      // Level-up detection
       const oldLevelRank = activeUser ? getLevelForXP(activeUser.xpTotal).rank : 1;
       const newXPTotal = (activeUser?.xpTotal ?? 0) + xp;
       const newLevelRank = getLevelForXP(newXPTotal).rank;
@@ -709,14 +642,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           await addToSyncQueue({ table: 'xp_transactions', action: 'insert', payload: txPayload });
         }
       }
-      
-      // FIX 1: Yesterday ki date bhi UTC free (Local Time) kar di hai
-      const yesterday = getLocalDateStr(new Date(Date.now() - 86400000));
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
       let newStreak = activeUser.streakCurrent;
       if (isCompleted && activeUser.lastStudyDate !== today) {
         newStreak = (activeUser.lastStudyDate === yesterday || activeUser.lastStudyDate === null) ? newStreak + 1 : 1;
       } else if (!isCompleted) {
-        newStreak = activeUser.streakCurrent;
+        newStreak = 0;
       }
       
       await setUser({
@@ -734,8 +665,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const getDailySummary = (date: string) => dailySummaries.find(s => s.date === date) ?? null;
 
   const getEmptySummary = (daysAgo: number): DailySummary => {
-    // ✅ FIX 1: History days ki date bhi UTC free (Local Time)
-    const d = getLocalDateStr(new Date(Date.now() - daysAgo * 86400000));
+    const d = new Date(Date.now() - daysAgo * 86400000).toISOString().split('T')[0];
     return dailySummaries.find(s => s.date === d) ?? {
       id: '', userId: user?.id || '', date: d, totalMinutes: 0,
       sessionsCompleted: 0, sessionsBroken: 0, goalMinutes: user?.dailyGoalMinutes ?? 120, goalMet: false, xpEarned: 0,

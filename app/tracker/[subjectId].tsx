@@ -42,9 +42,6 @@ export default function SubjectDetailScreen() {
   const [subjectModalVisible, setSubjectModalVisible] = useState(false);
   const [editSubjectName, setEditSubjectName] = useState('');
   const [updatingSubject, setUpdatingSubject] = useState(false);
-  
-  // ✅ Naya Guard State: Delete operations ke liye double-click rokne ko
-  const [isProcessing, setIsProcessing] = useState(false);
 
   // -- Filter & Selection States --
   const [filterStatus, setFilterStatus] = useState<Chapter['status'] | 'all'>('all');
@@ -81,15 +78,13 @@ export default function SubjectDetailScreen() {
   };
 
   const handleDeleteSubject = async () => {
-    if (!subject || isProcessing) return; // ✅ Guard
-    setIsProcessing(true);
+    if (!subject) return;
     try {
       await deleteSubject(subject.id);
       router.back(); // Redirect back to tracker main screen
     } catch (error: any) {
       console.error("Subject Delete Error", error);
       alert("Failed to delete subject: " + error.message);
-      setIsProcessing(false);
     }
   };
 
@@ -109,7 +104,7 @@ export default function SubjectDetailScreen() {
   };
 
   const handleSave = async () => {
-    if (!chapterName.trim() || !subjectId || saving) return; // ✅ Guard
+    if (!chapterName.trim() || !subjectId) return;
     setSaving(true);
     
     try {
@@ -149,8 +144,7 @@ export default function SubjectDetailScreen() {
   };
 
   const handleBulkDelete = async () => {
-    if (selectedIds.length === 0 || isProcessing) return; // ✅ Guard
-    setIsProcessing(true);
+    if (selectedIds.length === 0) return;
     try {
       await bulkDeleteChapters(selectedIds);
       setSelectedIds([]); 
@@ -158,21 +152,15 @@ export default function SubjectDetailScreen() {
     } catch (error: any) {
       console.error("Bulk Delete Failed", error);
       alert("Delete Failed: " + error.message);
-    } finally {
-      setIsProcessing(false);
     }
   };
 
   const handleSingleDelete = async (id: string) => {
-    if (isProcessing) return; // ✅ Guard
-    setIsProcessing(true);
     try {
       await deleteChapter(id);
     } catch (error: any) {
       console.error("Delete Failed", error);
       alert("Delete Failed: " + error.message);
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -202,8 +190,8 @@ export default function SubjectDetailScreen() {
           <Text style={styles.selectionCount}>{selectedIds.length} Selected</Text>
           <TouchableOpacity 
              onPress={handleBulkDelete} 
-             style={[styles.iconBtn, isProcessing && { opacity: 0.5 }]}
-             disabled={selectedIds.length === 0 || isProcessing} // ✅ Button Disabled Check
+             style={styles.iconBtn}
+             disabled={selectedIds.length === 0}
           >
             <MaterialIcons name="delete" size={26} color={selectedIds.length > 0 ? '#ff4444' : Colors.textTertiary} />
           </TouchableOpacity>
@@ -222,12 +210,7 @@ export default function SubjectDetailScreen() {
             <TouchableOpacity onPress={openEditSubjectModal} style={styles.subjectActionBtn} hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}>
               <MaterialIcons name="edit" size={16} color={Colors.textSecondary} />
             </TouchableOpacity>
-            <TouchableOpacity 
-              onPress={handleDeleteSubject} 
-              style={[styles.subjectActionBtn, isProcessing && { opacity: 0.5 }]} 
-              hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
-              disabled={isProcessing} // ✅ Button Disabled Check
-            >
+            <TouchableOpacity onPress={handleDeleteSubject} style={styles.subjectActionBtn} hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}>
               <MaterialIcons name="delete" size={16} color="#ff4444" />
             </TouchableOpacity>
           </View>
@@ -326,12 +309,6 @@ export default function SubjectDetailScreen() {
                     chapter={chapter}
                     onStatusChange={(status) => handleStatusChange(chapter.id, status)}
                     onPress={() => isSelectionMode ? toggleSelection(chapter.id) : router.push(`/tracker/chapters/${chapter.id}` as any)}
-                    onLongPress={() => {
-                      if (!isSelectionMode) {
-                        setIsSelectionMode(true);
-                        toggleSelection(chapter.id);
-                      }
-                    }}
                     onDelete={() => handleSingleDelete(chapter.id)} 
                   />
                 </View>
@@ -565,3 +542,4 @@ const styles = StyleSheet.create({
   saveBtnDisabled: { opacity: 0.4 },
   saveBtnText: { color: Colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
 });
+

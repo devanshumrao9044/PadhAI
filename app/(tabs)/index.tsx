@@ -1,10 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   ScrollView, View, Text, StyleSheet,
   RefreshControl, TouchableOpacity
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useApp } from '../../hooks/useApp'; // ✅ Global state import kiya
+import { supabase } from '../../services/supabase';
 import GreetingCard from '../../components/dashboard/GreetingCard';
 import StatsRow from '../../components/dashboard/StatsRow';
 import QuickShortcuts from '../../components/dashboard/QuickShortcuts';
@@ -12,35 +12,123 @@ import QuoteCard from '../../components/dashboard/QuoteCard';
 import SideDrawer from '../../components/ui/SideDrawer';
 
 export default function Dashboard() {
-  // ✅ Seedha AppContext se data uthaya (no separate Supabase queries needed)
-  const { user, chapters, sessions, reload } = useApp();
-
+  const [userName, setUserName] = useState('Student');
+  const [streak, setStreak] = useState(0);
+  const [todayMinutes, setTodayMinutes] = useState(0);
+  const [xpTotal, setXpTotal] = useState(0);
+  const [chaptersTotal, setChaptersTotal] = useState(0);
+  const [chaptersDone, setChaptersDone] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  // ✅ Synchronously calculations (instant UI update)
-  const userName = user?.fullName || 'Student';
-  const streak = user?.streakCurrent || 0;
-  const xpTotal = user?.xpTotal || 0;
+  async function loadUserData() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('users')
+        .select('name, streak, daily_goal_minutes, xp')
+        .eq('id', user.id)
+        .single();
+      if (data) {
+        setUserName(data.name || 'Student');
+        setStreak(data.streak || 0);
+        setXpTotal(data.xp || 0);
+      }
+      setUserId(user.id);
+    } catch (e) {
+      console.log('User data error:', e);
+    }
+  }
 
-  const activeChapters = chapters.filter(c => !c.isDeleted);
-  const chaptersTotal = activeChapters.length;
-  const chaptersDone = activeChapters.filter(c => c.status === 'done').length;
+  async function loadChaptersStats() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('chapters')
+        .select('status, is_deleted')
+        .eq('user_id', user.id)
+        .eq('is_deleted', false);
+      if (data) {
+        setChaptersTotal(data.length);
+        setChaptersDone(data.filter((c: any) => c.status === 'done').length);
+      }
+    } catch (e) {
+      console.log('Chapters error:', e);
+    }
+  }
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todayMinutes = sessions
-    .filter(s => s.sessionDate === todayStr && s.completed)
-    .reduce((sum, s) => sum + (s.durationActualMins || 0), 0);
+  async function loadTodayStats() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const { data } = await supabase
+        .from('focus_sessions')
+        .select('actual_minutes')
+        .eq('user_id', user.id)
+        .eq('broken', false)
+        .gte('started_at', today.toISOString());
+      if (data) {
+        const total = data.reduce(
+          (sum: number, s: any) => sum + (s.actual_minutes || 0), 0
+        );
+        setTodayMinutes(total);
+      }
+    } catch (e) {
+      console.log('Stats error:', e);
+    }
+  }
 
-  // ✅ Pull-to-refresh ab global state ko reload karega
+  async function loadAll() {
+    await Promise.all([loadUserData(), loadTodayStats(), loadChaptersStats()]);
+  }
+
+  useEffect(() => { loadAll(); }, []);
+
+  const channelIdRef = useRef(0);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    // Remove any existing channel first
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    // Use a unique channel name each time to prevent "subscribe multiple times" error
+    channelIdRef.current += 1;
+    const channelName = `dashboard-${userId}-${channelIdRef.current}`;
+
+    const channel = supabase
+      .channel(channelName)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'focus_sessions', filter: `user_id=eq.${userId}` },
+        () => { loadTodayStats(); loadUserData(); }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'chapters', filter: `user_id=eq.${userId}` },
+        () => loadChaptersStats()
+      )
+      .subscribe();
+
+    channelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+      channelRef.current = null;
+    };
+  }, [userId]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    try {
-      await reload();
-    } finally {
-      setRefreshing(false);
-    }
-  }, [reload]);
+    try { await loadAll(); } finally { setRefreshing(false); }
+  }, []);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -93,6 +181,7 @@ export default function Dashboard() {
         <QuoteCard />
       </ScrollView>
 
+      {/*  FIX: Removed unnecessary props from SideDrawer */}
       <SideDrawer
         visible={drawerOpen}
         onClose={() => setDrawerOpen(false)}

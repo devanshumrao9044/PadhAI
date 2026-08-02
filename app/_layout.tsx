@@ -7,94 +7,74 @@ import { supabase } from '@/services/supabase';
 import { View, ActivityIndicator } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// All segments that require an authenticated session.
-// Add any new protected route names here.
-// ─────────────────────────────────────────────────────────────────────────────
-const PROTECTED_SEGMENTS = new Set([
-  '(tabs)',
-  'onboarding',
-  'focus',
-  'tracker',
-  'streak-broken',
-  'referral',
-]);
-
 function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const segments = useSegments();
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [checking, setChecking] = useState(true);
+  const streakCheckedRef = useRef(false);
   const appCtx = useContext(AppContext);
 
-  // undefined = initial load (session not yet resolved — show spinner)
-  // null      = confirmed no session
-  // Session   = confirmed active session
-  const [session, setSession] = useState<Session | null | undefined>(undefined);
-  const streakCheckedRef = useRef(false);
-
-  // ── 1. Auth listener — ONLY updates state, never navigates ───────────────
   useEffect(() => {
-    // Resolve the current session on cold start
     supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s ?? null);
+      setSession(s);
+      setChecking(false);
     });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
       if (_event === 'SIGNED_OUT') {
-        // Reset so the streak check runs again on next login
         streakCheckedRef.current = false;
+        // ✅ Fix: removed the duplicate router.replace('/') call here.
+        // The segments-effect below (driven by [session, segments, checking])
+        // already handles redirecting to '/' whenever session is null and the
+        // current route is protected. Having BOTH this listener AND that effect
+        // call router.replace('/') independently caused a race — whichever fired
+        // last would "win," producing an unstable landing screen right after sign-out.
+        // Now there's exactly one place that decides where to send you on sign-out.
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // ── 2. Routing — the ONLY place that calls router.replace ────────────────
   useEffect(() => {
-    // Still waiting for Supabase to resolve the initial session — don't route yet
-    if (session === undefined) return;
+    if (checking) return;
 
-    const currentSegment = segments[0] as string | undefined;
-    const onAuthScreen = !currentSegment || currentSegment === 'index';
-    const onProtectedScreen = PROTECTED_SEGMENTS.has(currentSegment ?? '');
+    const inAuthGroup = segments[0] === '(tabs)';
+    const inOnboarding = segments[0] === 'onboarding';
+    const inFocus = segments[0] === 'focus';
+    const inTracker = segments[0] === 'tracker';
+    const inStreakBroken = segments[0] === 'streak-broken';
+    const inReferral = segments[0] === 'referral';
+    const inIndex = segments[0] === 'index' || segments.length === 0;
 
-    // ── Sign-out / expired session: kick off protected screens ──────────────
-    if (!session) {
-      if (onProtectedScreen) {
-        router.replace('/');
-      }
-      return;
-    }
+    const isProtected = inAuthGroup || inOnboarding || inFocus || inTracker || inStreakBroken || inReferral;
 
-    // ── Authenticated: run the one-time startup check ────────────────────────
-    if (!streakCheckedRef.current) {
-      streakCheckedRef.current = true; // Set immediately — prevents re-entry on re-renders
-
+    // ✅ Fix: this is now the ONLY place that redirects on sign-out.
+    // Runs whenever session OR segments change — so it catches the sign-out
+    // immediately (session becomes null) without needing to wait for a
+    // navigation to happen first. No longer requires visiting another
+    // screen to "trigger" the redirect.
+    if (!session && isProtected && !inIndex) {
+      streakCheckedRef.current = false;
+      router.replace('/');
+    } else if (session && !streakCheckedRef.current) {
+      streakCheckedRef.current = true;
       const uid = session.user.id;
-
-      if (onAuthScreen) {
-        // User is on the root/login screen — check streak then route
+      
+      if (segments[0] === 'index' || segments.length === 0) {
         (async () => {
-          const streakRedirected = await checkStreakOnLaunch(uid);
-          // Only proceed to onboarding/tabs if streak check didn't already redirect
-          if (!streakRedirected) {
-            await checkAndRedirect(uid);
-          }
+          await checkStreakOnLaunch(uid);
+          checkAndRedirect(uid);
         })();
       } else {
-        // User is already on a protected screen (resumed from background, etc.)
-        // Run the streak check but don't force a redirect to onboarding/tabs
-        checkStreakOnLaunch(uid).catch((err) =>
-          console.log('[AuthGate] Background streak check failed:', err)
-        );
+        checkStreakOnLaunch(uid);
       }
     }
-  }, [session, segments]);
+  }, [session, segments, checking]);
 
-  // ── Streak guard — returns true if it redirected ─────────────────────────
-  const checkStreakOnLaunch = async (userId: string): Promise<boolean> => {
+  const checkStreakOnLaunch = async (userId: string) => {
     try {
       const { data: profile } = await supabase
         .from('users')
@@ -102,7 +82,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         .eq('id', userId)
         .single();
 
-      if (!profile || profile.streak <= 0) return false;
+      if (!profile || profile.streak <= 0) return;
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -119,22 +99,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       if (isBroken) {
         await supabase.from('users').update({ streak: 0 }).eq('id', userId);
         appCtx?.setComebackPending(true);
-        router.replace({
-          pathname: '/streak-broken',
-          params: { lost: profile.streak },
-        });
-        return true; // ← caller must check this before doing any further redirect
+        router.replace({ pathname: '/streak-broken', params: { lost: profile.streak } });
       }
-
-      return false;
     } catch (err) {
-      console.log('[AuthGate] Streak guard error:', err);
-      return false;
+      console.log('Streak guard error:', err);
     }
   };
 
-  // ── Onboarding / main app redirect ───────────────────────────────────────
-  const checkAndRedirect = async (userId: string): Promise<void> => {
+  const checkAndRedirect = async (userId: string) => {
     try {
       const { data: profile } = await supabase
         .from('users')
@@ -152,73 +124,35 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // ── Loading screen — shown until Supabase resolves the session ────────────
-  if (session === undefined) {
+  if (checking) {
     return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: '#0A0A0F',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
+      <View style={{ flex: 1, backgroundColor: '#0A0A0F', justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#6B21A8" />
       </View>
     );
   }
 
-  return <>{children}</>;
+  return <>{children}</>
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AppProvider>
         <StatusBar style="light" backgroundColor="#0A0A0F" />
         <AuthGate>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: '#0A0A0F' },
-            }}
-          >
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0A0A0F' } }}>
             <Stack.Screen name="index" />
             <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
-            <Stack.Screen
-              name="streak-broken"
-              options={{ animation: 'fade', gestureEnabled: false }}
-            />
+            <Stack.Screen name="streak-broken" options={{ animation: 'fade', gestureEnabled: false }} />
             <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
-            <Stack.Screen
-              name="focus/active"
-              options={{ animation: 'slide_from_bottom', gestureEnabled: false }}
-            />
-            <Stack.Screen
-              name="focus/complete"
-              options={{ animation: 'fade', gestureEnabled: false }}
-            />
-            <Stack.Screen
-              name="focus/levelup"
-              options={{ animation: 'fade', gestureEnabled: false }}
-            />
-            <Stack.Screen
-              name="focus/broken"
-              options={{ animation: 'fade', gestureEnabled: false }}
-            />
-            <Stack.Screen
-              name="referral"
-              options={{ animation: 'slide_from_right' }}
-            />
-            <Stack.Screen
-              name="tracker/[subjectId]"
-              options={{ animation: 'slide_from_right' }}
-            />
-            <Stack.Screen
-              name="tracker/chapters/[chapterId]"
-              options={{ animation: 'slide_from_right' }}
-            />
+            <Stack.Screen name="focus/active" options={{ animation: 'slide_from_bottom', gestureEnabled: false }} />
+            <Stack.Screen name="focus/complete" options={{ animation: 'fade', gestureEnabled: false }} />
+            <Stack.Screen name="focus/levelup" options={{ animation: 'fade', gestureEnabled: false }} />
+            <Stack.Screen name="focus/broken" options={{ animation: 'fade', gestureEnabled: false }} />
+            <Stack.Screen name="referral" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="tracker/[subjectId]" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="tracker/chapters/[chapterId]" options={{ animation: 'slide_from_right' }} />
           </Stack>
         </AuthGate>
       </AppProvider>
