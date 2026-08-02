@@ -32,6 +32,7 @@ export default function ProfileScreen() {
   const [alertConfig, setAlertConfig] = useState<{
     visible: boolean; title: string; message: string; isSignOut?: boolean;
   }>({ visible: false, title: '', message: '' });
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     async function fetchRankInfo() {
@@ -91,10 +92,13 @@ export default function ProfileScreen() {
 
   const handleSignOut = async () => {
     setAlertConfig(p => ({ ...p, visible: false }));
-    // ✅ Fix: don't navigate here — AuthGate's onAuthStateChange listener
-    // in _layout.tsx already handles SIGNED_OUT navigation. Two competing
-    // router.replace('/') calls were racing and causing an unpredictable landing screen.
-    await supabase.auth.signOut();
+    setSigningOut(true);
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // AuthGate will handle redirect; if signOut fails just hide overlay
+      setSigningOut(false);
+    }
   };
 
   const openEditModal = () => {
@@ -496,6 +500,14 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
+      {/* Sign-out loading overlay */}
+      <Modal visible={signingOut} transparent animationType="fade">
+        <View style={styles.signOutOverlay}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.signOutOverlayText}>Signing out...</Text>
+        </View>
+      </Modal>
+
       {/* Web Alert */}
       {Platform.OS === 'web' && (
         <Modal visible={alertConfig.visible} transparent animationType="fade">
@@ -606,5 +618,17 @@ const styles = StyleSheet.create({
   alertTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.textPrimary, marginBottom: 8 },
   alertMsg: { fontSize: FontSize.base, color: Colors.textSecondary, marginBottom: Spacing.md },
   alertBtn: { backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center' },
+  signOutOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  signOutOverlayText: {
+    color: Colors.textSecondary,
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.medium,
+  },
 });
 
