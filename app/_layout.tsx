@@ -16,10 +16,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // Track whether we have already performed the post-boot redirect so we only
   // do it once (on cold-start when the user already has a valid session).
   const bootRedirectDone = useRef(false);
+  // Only true when getSession() itself found a session on mount (genuine cold-start).
+  // Fresh logins via index.tsx keep this false so the AuthGate does NOT compete.
+  const coldStartHasSession = useRef(false);
 
   // ── 1. Initialise session once on mount ──────────────────────────────────
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
+      if (s) coldStartHasSession.current = true; // existing session on app open
       setSession(s);
       setChecking(false);
     });
@@ -28,6 +32,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       setSession(s);
       if (_event === 'SIGNED_OUT') {
         bootRedirectDone.current = false;
+        coldStartHasSession.current = false;
       }
     });
 
@@ -58,8 +63,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     // Cold-start: session already exists and we are on the root index.
     // Run the streak check + profile check exactly once so the user lands
     // on the correct screen without the login page doing a double redirect.
+    // coldStartHasSession guards against running this on fresh login (index.tsx
+    // handles post-login redirects itself).
     const onIndex = segments.length === 0 || segments[0] === 'index';
-    if (session && onIndex && !bootRedirectDone.current) {
+    if (session && onIndex && !bootRedirectDone.current && coldStartHasSession.current) {
       bootRedirectDone.current = true;
       const uid = session.user.id;
       (async () => {
