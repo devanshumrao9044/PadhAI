@@ -12,9 +12,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const segments = useSegments();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [checking, setChecking] = useState(true);
-  const streakCheckedRef = useRef(false);
   const appCtx = useContext(AppContext);
+  // Track whether we have already performed the post-boot redirect so we only
+  // do it once (on cold-start when the user already has a valid session).
+  const bootRedirectDone = useRef(false);
 
+  // ── 1. Initialise session once on mount ──────────────────────────────────
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
@@ -24,106 +27,84 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       if (_event === 'SIGNED_OUT') {
-        streakCheckedRef.current = false;
-        // ✅ Fix: removed the duplicate router.replace('/') call here.
-        // The segments-effect below (driven by [session, segments, checking])
-        // already handles redirecting to '/' whenever session is null and the
-        // current route is protected. Having BOTH this listener AND that effect
-        // call router.replace('/') independently caused a race — whichever fired
-        // last would "win," producing an unstable landing screen right after sign-out.
-        // Now there's exactly one place that decides where to send you on sign-out.
+        bootRedirectDone.current = false;
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
+  // ── 2. Guard: kick unauthenticated users off protected routes ─────────────
+  //    This is the ONLY place that fires router.replace('/') on sign-out.
+  //    Post-login redirects are handled by app/index.tsx itself.
   useEffect(() => {
     if (checking) return;
 
-    const inAuthGroup = segments[0] === '(tabs)';
-    const inOnboarding = segments[0] === 'onboarding';
-    const inFocus = segments[0] === 'focus';
-    const inTracker = segments[0] === 'tracker';
-    const inStreakBroken = segments[0] === 'streak-broken';
-    const inReferral = segments[0] === 'referral';
-    const inIndex = segments[0] === 'index' || segments.length === 0;
+    const isProtected =
+      segments[0] === '(tabs)'      ||
+      segments[0] === 'onboarding'  ||
+      segments[0] === 'focus'       ||
+      segments[0] === 'tracker'     ||
+      segments[0] === 'streak-broken' ||
+      segments[0] === 'referral';
 
-    const isProtected = inAuthGroup || inOnboarding || inFocus || inTracker || inStreakBroken || inReferral;
-
-    // ✅ Fix: this is now the ONLY place that redirects on sign-out.
-    // Runs whenever session OR segments change — so it catches the sign-out
-    // immediately (session becomes null) without needing to wait for a
-    // navigation to happen first. No longer requires visiting another
-    // screen to "trigger" the redirect.
-    if (!session && isProtected && !inIndex) {
-      streakCheckedRef.current = false;
+    if (!session && isProtected) {
+      // User signed out while on a protected screen → send to login
       try { router.dismissAll(); } catch (_) {}
       router.replace('/');
-    } else if (session && !streakCheckedRef.current) {
-      streakCheckedRef.current = true;
+      return;
+    }
+
+    // Cold-start: session already exists and we are on the root index.
+    // Run the streak check + profile check exactly once so the user lands
+    // on the correct screen without the login page doing a double redirect.
+    const onIndex = segments.length === 0 || segments[0] === 'index';
+    if (session && onIndex && !bootRedirectDone.current) {
+      bootRedirectDone.current = true;
       const uid = session.user.id;
-      
-      if (segments[0] === 'index' || segments.length === 0) {
-        (async () => {
-          await checkStreakOnLaunch(uid);
-          checkAndRedirect(uid);
-        })();
-      } else {
-        checkStreakOnLaunch(uid);
-      }
+      (async () => {
+        // Streak guard
+        try {
+          const { data: profile } = await supabase
+            .from('users')
+            .select('streak, last_study_date')
+            .eq('id', uid)
+            .single();
+
+          if (profile && profile.streak > 0) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const lastStudy = profile.last_study_date ? new Date(profile.last_study_date) : null;
+            if (lastStudy) lastStudy.setHours(0, 0, 0, 0);
+
+            if (!lastStudy || lastStudy < yesterday) {
+              await supabase.from('users').update({ streak: 0 }).eq('id', uid);
+              appCtx?.setComebackPending(true);
+              router.replace({ pathname: '/streak-broken', params: { lost: profile.streak } });
+              return;
+            }
+          }
+        } catch (err) {
+          console.log('Streak guard error:', err);
+        }
+
+        // Profile check → onboarding or home
+        try {
+          const { data: profile } = await supabase
+            .from('users').select('name').eq('id', uid).single();
+          if (!profile?.name || profile.name === 'Student') {
+            router.replace('/onboarding');
+          } else {
+            router.replace('/(tabs)');
+          }
+        } catch {
+          router.replace('/(tabs)');
+        }
+      })();
     }
   }, [session, segments, checking]);
-
-  const checkStreakOnLaunch = async (userId: string) => {
-    try {
-      const { data: profile } = await supabase
-        .from('users')
-        .select('streak, last_study_date')
-        .eq('id', userId)
-        .single();
-
-      if (!profile || profile.streak <= 0) return;
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-
-      const lastStudy = profile.last_study_date
-        ? new Date(profile.last_study_date)
-        : null;
-      if (lastStudy) lastStudy.setHours(0, 0, 0, 0);
-
-      const isBroken = !lastStudy || lastStudy < yesterday;
-
-      if (isBroken) {
-        await supabase.from('users').update({ streak: 0 }).eq('id', userId);
-        appCtx?.setComebackPending(true);
-        router.replace({ pathname: '/streak-broken', params: { lost: profile.streak } });
-      }
-    } catch (err) {
-      console.log('Streak guard error:', err);
-    }
-  };
-
-  const checkAndRedirect = async (userId: string) => {
-    try {
-      const { data: profile } = await supabase
-        .from('users')
-        .select('name')
-        .eq('id', userId)
-        .single();
-
-      if (!profile?.name || profile.name === 'Student') {
-        router.replace('/onboarding');
-      } else {
-        router.replace('/(tabs)');
-      }
-    } catch {
-      router.replace('/(tabs)');
-    }
-  };
 
   if (checking) {
     return (
