@@ -33,6 +33,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       if (_event === 'SIGNED_OUT') {
         bootRedirectDone.current = false;
         coldStartHasSession.current = false;
+        // Fire the redirect immediately — do not rely on the segments effect
+        // which only runs after React re-renders (too slow / unreliable).
+        setTimeout(() => {
+          try { router.dismissAll(); } catch (_) {}
+          router.replace('/');
+        }, 0);
       }
     });
 
@@ -54,7 +60,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       segments[0] === 'referral';
 
     if (!session && isProtected) {
-      // User signed out while on a protected screen → send to login
+      // Safety-net only (e.g. deep-link to protected route while logged out).
+      // Normal logout is already handled directly in the SIGNED_OUT event above.
       try { router.dismissAll(); } catch (_) {}
       router.replace('/');
       return;
