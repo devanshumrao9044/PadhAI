@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useContext } from 'react';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Redirect, Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider, AppContext } from '@/contexts/AppContext';
@@ -10,6 +10,9 @@ import type { Session } from '@supabase/supabase-js';
 function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const segments = useSegments();
+  // Expo Router's generated tuple type excludes the root empty segment even
+  // though it is returned at runtime, so use a string view for guard logic.
+  const routeSegments = segments as string[];
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [checking, setChecking] = useState(true);
   const appCtx = useContext(AppContext);
@@ -19,6 +22,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // Only true when getSession() itself found a session on mount (genuine cold-start).
   // Fresh logins via index.tsx keep this false so the AuthGate does NOT compete.
   const coldStartHasSession = useRef(false);
+  const isProtected =
+    routeSegments[0] === '(tabs)' ||
+    routeSegments[0] === 'onboarding' ||
+    routeSegments[0] === 'focus' ||
+    routeSegments[0] === 'tracker' ||
+    routeSegments[0] === 'streak-broken' ||
+    routeSegments[0] === 'referral';
 
   // ── 1. Initialise session once on mount ──────────────────────────────────
   useEffect(() => {
@@ -33,12 +43,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       if (_event === 'SIGNED_OUT') {
         bootRedirectDone.current = false;
         coldStartHasSession.current = false;
-        // Fire the redirect immediately — do not rely on the segments effect
-        // which only runs after React re-renders (too slow / unreliable).
-        setTimeout(() => {
-          try { router.dismissAll(); } catch (_) {}
-          router.replace('/');
-        }, 0);
+        // setSession(null) below triggers the render-level Redirect. Keeping
+        // navigation declarative prevents a race with the tab navigator stack.
       }
     });
 
@@ -51,19 +57,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (checking) return;
 
-    const isProtected =
-      segments[0] === '(tabs)'      ||
-      segments[0] === 'onboarding'  ||
-      segments[0] === 'focus'       ||
-      segments[0] === 'tracker'     ||
-      segments[0] === 'streak-broken' ||
-      segments[0] === 'referral';
-
     if (!session && isProtected) {
-      // Safety-net only (e.g. deep-link to protected route while logged out).
-      // Normal logout is already handled directly in the SIGNED_OUT event above.
-      try { router.dismissAll(); } catch (_) {}
-      router.replace('/');
+      // The render-level Redirect below is the source of truth. Keep this
+      // effect free of stack mutations so it cannot race the router state.
       return;
     }
 
@@ -72,7 +68,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     // on the correct screen without the login page doing a double redirect.
     // coldStartHasSession guards against running this on fresh login (index.tsx
     // handles post-login redirects itself).
-    const onIndex = segments.length === 0 || segments[0] === 'index';
+    const onIndex = routeSegments.length === 0;
     if (session && onIndex && !bootRedirectDone.current && coldStartHasSession.current) {
       bootRedirectDone.current = true;
       const uid = session.user.id;
@@ -118,7 +114,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         }
       })();
     }
-  }, [session, segments, checking]);
+  }, [session, routeSegments, checking, isProtected]);
+
+  if (!checking && !session && isProtected) {
+    return <Redirect href="/" />;
+  }
 
   if (checking) {
     return (
@@ -139,6 +139,7 @@ export default function RootLayout() {
         <AuthGate>
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0A0A0F' } }}>
             <Stack.Screen name="index" />
+            <Stack.Screen name="reset-password" options={{ animation: 'fade' }} />
             <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
             <Stack.Screen name="streak-broken" options={{ animation: 'fade', gestureEnabled: false }} />
             <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />

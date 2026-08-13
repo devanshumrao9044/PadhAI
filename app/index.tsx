@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { useEffect } from 'react';
 import { supabase } from '@/services/supabase';
 
 // ── Validation ────────────────────────────────────────────────────────────────
@@ -177,6 +178,15 @@ type Mode = 'login' | 'signup' | 'forgot';
 // MAIN AUTH SCREEN
 // ═════════════════════════════════════════════════════════════════════════════
 export default function AuthScreen() {
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        router.replace('/reset-password');
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   const [mode, setMode] = useState<Mode>('login');
 
   // Login state
@@ -383,7 +393,7 @@ export default function AuthScreen() {
             <Text style={s.logoText}>पढ़</Text>
             <Text style={s.logoAI}>AI</Text>
           </View>
-          <Text style={s.tagline}>"Stay Focused. Study Hard. No Excuses."</Text>
+          <Text style={s.tagline}>{"Stay Focused. Study Hard. No Excuses."}</Text>
 
           {/* ── LOGIN ── */}
           {mode === 'login' && (

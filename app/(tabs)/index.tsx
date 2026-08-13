@@ -23,7 +23,7 @@ export default function Dashboard() {
   const [userId, setUserId] = useState<string | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  async function loadUserData() {
+  const loadUserData = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -41,9 +41,9 @@ export default function Dashboard() {
     } catch (e) {
       console.log('User data error:', e);
     }
-  }
+  }, []);
 
-  async function loadChaptersStats() {
+  const loadChaptersStats = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -59,9 +59,9 @@ export default function Dashboard() {
     } catch (e) {
       console.log('Chapters error:', e);
     }
-  }
+  }, []);
 
-  async function loadTodayStats() {
+  const loadTodayStats = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -82,13 +82,15 @@ export default function Dashboard() {
     } catch (e) {
       console.log('Stats error:', e);
     }
-  }
+  }, []);
 
-  async function loadAll() {
+  const loadAll = useCallback(async () => {
     await Promise.all([loadUserData(), loadTodayStats(), loadChaptersStats()]);
-  }
+  }, [loadUserData, loadTodayStats, loadChaptersStats]);
 
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => {
+    void loadAll();
+  }, [loadAll]);
 
   const channelIdRef = useRef(0);
 
@@ -123,12 +125,12 @@ export default function Dashboard() {
       supabase.removeChannel(channel);
       channelRef.current = null;
     };
-  }, [userId]);
+  }, [userId, loadTodayStats, loadUserData, loadChaptersStats]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try { await loadAll(); } finally { setRefreshing(false); }
-  }, []);
+  }, [loadAll]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

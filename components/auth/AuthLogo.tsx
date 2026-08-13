@@ -8,7 +8,7 @@ export default function AuthLogo() {
         <Text style={styles.logoAI}>AI</Text>
       </View>
       <Text style={styles.tagline}>
-        "Stay Focused. Study Hard. No Excuses."
+        {"Stay Focused. Study Hard. No Excuses."}
       </Text>
     </View>
   );

@@ -89,12 +89,14 @@ export default function FocusCompleteScreen() {
     COMPLETION_MESSAGES[Math.floor(Math.random() * COMPLETION_MESSAGES.length)]
   );
   const level = user ? getLevelForXP(user.xpTotal) : null;
+  const recoveryAppliedRef = useRef(false);
 
   // ✅ Restore half-streak when this is a recovery session
   useEffect(() => {
-    if (!isRecovery || !user || lostStreak <= 0) return;
-    setUser({ ...user, streakCurrent: recoveredStreak });
-  }, []);
+    if (recoveryAppliedRef.current || !isRecovery || !user || lostStreak <= 0) return;
+    recoveryAppliedRef.current = true;
+    void setUser({ ...user, streakCurrent: recoveredStreak });
+  }, [isRecovery, lostStreak, recoveredStreak, setUser, user]);
 
   // Referral check
   useEffect(() => {

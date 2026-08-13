@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, TextInput,
+  TextInput, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -35,7 +35,6 @@ export default function ChapterDetailScreen() {
   const subject = chapter ? subjects.find(s => s.id === chapter.subjectId) : null;
   const topics = getTopicsForChapter(chapterId ?? '');
 
-  const [addModal, setAddModal] = useState(false);
   const [topicName, setTopicName] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -47,15 +46,24 @@ export default function ChapterDetailScreen() {
     const idx = STATUS_CYCLE.indexOf(chapter.status);
     const next = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
     const completedDate = next === 'done' ? new Date().toISOString().split('T')[0] : undefined;
-    await updateChapter(chapter.id, { status: next, ...(completedDate ? { completedDate } : {}) });
+    try {
+      await updateChapter(chapter.id, { status: next, ...(completedDate ? { completedDate } : {}) });
+    } catch {
+      Alert.alert('Could Not Update Chapter', 'Please check your connection and try again.');
+    }
   };
 
   const handleAddTopic = async () => {
-    if (!topicName.trim() || !chapterId) return;
+    if (!topicName.trim() || !chapterId || saving) return;
     setSaving(true);
-    await addTopic(chapterId, topicName.trim());
-    setSaving(false);
-    setTopicName('');
+    try {
+      await addTopic(chapterId, topicName.trim());
+      setTopicName('');
+    } catch {
+      Alert.alert('Could Not Add Topic', 'Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!chapter) {

@@ -94,10 +94,12 @@ export default function ProfileScreen() {
     setAlertConfig(p => ({ ...p, visible: false }));
     setSigningOut(true);
     try {
-      await supabase.auth.signOut();
-    } catch {
-      // AuthGate will handle redirect; if signOut fails just hide overlay
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      router.replace('/');
+    } catch (error: any) {
       setSigningOut(false);
+      showAlert('Sign Out Failed', error?.message ?? 'Please try again.');
     }
   };
 
@@ -373,11 +375,12 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={styles.signOutRow}
             onPress={() => showAlert('Sign Out', 'Are you sure you want to sign out?', true)}
+            disabled={signingOut}
             activeOpacity={0.7}
           >
             <MaterialIcons name="logout" size={20} color={Colors.danger} />
             <View style={styles.settingInfo}>
-              <Text style={styles.signOutLabel}>Sign Out</Text>
+              <Text style={styles.signOutLabel}>{signingOut ? 'Signing out…' : 'Sign Out'}</Text>
             </View>
             <MaterialIcons name="chevron-right" size={20} color={Colors.danger} />
           </TouchableOpacity>

@@ -172,7 +172,7 @@ export default function AnalyticsScreen() {
         <View style={styles.goalCard}>
           <View style={styles.goalHeader}>
             <View>
-              <Text style={styles.goalLabel}>TODAY'S GOAL</Text>
+              <Text style={styles.goalLabel}>{"TODAY'S GOAL"}</Text>
               <Text style={styles.goalFraction}>
                 <Text style={[styles.goalCurrent, goalMet && { color: Colors.success }]}>
                   {formatMins(todayMins)}

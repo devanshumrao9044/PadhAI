@@ -15,7 +15,7 @@ export default function QuoteCard() {
   return (
     <View style={styles.card}>
       <Text style={styles.icon}>💭</Text>
-      <Text style={styles.quote}>"{quote.en}"</Text>
+      <Text style={styles.quote}>{`"${quote.en}"`}</Text>
       <Text style={styles.quoteHi}>{quote.hi}</Text>
     </View>
   );

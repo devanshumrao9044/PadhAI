@@ -61,9 +61,12 @@ export default function SideDrawer({ visible, onClose }: Props) {
   }, [visible]);
 
   const navigate = (route: string) => {
-  
-    router.push(route as any);
     onClose();
+    if (!user) {
+      router.replace('/');
+      return;
+    }
+    router.push(route as any);
   };
 
   if (!mounted) return null;

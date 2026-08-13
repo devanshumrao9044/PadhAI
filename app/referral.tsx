@@ -176,7 +176,7 @@ export default function ReferralScreen() {
 
           {pending > 0 ? (
             <Text style={styles.pendingText}>
-              {pending} referral{pending > 1 ? 's' : ''} pending — friend hasn't completed first session yet.
+              {pending} referral{pending > 1 ? 's' : ''} pending — friend hasn&apos;t completed first session yet.
             </Text>
           ) : null}
         </View>
@@ -240,7 +240,7 @@ export default function ReferralScreen() {
             <Text style={styles.modalEmoji}>🏆</Text>
             <Text style={styles.modalTitle}>Reward Unlocked!</Text>
             <Text style={styles.modalSubtitle}>
-              You've successfully referred 5 friends. Claim your exclusive reward now!
+              You&apos;ve successfully referred 5 friends. Claim your exclusive reward now!
             </Text>
             <TouchableOpacity
               style={styles.modalInstagramBtn}

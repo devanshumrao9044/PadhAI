@@ -62,7 +62,7 @@ export default function SubjectCard({
       <Modal visible={confirmDelete} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.confirmCard}>
-            <Text style={styles.confirmTitle}>"{subject.name}" delete karo?</Text>
+            <Text style={styles.confirmTitle}>{`"${subject.name}" delete karo?`}</Text>
             <Text style={styles.confirmSub}>All chapters will be removed.</Text>
             <View style={styles.confirmBtns}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setConfirmDelete(false)}>

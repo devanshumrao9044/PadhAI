@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable,
-  TextInput, Animated,
+  TextInput, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -55,9 +55,14 @@ export default function FocusScreen() {
   const handleLockIn = async () => {
     if (isLockInDisabled) return;
     setStarting(true);
-    await startSession(effectiveMins, selectedSubjectId, null);
-    setStarting(false);
-    router.push('/focus/active');
+    try {
+      await startSession(effectiveMins, selectedSubjectId, null);
+      router.push('/focus/active');
+    } catch {
+      Alert.alert('Could Not Start Session', 'Please check your connection and try again.');
+    } finally {
+      setStarting(false);
+    }
   };
 
   return (

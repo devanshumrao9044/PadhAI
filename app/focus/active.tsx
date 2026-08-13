@@ -17,7 +17,16 @@ function formatTime(secs: number): string {
 
 export default function FocusActiveScreen() {
   const router = useRouter();
-  const { activeSession, completeSession, breakSession, subjects, streakRecoveryPending, lostStreakCount, setStreakRecoveryPending } = useApp();
+  const {
+    activeSession,
+    completeSession,
+    breakSession,
+    subjects,
+    streakRecoveryPending,
+    lostStreakCount,
+    setStreakRecoveryPending,
+    isLoading,
+  } = useApp();
 
   const [remaining, setRemaining] = useState(0);
   const [elapsed, setElapsed] = useState(0);
@@ -72,7 +81,7 @@ export default function FocusActiveScreen() {
       if (session?.leveledUp && session?.newLevelRank) {
         const { LEVELS } = await import('@/constants/levels');
         const levelDef = LEVELS.find(l => l.rank === session.newLevelRank);
-        const totalXPAfter = xpEarned;
+        const totalXPAfter = session?.totalXP ?? xpEarned;
         router.replace(
           `/focus/levelup?newLevel=${session.newLevelRank}&title=${encodeURIComponent(levelDef?.realisticTitle ?? '')}&examTitle=${encodeURIComponent(levelDef?.examTitle ?? '')}&color=${encodeURIComponent(levelDef?.color ?? '#A855F7')}&totalXP=${totalXPAfter}&xpEarned=${xpEarned}&recovery=${isRecovery ? '1' : '0'}&lostStreak=${recoveredStreak}`
         );
@@ -117,6 +126,7 @@ export default function FocusActiveScreen() {
   };
 
   useEffect(() => {
+    if (isLoading) return;
     if (!activeSession) {
       router.replace('/(tabs)/focus');
       return;
@@ -153,7 +163,7 @@ export default function FocusActiveScreen() {
       try {
         const handler = () => { setShowExit(true); return true; };
         const sub = BackHandler.addEventListener('hardwareBackPress', handler);
-        backSubRef.current = sub ?? { remove: () => BackHandler.removeEventListener('hardwareBackPress', handler) };
+        backSubRef.current = sub ?? null;
       } catch (e) {
         console.log('BackHandler setup failed:', e);
         backSubRef.current = null;
@@ -177,7 +187,7 @@ export default function FocusActiveScreen() {
       }
       backSubRef.current = null;
     };
-  }, []);
+  }, [isLoading]);
 
   useEffect(() => {
     if (!activeSession?.sessionId) return;

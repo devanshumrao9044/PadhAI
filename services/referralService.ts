@@ -25,14 +25,23 @@ export async function processReferralOnFirstSession(
       .eq('broken', false)
       .limit(2);
 
-    if (!sessions || sessions.length !== 1) return;
+    // The handler may run immediately after the insert or during offline sync.
+    // Any completed session proves the user has reached the referral milestone;
+    // the pending referral filter below keeps the operation idempotent.
+    if (!sessions || sessions.length === 0) return;
 
-    await supabase
+    const { data: completedReferral, error: completionError } = await supabase
       .from('referrals')
-      .update({
-        status: 'completed',
-      })
-      .eq('id', referral.id);
+      .update({ status: 'completed' })
+      .eq('id', referral.id)
+      .eq('status', 'pending')
+      .select('id')
+      .maybeSingle();
+
+    if (completionError) throw completionError;
+    // Only the caller that successfully transitions pending -> completed may
+    // award XP; concurrent retries exit here without duplicating the reward.
+    if (!completedReferral) return;
 
     const { data: referee } = await supabase
       .from('users')
@@ -88,6 +97,51 @@ export async function processReferralOnFirstSession(
     console.log(`Referral done: +${XP_REFEREE} to referee, +${XP_REFERRER} to referrer`);
   } catch (err) {
     console.log('processReferralOnFirstSession error:', err);
+  }
+}
+
+// ── applyReferralCode: Validates and attaches a referral to a new user ─────────
+export async function applyReferralCode(
+  refereeId: string,
+  code: string,
+): Promise<boolean> {
+  const normalizedCode = code.trim().toUpperCase();
+  if (!normalizedCode) return false;
+
+  try {
+    const { data: referrerId, error: lookupError } = await supabase.rpc(
+      'get_referrer_id',
+      { code: normalizedCode },
+    );
+
+    if (lookupError || !referrerId || referrerId === refereeId) return false;
+
+    const { data: existingReferral, error: existingError } = await supabase
+      .from('referrals')
+      .select('id')
+      .eq('referee_id', refereeId)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+    if (existingReferral) return true;
+
+    const { error: userError } = await supabase
+      .from('users')
+      .update({ referred_by: normalizedCode })
+      .eq('id', refereeId);
+    if (userError) throw userError;
+
+    const { error: referralError } = await supabase.from('referrals').insert({
+      referrer_id: referrerId,
+      referee_id: refereeId,
+      status: 'pending',
+    });
+    if (referralError) throw referralError;
+
+    return true;
+  } catch (err) {
+    console.log('applyReferralCode error:', err);
+    return false;
   }
 }
 

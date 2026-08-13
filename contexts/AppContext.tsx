@@ -18,6 +18,7 @@ import {
   FocusSession, DailySummary, XPTransaction, ActiveSession
 } from '@/types/models';
 import { calculateSessionXP, XP_REWARDS, getLevelForXP } from '@/constants/levels';
+import { processReferralOnFirstSession } from '@/services/referralService';
 
 export type AppContextType = {
   comebackPending: boolean;
@@ -50,7 +51,7 @@ export type AppContextType = {
   sessions: FocusSession[];
   activeSession: ActiveSession | null;
   startSession: (plannedMins: number, subjectId: string | null, chapterId: string | null) => Promise<string>;
-  completeSession: (sessionId: string, actualMins: number) => Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number }) | null>;
+  completeSession: (sessionId: string, actualMins: number) => Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number }) | null>;
   breakSession: (sessionId: string, actualMins: number) => Promise<FocusSession | null>;
   getDailySummary: (date: string) => DailySummary | null;
   getLast7Days: () => DailySummary[];
@@ -64,8 +65,21 @@ export type AppContextType = {
 
 export const AppContext = createContext<AppContextType | undefined>(undefined);
 
+function dateStr(date: Date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function todayStr() {
-  return new Date().toISOString().split('T')[0];
+  return dateStr();
+}
+
+function daysAgoStr(daysAgo: number) {
+  const date = new Date();
+  date.setDate(date.getDate() - daysAgo);
+  return dateStr(date);
 }
 
 // ── Data Mappers ──────────────────────────────────────────────────────────────
@@ -74,7 +88,7 @@ const mapUser = (u: any): UserProfile => ({
   username: u.email?.split('@')[0] ?? 'student',
   fullName: u.name ?? 'Student',
   targetExam: u.target_exam ?? 'JEE',
-  classLevel: u.class ?? '12',
+  classLevel: u.class ?? '12th',
   dailyGoalMinutes: u.daily_goal_minutes ?? 120,
   xpTotal: u.xp ?? 0,
   streakCurrent: u.streak ?? 0,
@@ -124,7 +138,7 @@ const mapSession = (s: any): FocusSession => ({
   xpEarned: s.xp_earned,
   xpDeducted: s.xp_deducted,
   brokenAtPercent: s.broken_at_percent ?? (s.broken ? 0 : 100),
-  sessionDate: s.started_at ? s.started_at.split('T')[0] : todayStr(),
+  sessionDate: s.started_at ? dateStr(new Date(s.started_at)) : todayStr(),
   createdAt: s.created_at,
 });
 
@@ -192,6 +206,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (task.action === 'insert') {
             const { error } = await supabase.from(task.table).insert(task.payload);
             if (error) throw error;
+            if (
+              task.table === 'focus_sessions' &&
+              task.payload?.broken === false &&
+              task.payload?.user_id
+            ) {
+              try {
+                await processReferralOnFirstSession(task.payload.user_id);
+              } catch (referralError) {
+                console.warn('[Referral] Sync processing failed:', referralError);
+              }
+            }
           } else if (task.action === 'upsert') {
             const conflictKey = task.table === 'daily_summary' ? 'user_id,date' : 'id';
             const { error } = await supabase.from(task.table).upsert(task.payload, { onConflict: conflictKey });
@@ -211,11 +236,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const clearLocalAccountData = async () => {
+    await Promise.all([
+      removeItem(StorageKeys.USER),
+      removeItem(StorageKeys.SUBJECTS),
+      removeItem(StorageKeys.CHAPTERS),
+      removeItem(StorageKeys.TOPICS),
+      removeItem(StorageKeys.SESSIONS),
+      removeItem(StorageKeys.DAILY_SUMMARY),
+      removeItem(StorageKeys.XP_LOG),
+      removeItem(StorageKeys.ONBOARDED),
+      removeItem(StorageKeys.ACTIVE_SESSION),
+      removeItem(OFFLINE_QUEUE_KEY),
+    ]);
+  };
+
   // ── Core Load ─────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [savedTopics, savedActive, savedSessions, savedSummaries, savedXP] = await Promise.all([
+      const [savedUser, savedTopics, savedActive, savedSessions, savedSummaries, savedXP] = await Promise.all([
+        getItem<UserProfile>(StorageKeys.USER),
         getItem<Topic[]>(StorageKeys.TOPICS),
         getItem<ActiveSession>(StorageKeys.ACTIVE_SESSION),
         getItem<FocusSession[]>(StorageKeys.SESSIONS),
@@ -223,17 +264,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
         getItem<XPTransaction[]>(StorageKeys.XP_LOG),
       ]);
 
-      setTopics(savedTopics ?? []);
-      setActiveSession(savedActive ?? null);
-      if (savedSessions) setSessions(savedSessions);
-      if (savedSummaries) setDailySummaries(savedSummaries);
-      if (savedXP) setXpLog(savedXP);
-
-      await processSyncQueue();
-
       const { data: authData } = await supabase.auth.getUser();
       if (authData?.user) {
         const userId = authData.user.id;
+        const sameAccount = savedUser?.id === userId;
+
+        if (sameAccount) {
+          setTopics(savedTopics ?? []);
+          setActiveSession(savedActive ?? null);
+          setSessions(savedSessions ?? []);
+          setDailySummaries(savedSummaries ?? []);
+          setXpLog(savedXP ?? []);
+          await processSyncQueue();
+        } else {
+          await clearLocalAccountData();
+          setTopics([]);
+          setActiveSession(null);
+          setSessions([]);
+          setDailySummaries([]);
+          setXpLog([]);
+        }
 
         // Load user profile from DB
         const { data: profileData } = await supabase
@@ -258,7 +308,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             .eq('status', 'completed');
           const rCount = count ?? 0;
           setReferralCount(rCount);
-          if (rCount >= 5) setHasUnlockedRewardState(true);
+          setHasUnlockedRewardState(rCount >= 5);
         } catch {
           // ignore
         }
@@ -288,6 +338,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setXpLog(cloudXP);
           setItem(StorageKeys.XP_LOG, cloudXP);
         }
+      } else {
+        setUserState(null);
+        setIsOnboardedState(false);
+        setSubjects([]);
+        setChapters([]);
+        setTopics([]);
+        setSessions([]);
+        setDailySummaries([]);
+        setXpLog([]);
+        setActiveSession(null);
       }
     } catch (err) {
       console.warn('Cloud load failed, operating in offline mode.');
@@ -316,7 +376,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setDailySummaries([]);
         setXpLog([]);
         setActiveSession(null);
-        await removeItem(StorageKeys.USER);
+        setReferralCount(0);
+        setHasUnlockedRewardState(false);
+        setComebackPendingState(false);
+        setStreakRecoveryPendingState(false);
+        setLostStreakCount(0);
+        await clearLocalAccountData();
       }
     });
 
@@ -498,19 +563,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const COMEBACK_BONUS_XP = 50;
 
-  const completeSession = async (sessionId: string, actualMins: number): Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number }) | null> => {
+  const completeSession = async (sessionId: string, actualMins: number): Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number }) | null> => {
     try {
       const activeUser = user ?? await getItem<UserProfile>(StorageKeys.USER);
       const bonusFromComeback = comebackPending ? COMEBACK_BONUS_XP : 0;
       const xp = calculateSessionXP(actualMins) + bonusFromComeback;
       if (comebackPending) setComebackPendingState(false);
 
-      // Level-up detection
-      const oldLevelRank = activeUser ? getLevelForXP(activeUser.xpTotal).rank : 1;
-      const newXPTotal = (activeUser?.xpTotal ?? 0) + xp;
-      const newLevelRank = getLevelForXP(newXPTotal).rank;
-      const leveledUp = newLevelRank > oldLevelRank;
-      
+      let newXPTotal = activeUser?.xpTotal ?? 0;
+
       const sessionPayload = {
         id: sessionId,
         user_id: activeUser?.id ?? '',
@@ -535,16 +596,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setActiveSession(null);
       await setItem(StorageKeys.ACTIVE_SESSION, null);
       if (activeUser) {
-        await processPostSessionData(actualMins, xp, true, activeUser);
+        const postSessionResult = await processPostSessionData(actualMins, xp, true, activeUser);
+        newXPTotal = postSessionResult.newXPTotal;
+        let sessionSaved = false;
         try {
           const { error } = await supabase.from('focus_sessions').insert([sessionPayload]);
           if (error) throw error;
+          sessionSaved = true;
         } catch {
           await addToSyncQueue({ table: 'focus_sessions', action: 'insert', payload: sessionPayload });
         }
+        if (sessionSaved) {
+          try {
+            await processReferralOnFirstSession(activeUser.id);
+          } catch (referralError) {
+            console.warn('[Referral] Processing failed:', referralError);
+          }
+        }
       }
+      const oldLevelRank = activeUser ? getLevelForXP(activeUser.xpTotal).rank : 1;
+      const newLevelRank = getLevelForXP(newXPTotal).rank;
+      const leveledUp = newLevelRank > oldLevelRank;
       processSyncQueue();
-      return { ...sessionObj, leveledUp, newLevelRank };
+      return { ...sessionObj, leveledUp, newLevelRank, totalXP: newXPTotal };
     } catch {
       return null;
     }
@@ -603,7 +677,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (lostStreak !== undefined) setLostStreakCount(lostStreak);
   };
 
-  const processPostSessionData = async (mins: number, xpDelta: number, isCompleted: boolean, activeUser: UserProfile) => {
+  const processPostSessionData = async (
+    mins: number,
+    xpDelta: number,
+    isCompleted: boolean,
+    activeUser: UserProfile,
+  ): Promise<{ finalXP: number; newXPTotal: number }> => {
     try {
       const today = todayStr();
       const existingSummary = dailySummaries.find(s => s.date === today);
@@ -642,7 +721,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           await addToSyncQueue({ table: 'xp_transactions', action: 'insert', payload: txPayload });
         }
       }
-      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+      const yesterday = daysAgoStr(1);
       let newStreak = activeUser.streakCurrent;
       if (isCompleted && activeUser.lastStudyDate !== today) {
         newStreak = (activeUser.lastStudyDate === yesterday || activeUser.lastStudyDate === null) ? newStreak + 1 : 1;
@@ -650,22 +729,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
         newStreak = 0;
       }
       
+      const newXPTotal = Math.max(0, activeUser.xpTotal + finalXP);
       await setUser({
         ...activeUser,
-        xpTotal: Math.max(0, activeUser.xpTotal + finalXP),
+        xpTotal: newXPTotal,
         streakCurrent: newStreak,
         streakLongest: Math.max(newStreak, activeUser.streakLongest),
-        lastStudyDate: isCompleted ? today : activeUser.lastStudyDate, 
+        lastStudyDate: isCompleted ? today : activeUser.lastStudyDate,
       });
+      return { finalXP, newXPTotal };
     } catch (e) {
       console.error('Failed to process post session data', e);
+      return {
+        finalXP: xpDelta,
+        newXPTotal: Math.max(0, activeUser.xpTotal + xpDelta),
+      };
     }
   };
 
   const getDailySummary = (date: string) => dailySummaries.find(s => s.date === date) ?? null;
 
   const getEmptySummary = (daysAgo: number): DailySummary => {
-    const d = new Date(Date.now() - daysAgo * 86400000).toISOString().split('T')[0];
+    const d = daysAgoStr(daysAgo);
     return dailySummaries.find(s => s.date === d) ?? {
       id: '', userId: user?.id || '', date: d, totalMinutes: 0,
       sessionsCompleted: 0, sessionsBroken: 0, goalMinutes: user?.dailyGoalMinutes ?? 120, goalMet: false, xpEarned: 0,

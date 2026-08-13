@@ -69,6 +69,18 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
     try {
       const trimmedEmail = email.trim().toLowerCase();
       const trimmedPassword = password.trim();
+      const normalizedReferralCode = referralCode.trim().toUpperCase();
+
+      if (normalizedReferralCode) {
+        const { data: referrerId, error: referralLookupError } = await supabase.rpc(
+          'get_referrer_id',
+          { code: normalizedReferralCode },
+        );
+        if (referralLookupError || !referrerId) {
+          setApiError('Invalid referral code. Please check and try again.');
+          return;
+        }
+      }
 
       const { data: signupData, error: signupError } = await supabase.auth.signUp({
         email: trimmedEmail,
@@ -92,16 +104,18 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
         return;
       }
 
+      const signupUser = signupData?.user;
+
       // Referral code check aur execute
-      if (referralCode.trim() && signupData?.user) {
-        await applyReferralCode(signupData.user.id, referralCode.trim());
+      if (normalizedReferralCode && signupUser) {
+        await applyReferralCode(signupUser.id, normalizedReferralCode);
       }
 
-      if (signupData?.session) {
+      if (signupData?.session && signupUser) {
         const { data: profile } = await supabase
           .from('users')
           .select('name')
-          .eq('id', signupData.user.id)
+          .eq('id', signupUser.id)
           .single();
 
         if (!profile?.name || profile.name === 'Student') {
@@ -112,7 +126,7 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
         return;
       }
 
-      if (signupData?.user) {
+      if (signupUser) {
         const { data: signInData, error: signInError } =
           await supabase.auth.signInWithPassword({
             email: trimmedEmail,
