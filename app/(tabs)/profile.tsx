@@ -4,7 +4,6 @@ import {
   Modal, TextInput, Alert, Platform, Image, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/services/supabase';
@@ -14,7 +13,6 @@ import { getLevelForXP, getXPProgress, LEVELS } from '@/constants/levels';
 import XPBar from '@/components/ui/XPBar';
 
 export default function ProfileScreen() {
-  const router = useRouter();
   const { user, setUser, sessions, chapters, xpLog } = useApp();
 
   const [editVisible, setEditVisible] = useState(false);
@@ -96,7 +94,6 @@ export default function ProfileScreen() {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      router.replace('/');
     } catch (error: any) {
       setSigningOut(false);
       showAlert('Sign Out Failed', error?.message ?? 'Please try again.');

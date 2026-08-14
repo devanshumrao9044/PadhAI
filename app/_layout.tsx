@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useContext } from 'react';
-import { Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider, AppContext } from '@/contexts/AppContext';
@@ -13,7 +13,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // Expo Router's generated tuple type excludes the root empty segment even
   // though it is returned at runtime, so use a string view for guard logic.
   const routeSegments = segments as string[];
-  const rootNavigationState = useRootNavigationState();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [checking, setChecking] = useState(true);
   const appCtx = useContext(AppContext);
@@ -23,6 +22,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // Only true when getSession() itself found a session on mount (genuine cold-start).
   // Fresh logins via index.tsx keep this false so the AuthGate does NOT compete.
   const coldStartHasSession = useRef(false);
+  const logoutRedirectScheduled = useRef(false);
   const isProtected =
     routeSegments[0] === '(tabs)' ||
     routeSegments[0] === 'onboarding' ||
@@ -44,8 +44,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       if (_event === 'SIGNED_OUT') {
         bootRedirectDone.current = false;
         coldStartHasSession.current = false;
-        // setSession(null) below triggers the render-level Redirect. Keeping
-        // navigation declarative prevents a race with the tab navigator stack.
+        // The protected-route effect above performs one deferred replace after
+        // the root stack has had a chance to process the signed-out state.
       }
     });
 
@@ -53,14 +53,23 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }, []);
 
   // ── 2. Guard: kick unauthenticated users off protected routes ─────────────
-  //    Wait for the root navigator to be ready, then replace only the current
-  //    route. Dismissing the whole stack or rendering Redirect before Stack
-  //    mounts can leave native builds on a blank screen.
+  //    AuthGate wraps the root Stack, so root-navigation-state hooks are not
+  //    safe here during native startup. Defer one replace until after the
+  //    current navigator transaction has mounted instead.
   useEffect(() => {
-    if (!checking && !session && isProtected && rootNavigationState?.key) {
-      router.replace('/');
+    if (session) {
+      logoutRedirectScheduled.current = false;
+      return;
     }
-  }, [checking, isProtected, rootNavigationState?.key, router, session]);
+    if (checking || !isProtected || logoutRedirectScheduled.current) return;
+
+    logoutRedirectScheduled.current = true;
+    const redirectTimer = setTimeout(() => {
+      router.replace('/');
+    }, 0);
+
+    return () => clearTimeout(redirectTimer);
+  }, [checking, isProtected, router, session]);
 
   // ── 3. Cold-start redirect and profile checks ─────────────────────────────
   useEffect(() => {
