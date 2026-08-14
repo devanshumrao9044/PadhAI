@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { STREAK_BROKEN_MESSAGES } from '@/constants/messages';
 import { useApp } from '@/hooks/useApp';

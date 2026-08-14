@@ -4,7 +4,7 @@ import {
   Modal, TextInput, Alert, Platform, Image, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/services/supabase';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';

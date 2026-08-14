@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Pressable, Modal } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import type { Chapter } from '@/types/models';
 

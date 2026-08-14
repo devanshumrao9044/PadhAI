@@ -4,7 +4,7 @@ import {
   ScrollView, View, Text, StyleSheet, RefreshControl, TouchableOpacity
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { supabase } from '../../services/supabase';
 import GreetingCard from '../../components/dashboard/GreetingCard';
 import StatsRow from '../../components/dashboard/StatsRow';
