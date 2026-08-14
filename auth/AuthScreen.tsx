@@ -53,6 +53,7 @@ export default function AuthScreen() {
     try {
       if (mode === 'login') {
         await signIn(normalizedEmail, password);
+        router.replace('/(tabs)');
       } else if (mode === 'signup') {
         const result = await signUp(name, normalizedEmail, password, referralCode);
         if (result.requiresEmailConfirmation) {

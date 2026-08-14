@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { useRouter, useSegments } from 'expo-router';
 import { AppContext } from '@/contexts/AppContext';
 import { supabase } from '@/services/supabase';
@@ -8,10 +8,16 @@ export default function AuthRouteGuard() {
   const router = useRouter();
   const segments = useSegments();
   const routeSegments = segments as string[];
+  const [navigationReady, setNavigationReady] = useState(false);
   const { session, ready } = useAuthSession();
   const appContext = useContext(AppContext);
   const redirectingOut = useRef(false);
   const checkedSessionId = useRef<string | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setNavigationReady(true), 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   const isProtected =
     routeSegments[0] === '(tabs)' ||
@@ -22,7 +28,7 @@ export default function AuthRouteGuard() {
     routeSegments[0] === 'referral';
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !navigationReady) return;
     if (session) {
       redirectingOut.current = false;
       return;
@@ -32,21 +38,21 @@ export default function AuthRouteGuard() {
     redirectingOut.current = true;
     const timer = setTimeout(() => {
       try {
-        router.replace('/');
+        router.replace('/login' as Parameters<typeof router.replace>[0]);
       } catch {
         redirectingOut.current = false;
       }
     }, 50);
     return () => clearTimeout(timer);
-  }, [isProtected, ready, router, session]);
+  }, [isProtected, navigationReady, ready, router, session]);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !navigationReady) return;
     if (!session) {
       checkedSessionId.current = null;
       return;
     }
-    if (routeSegments.length !== 0 || checkedSessionId.current === session.user.id) return;
+    if (isProtected || checkedSessionId.current === session.user.id) return;
 
     checkedSessionId.current = session.user.id;
     let cancelled = false;
@@ -79,7 +85,16 @@ export default function AuthRouteGuard() {
         }
 
         if (cancelled) return;
-        router.replace(!profile?.name || profile.name === 'Student' ? '/onboarding' : '/(tabs)');
+        const landingRoute = !profile?.name || profile.name === 'Student' ? '/onboarding' : '/(tabs)';
+        router.replace(landingRoute);
+        // On web and some native startup frames the first replace can be
+        // ignored while the root navigator is committing its state. Retry a
+        // few times, cancelling all retries if auth or the route changes.
+        [150, 350, 700].forEach((delay) => {
+          setTimeout(() => {
+            if (!cancelled && !isProtected) router.replace(landingRoute);
+          }, delay);
+        });
       } catch {
         if (!cancelled) router.replace('/(tabs)');
       }
@@ -88,7 +103,7 @@ export default function AuthRouteGuard() {
     return () => {
       cancelled = true;
     };
-  }, [appContext, ready, routeSegments, router, session]);
+  }, [appContext, isProtected, navigationReady, ready, router, session]);
 
   return null;
 }
