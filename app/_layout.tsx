@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useContext } from 'react';
-import { Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider, AppContext } from '@/contexts/AppContext';
@@ -13,7 +13,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // Expo Router's generated tuple type excludes the root empty segment even
   // though it is returned at runtime, so use a string view for guard logic.
   const routeSegments = segments as string[];
-  const rootNavigationState = useRootNavigationState();
+  const [navReady, setNavReady] = useState(false);
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [checking, setChecking] = useState(true);
   const appCtx = useContext(AppContext);
@@ -30,6 +30,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     routeSegments[0] === 'tracker' ||
     routeSegments[0] === 'streak-broken' ||
     routeSegments[0] === 'referral';
+
+  // ── 0. Mark navigator as ready after first paint ───────────────────────
+  useEffect(() => { setNavReady(true); }, []);
 
   // ── 1. Initialise session once on mount ──────────────────────────────────
   useEffect(() => {
@@ -53,14 +56,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }, []);
 
   // ── 2. Guard: kick unauthenticated users off protected routes ─────────────
-  //    Wait for the root navigator to be ready, then replace only the current
-  //    route. Dismissing the whole stack or rendering Redirect before Stack
-  //    mounts can leave native builds on a blank screen.
+  //    Wait for the navigator to be ready (navReady) before calling router,
+  //    otherwise Android/Hermes crashes on the very first render.
   useEffect(() => {
-    if (!checking && !session && isProtected && rootNavigationState?.key) {
+    if (navReady && !checking && !session && isProtected) {
       router.replace('/');
     }
-  }, [checking, isProtected, rootNavigationState?.key, router, session]);
+  }, [navReady, checking, isProtected, router, session]);
 
   // ── 3. Cold-start redirect and profile checks ─────────────────────────────
   useEffect(() => {
