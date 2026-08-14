@@ -41,7 +41,12 @@ export default function AuthRouteGuard() {
   }, [isProtected, ready, router, session]);
 
   useEffect(() => {
-    if (!ready || !session || routeSegments.length !== 0 || checkedSessionId.current === session.user.id) return;
+    if (!ready) return;
+    if (!session) {
+      checkedSessionId.current = null;
+      return;
+    }
+    if (routeSegments.length !== 0 || checkedSessionId.current === session.user.id) return;
 
     checkedSessionId.current = session.user.id;
     let cancelled = false;
