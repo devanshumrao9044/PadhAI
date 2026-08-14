@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useContext } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -7,22 +7,20 @@ import { supabase } from '@/services/supabase';
 import { View, ActivityIndicator } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
 
-function AuthGate({ children }: { children: React.ReactNode }) {
+// NavigationGuard is rendered beside the root Stack, not around it. This means
+// Expo Router has already installed its navigation context before the guard
+// calls useRouter/useSegments or attempts a logout redirect.
+function NavigationGuard() {
   const router = useRouter();
   const segments = useSegments();
-  // Expo Router's generated tuple type excludes the root empty segment even
-  // though it is returned at runtime, so use a string view for guard logic.
   const routeSegments = segments as string[];
-  const [session, setSession] = useState<Session | null | undefined>(undefined);
-  const [checking, setChecking] = useState(true);
   const appCtx = useContext(AppContext);
-  // Track whether we have already performed the post-boot redirect so we only
-  // do it once (on cold-start when the user already has a valid session).
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const navReady = useRef(false);
+  const redirectPending = useRef(false);
   const bootRedirectDone = useRef(false);
-  // Only true when getSession() itself found a session on mount (genuine cold-start).
-  // Fresh logins via index.tsx keep this false so the AuthGate does NOT compete.
   const coldStartHasSession = useRef(false);
-  const logoutRedirectScheduled = useRef(false);
+
   const isProtected =
     routeSegments[0] === '(tabs)' ||
     routeSegments[0] === 'onboarding' ||
@@ -31,136 +29,152 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     routeSegments[0] === 'streak-broken' ||
     routeSegments[0] === 'referral';
 
-  // ── 1. Initialise session once on mount ──────────────────────────────────
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      if (s) coldStartHasSession.current = true; // existing session on app open
-      setSession(s);
-      setChecking(false);
+    // This effect only runs after the Stack and its navigation context mount.
+    navReady.current = true;
+
+    supabase.auth.getSession().then(({ data: { session: savedSession } }) => {
+      if (savedSession) coldStartHasSession.current = true;
+      setSession(savedSession);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
-      if (_event === 'SIGNED_OUT') {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'SIGNED_OUT') {
         bootRedirectDone.current = false;
         coldStartHasSession.current = false;
-        // The protected-route effect above performs one deferred replace after
-        // the root stack has had a chance to process the signed-out state.
       }
+      setSession(nextSession);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      navReady.current = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  // ── 2. Guard: kick unauthenticated users off protected routes ─────────────
-  //    AuthGate wraps the root Stack, so root-navigation-state hooks are not
-  //    safe here during native startup. Defer one replace until after the
-  //    current navigator transaction has mounted instead.
   useEffect(() => {
     if (session) {
-      logoutRedirectScheduled.current = false;
+      redirectPending.current = false;
       return;
     }
-    if (checking || !isProtected || logoutRedirectScheduled.current) return;
+    if (!navReady.current || session === undefined || !isProtected || redirectPending.current) {
+      return;
+    }
 
-    logoutRedirectScheduled.current = true;
+    redirectPending.current = true;
     const redirectTimer = setTimeout(() => {
-      router.replace('/');
-    }, 0);
+      try {
+        router.replace('/');
+      } catch {
+        // If native navigation is still completing a transaction, allow the
+        // effect to retry on the next auth/segment update instead of crashing.
+        redirectPending.current = false;
+      }
+    }, 50);
 
     return () => clearTimeout(redirectTimer);
-  }, [checking, isProtected, router, session]);
+  }, [isProtected, router, session]);
 
-  // ── 3. Cold-start redirect and profile checks ─────────────────────────────
   useEffect(() => {
-    if (checking) return;
+    if (!navReady.current || session === undefined) return;
 
-
-    // Cold-start: session already exists and we are on the root index.
-    // Run the streak check + profile check exactly once so the user lands
-    // on the correct screen without the login page doing a double redirect.
-    // coldStartHasSession guards against running this on fresh login (index.tsx
-    // handles post-login redirects itself).
     const onIndex = routeSegments.length === 0;
-    if (session && onIndex && !bootRedirectDone.current && coldStartHasSession.current) {
-      bootRedirectDone.current = true;
-      const uid = session.user.id;
-      (async () => {
-        // Streak guard
-        try {
-          const { data: profile } = await supabase
-            .from('users')
-            .select('streak, last_study_date')
-            .eq('id', uid)
-            .single();
+    if (!session || !onIndex || bootRedirectDone.current || !coldStartHasSession.current) return;
 
-          if (profile && profile.streak > 0) {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
-            const lastStudy = profile.last_study_date ? new Date(profile.last_study_date) : null;
-            if (lastStudy) lastStudy.setHours(0, 0, 0, 0);
+    bootRedirectDone.current = true;
+    const uid = session.user.id;
+    (async () => {
+      try {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('streak, last_study_date')
+          .eq('id', uid)
+          .single();
 
-            if (!lastStudy || lastStudy < yesterday) {
-              await supabase.from('users').update({ streak: 0 }).eq('id', uid);
-              appCtx?.setComebackPending(true);
-              router.replace({ pathname: '/streak-broken', params: { lost: profile.streak } });
-              return;
-            }
+        if (profile && profile.streak > 0) {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+          const lastStudy = profile.last_study_date ? new Date(profile.last_study_date) : null;
+          if (lastStudy) lastStudy.setHours(0, 0, 0, 0);
+
+          if (!lastStudy || lastStudy < yesterday) {
+            await supabase.from('users').update({ streak: 0 }).eq('id', uid);
+            appCtx?.setComebackPending(true);
+            router.replace({ pathname: '/streak-broken', params: { lost: profile.streak } });
+            return;
           }
-        } catch (err) {
-          console.log('Streak guard error:', err);
         }
+      } catch (error) {
+        console.log('Streak guard error:', error);
+      }
 
-        // Profile check → onboarding or home
-        try {
-          const { data: profile } = await supabase
-            .from('users').select('name').eq('id', uid).single();
-          if (!profile?.name || profile.name === 'Student') {
-            router.replace('/onboarding');
-          } else {
-            router.replace('/(tabs)');
-          }
-        } catch {
-          router.replace('/(tabs)');
-        }
-      })();
-    }
-  }, [session, routeSegments, checking, isProtected]);
+      try {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('name')
+          .eq('id', uid)
+          .single();
+        router.replace(!profile?.name || profile.name === 'Student' ? '/onboarding' : '/(tabs)');
+      } catch {
+        router.replace('/(tabs)');
+      }
+    })();
+  }, [appCtx, routeSegments, router, session]);
 
-  if (checking) {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#0A0A0F', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#6B21A8" />
-      </View>
-    );
-  }
+  return null;
+}
 
-  return <>{children}</>
+function SplashScreen() {
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: '#0A0A0F',
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}
+    >
+      <ActivityIndicator size="large" color="#6B21A8" />
+    </View>
+  );
 }
 
 export default function RootLayout() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getSession().finally(() => {
+      if (mounted) setReady(true);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (!ready) return <SplashScreen />;
+
   return (
     <SafeAreaProvider>
       <AppProvider>
         <StatusBar style="light" backgroundColor="#0A0A0F" />
-        <AuthGate>
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0A0A0F' } }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="reset-password" options={{ animation: 'fade' }} />
-            <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
-            <Stack.Screen name="streak-broken" options={{ animation: 'fade', gestureEnabled: false }} />
-            <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
-            <Stack.Screen name="focus/active" options={{ animation: 'slide_from_bottom', gestureEnabled: false }} />
-            <Stack.Screen name="focus/complete" options={{ animation: 'fade', gestureEnabled: false }} />
-            <Stack.Screen name="focus/levelup" options={{ animation: 'fade', gestureEnabled: false }} />
-            <Stack.Screen name="focus/broken" options={{ animation: 'fade', gestureEnabled: false }} />
-            <Stack.Screen name="referral" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="tracker/[subjectId]" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="tracker/chapters/[chapterId]" options={{ animation: 'slide_from_right' }} />
-          </Stack>
-        </AuthGate>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0A0A0F' } }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="reset-password" options={{ animation: 'fade' }} />
+          <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
+          <Stack.Screen name="streak-broken" options={{ animation: 'fade', gestureEnabled: false }} />
+          <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+          <Stack.Screen name="focus/active" options={{ animation: 'slide_from_bottom', gestureEnabled: false }} />
+          <Stack.Screen name="focus/complete" options={{ animation: 'fade', gestureEnabled: false }} />
+          <Stack.Screen name="focus/levelup" options={{ animation: 'fade', gestureEnabled: false }} />
+          <Stack.Screen name="focus/broken" options={{ animation: 'fade', gestureEnabled: false }} />
+          <Stack.Screen name="referral" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="tracker/[subjectId]" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="tracker/chapters/[chapterId]" options={{ animation: 'slide_from_right' }} />
+        </Stack>
+        <NavigationGuard />
       </AppProvider>
     </SafeAreaProvider>
   );
