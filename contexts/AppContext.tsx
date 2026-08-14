@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react';
 import { AppState } from 'react-native';
 // Cross-platform UUID generator (no native crypto dependency)
 function uuidv4(): string {
@@ -49,6 +49,9 @@ export type AppContextType = {
   toggleTopic: (id: string) => Promise<void>;
   deleteTopic: (id: string) => Promise<void>;
   sessions: FocusSession[];
+  dailySummaries: DailySummary[];
+  last7Days: DailySummary[];
+  last90Days: DailySummary[];
   activeSession: ActiveSession | null;
   startSession: (plannedMins: number, subjectId: string | null, chapterId: string | null) => Promise<string>;
   completeSession: (sessionId: string, actualMins: number) => Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number }) | null>;
@@ -173,6 +176,12 @@ type SyncTask = {
   matchValue?: any;
 };
 
+function useStableCallback<T extends (...args: any[]) => any>(callback: T): T {
+  const callbackRef = useRef(callback);
+  callbackRef.current = callback;
+  return useCallback(((...args: Parameters<T>) => callbackRef.current(...args)) as T, []);
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isOnboarded, setIsOnboardedState] = useState(false);
@@ -190,6 +199,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [streakRecoveryPending, setStreakRecoveryPendingState] = useState(false);
   const [lostStreakCount, setLostStreakCount] = useState(0);
   const authGenerationRef = useRef(0);
+  const syncInFlightRef = useRef(false);
 
   const addToSyncQueue = async (task: Omit<SyncTask, 'id'>) => {
     const existingQueue = (await getItem<SyncTask[]>(OFFLINE_QUEUE_KEY)) || [];
@@ -198,6 +208,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const processSyncQueue = async () => {
+    if (syncInFlightRef.current) return;
+    syncInFlightRef.current = true;
     try {
       const queue = await getItem<SyncTask[]>(OFFLINE_QUEUE_KEY);
       if (!queue || queue.length === 0) return;
@@ -234,6 +246,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await setItem(OFFLINE_QUEUE_KEY, remainingQueue);
     } catch (e) {
       console.error('[Sync] Manager error:', e);
+    } finally {
+      syncInFlightRef.current = false;
     }
   };
 
@@ -291,7 +305,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // Load user profile from DB
         const { data: profileData } = await supabase
           .from('users')
-          .select('*')
+          .select('id,name,target_exam,class,daily_goal_minutes,xp,streak,longest_streak,last_study_date,created_at,avatar_url,my_referral_code,has_unlocked_reward')
           .eq('id', userId)
           .single();
 
@@ -319,11 +333,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (loadGeneration !== authGenerationRef.current) return;
         const [subRes, chapRes, sessRes, sumRes, xpRes] = await Promise.all([
-          supabase.from('subjects').select('*').eq('user_id', userId).eq('is_deleted', false).order('display_order', { ascending: true }),
-          supabase.from('chapters').select('*').eq('user_id', userId).eq('is_deleted', false).order('display_order', { ascending: true }),
-          supabase.from('focus_sessions').select('*').eq('user_id', userId).order('started_at', { ascending: false }).limit(200),
-          supabase.from('daily_summary').select('*').eq('user_id', userId).order('date', { ascending: false }).limit(100),
-          supabase.from('xp_transactions').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
+          supabase.from('subjects').select('id,user_id,name,color_hex,icon_name,display_order,created_at,is_deleted').eq('user_id', userId).eq('is_deleted', false).order('display_order', { ascending: true }),
+          supabase.from('chapters').select('id,subject_id,user_id,name,status,planned_date,completed_date,display_order,created_at,is_deleted').eq('user_id', userId).eq('is_deleted', false).order('display_order', { ascending: true }),
+          supabase.from('focus_sessions').select('id,user_id,subject_id,chapter_id,planned_minutes,actual_minutes,broken,xp_earned,xp_deducted,broken_at_percent,started_at,created_at').eq('user_id', userId).order('started_at', { ascending: false }).limit(200),
+          supabase.from('daily_summary').select('id,user_id,date,total_focus_minutes,sessions_completed,sessions_broken,goal_minutes,goal_met,xp_earned').eq('user_id', userId).order('date', { ascending: false }).limit(100),
+          supabase.from('xp_transactions').select('id,user_id,amount,reason,created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
         ]);
 
         if (loadGeneration !== authGenerationRef.current) return;
@@ -765,23 +779,68 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   };
 
-  const getLast7Days = () => Array.from({ length: 7 }).map((_, i) => getEmptySummary(6 - i));
-  const getLast90Days = () => Array.from({ length: 90 }).map((_, i) => getEmptySummary(89 - i));
+  const last7Days = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => getEmptySummary(6 - i)),
+    [dailySummaries, user?.id, user?.dailyGoalMinutes],
+  );
+  const last90Days = useMemo(
+    () => Array.from({ length: 90 }, (_, i) => getEmptySummary(89 - i)),
+    [dailySummaries, user?.id, user?.dailyGoalMinutes],
+  );
+  const getLast7Days = () => last7Days;
+  const getLast90Days = () => last90Days;
+
+  const stableSetUser = useStableCallback(setUser);
+  const stableSetOnboarded = useStableCallback(setOnboarded);
+  const stableAddSubject = useStableCallback(addSubject);
+  const stableUpdateSubject = useStableCallback(updateSubject);
+  const stableDeleteSubject = useStableCallback(deleteSubject);
+  const stableGetChaptersForSubject = useStableCallback(getChaptersForSubject);
+  const stableAddChapter = useStableCallback(addChapter);
+  const stableUpdateChapter = useStableCallback(updateChapter);
+  const stableDeleteChapter = useStableCallback(deleteChapter);
+  const stableBulkDeleteChapters = useStableCallback(bulkDeleteChapters);
+  const stableGetTopicsForChapter = useStableCallback(getTopicsForChapter);
+  const stableAddTopic = useStableCallback(addTopic);
+  const stableToggleTopic = useStableCallback(toggleTopic);
+  const stableDeleteTopic = useStableCallback(deleteTopic);
+  const stableStartSession = useStableCallback(startSession);
+  const stableCompleteSession = useStableCallback(completeSession);
+  const stableBreakSession = useStableCallback(breakSession);
+  const stableGetDailySummary = useStableCallback(getDailySummary);
+  const stableGetLast7Days = useStableCallback(getLast7Days);
+  const stableGetLast90Days = useStableCallback(getLast90Days);
+  const stableAwardXP = useStableCallback(awardXP);
+  const stableDeductXP = useStableCallback(deductXP);
+  const stableSetComebackPending = useStableCallback(setComebackPending);
+  const stableSetHasUnlockedReward = useStableCallback(setHasUnlockedReward);
+  const stableSetStreakRecoveryPending = useStableCallback(setStreakRecoveryPending);
+  const contextValue = useMemo<AppContextType>(() => ({
+    user, isOnboarded, setUser: stableSetUser, setOnboarded: stableSetOnboarded,
+    subjects, addSubject: stableAddSubject, updateSubject: stableUpdateSubject, deleteSubject: stableDeleteSubject,
+    chapters, getChaptersForSubject: stableGetChaptersForSubject, addChapter: stableAddChapter,
+    updateChapter: stableUpdateChapter, deleteChapter: stableDeleteChapter, bulkDeleteChapters: stableBulkDeleteChapters,
+    topics, getTopicsForChapter: stableGetTopicsForChapter, addTopic: stableAddTopic,
+    toggleTopic: stableToggleTopic, deleteTopic: stableDeleteTopic,
+    sessions, dailySummaries, last7Days, last90Days, activeSession, startSession: stableStartSession, completeSession: stableCompleteSession, breakSession: stableBreakSession,
+    getDailySummary: stableGetDailySummary, getLast7Days: stableGetLast7Days, getLast90Days: stableGetLast90Days,
+    xpLog, awardXP: stableAwardXP, deductXP: stableDeductXP,
+    comebackPending, setComebackPending: stableSetComebackPending,
+    hasUnlockedReward, setHasUnlockedReward: stableSetHasUnlockedReward, referralCount,
+    streakRecoveryPending, lostStreakCount, setStreakRecoveryPending: stableSetStreakRecoveryPending,
+    isLoading, reload: load,
+  }), [
+    user, isOnboarded, subjects, chapters, topics, sessions, dailySummaries, last7Days, last90Days, activeSession, xpLog,
+    comebackPending, hasUnlockedReward, referralCount, streakRecoveryPending, lostStreakCount, isLoading,
+    stableSetUser, stableSetOnboarded, stableAddSubject, stableUpdateSubject, stableDeleteSubject,
+    stableGetChaptersForSubject, stableAddChapter, stableUpdateChapter, stableDeleteChapter, stableBulkDeleteChapters,
+    stableGetTopicsForChapter, stableAddTopic, stableToggleTopic, stableDeleteTopic, stableStartSession,
+    stableCompleteSession, stableBreakSession, stableGetDailySummary, stableGetLast7Days, stableGetLast90Days,
+    stableAwardXP, stableDeductXP, stableSetComebackPending, stableSetHasUnlockedReward, stableSetStreakRecoveryPending, load,
+  ]);
 
   return (
-    <AppContext.Provider value={{
-      user, isOnboarded, setUser, setOnboarded,
-      subjects, addSubject, updateSubject, deleteSubject,
-      chapters, getChaptersForSubject, addChapter, updateChapter, deleteChapter, bulkDeleteChapters,
-      topics, getTopicsForChapter, addTopic, toggleTopic, deleteTopic,
-      sessions, activeSession, startSession, completeSession, breakSession,
-      getDailySummary, getLast7Days, getLast90Days,
-      xpLog, awardXP, deductXP,
-      comebackPending, setComebackPending,
-      hasUnlockedReward, setHasUnlockedReward, referralCount,
-      streakRecoveryPending, lostStreakCount, setStreakRecoveryPending,
-      isLoading, reload: load,
-    }}>
+    <AppContext.Provider value={contextValue}>
       {children}
     </AppContext.Provider>
   );

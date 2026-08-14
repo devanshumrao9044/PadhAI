@@ -28,7 +28,6 @@ export default function FocusActiveScreen() {
     isLoading,
   } = useApp();
 
-  const [remaining, setRemaining] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [tapCount, setTapCount] = useState(0);
   const [showExit, setShowExit] = useState(false);
@@ -118,7 +117,6 @@ export default function FocusActiveScreen() {
 
     elapsedRef.current = currentElapsed;
     setElapsed(currentElapsed);
-    setRemaining(currentRemaining);
 
     if (currentRemaining <= 0) {
       handleComplete();
@@ -139,7 +137,6 @@ export default function FocusActiveScreen() {
     const initialRemaining = Math.max(0, plannedSecs - alreadyElapsed);
     elapsedRef.current = alreadyElapsed;
     setElapsed(alreadyElapsed);
-    setRemaining(initialRemaining);
     intervalRef.current = setInterval(tick, 500);
 
     // ✅ Bulletproof AppState listener setup
@@ -241,6 +238,7 @@ export default function FocusActiveScreen() {
     };
   }, [activeSession?.sessionId]);
 
+  const remaining = Math.max(0, plannedSecs - elapsed);
   const progress = Math.min(1, elapsed / (plannedSecs || 1));
 
   const handleTripleTap = () => {

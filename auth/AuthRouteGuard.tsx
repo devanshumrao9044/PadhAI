@@ -11,6 +11,8 @@ export default function AuthRouteGuard() {
   const [navigationReady, setNavigationReady] = useState(false);
   const { session, ready } = useAuthSession();
   const appContext = useContext(AppContext);
+  const appUser = appContext?.user ?? null;
+  const appLoading = appContext?.isLoading ?? true;
   const redirectingOut = useRef(false);
   const checkedSessionId = useRef<string | null>(null);
 
@@ -28,7 +30,7 @@ export default function AuthRouteGuard() {
     routeSegments[0] === 'referral';
 
   useEffect(() => {
-    if (!ready || !navigationReady) return;
+    if (!ready || !navigationReady || appLoading) return;
     if (session) {
       redirectingOut.current = false;
       return;
@@ -44,10 +46,10 @@ export default function AuthRouteGuard() {
       }
     }, 50);
     return () => clearTimeout(timer);
-  }, [isProtected, navigationReady, ready, router, session]);
+  }, [appLoading, isProtected, navigationReady, ready, router, session]);
 
   useEffect(() => {
-    if (!ready || !navigationReady) return;
+    if (!ready || !navigationReady || appLoading) return;
     if (!session) {
       checkedSessionId.current = null;
       return;
@@ -57,35 +59,29 @@ export default function AuthRouteGuard() {
     checkedSessionId.current = session.user.id;
     let cancelled = false;
     const userId = session.user.id;
+    const profile = appUser;
 
     (async () => {
       try {
-        const { data: profile } = await supabase
-          .from('users')
-          .select('name, streak, last_study_date')
-          .eq('id', userId)
-          .single();
-        if (cancelled) return;
-
-        if (profile && profile.streak > 0) {
+        if (profile && profile.streakCurrent > 0) {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
           const yesterday = new Date(today);
           yesterday.setDate(yesterday.getDate() - 1);
-          const lastStudy = profile.last_study_date ? new Date(profile.last_study_date) : null;
+          const lastStudy = profile.lastStudyDate ? new Date(profile.lastStudyDate) : null;
           if (lastStudy) lastStudy.setHours(0, 0, 0, 0);
 
           if (!lastStudy || lastStudy < yesterday) {
             await supabase.from('users').update({ streak: 0 }).eq('id', userId);
             if (cancelled) return;
             appContext?.setComebackPending(true);
-            router.replace({ pathname: '/streak-broken', params: { lost: profile.streak } });
+            router.replace({ pathname: '/streak-broken', params: { lost: profile.streakCurrent } });
             return;
           }
         }
 
         if (cancelled) return;
-        const landingRoute = !profile?.name || profile.name === 'Student' ? '/onboarding' : '/(tabs)';
+        const landingRoute = !profile?.fullName || profile.fullName === 'Student' ? '/onboarding' : '/(tabs)';
         router.replace(landingRoute);
         // On web and some native startup frames the first replace can be
         // ignored while the root navigator is committing its state. Retry a
@@ -103,7 +99,7 @@ export default function AuthRouteGuard() {
     return () => {
       cancelled = true;
     };
-  }, [appContext, isProtected, navigationReady, ready, router, session]);
+  }, [appContext, appLoading, appUser, isProtected, navigationReady, ready, router, session]);
 
   return null;
 }

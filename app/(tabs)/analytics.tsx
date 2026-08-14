@@ -53,7 +53,7 @@ const LINE_CHART_CONFIG = {
 };
 
 export default function AnalyticsScreen() {
-  const { user, sessions, getLast7Days, getLast90Days, chapters, getDailySummary } = useApp();
+  const { user, sessions, last7Days: last7, last90Days: last90, chapters, getDailySummary } = useApp();
 
   // SSR-safe dimensions
   const [screenWidth, setScreenWidth] = useState(() => Math.max(320, Dimensions.get('window').width));
@@ -66,17 +66,34 @@ export default function AnalyticsScreen() {
   const CHART_WIDTH = Math.max(1, screenWidth - Spacing.md * 2 - 2);
 
   const today = new Date().toISOString().split('T')[0];
-  const last7 = getLast7Days();
-  const last90 = getLast90Days();
 
   // ── Summary Stats ────────────────────────────────────────────────────────
-  const totalMins = last7.reduce((sum, d) => sum + d.totalMinutes, 0);
-  const totalSessions = sessions.length;
-  const completedSessions = sessions.filter(s => s.completed).length;
-  const focusScore = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
-  const doneChapters = chapters.filter(c => !c.isDeleted && c.status === 'done').length;
-  const totalChapters = chapters.filter(c => !c.isDeleted).length;
-  const weakChapters = chapters.filter(c => !c.isDeleted && c.status === 'weak');
+  const {
+    totalMins,
+    totalSessions,
+    completedSessions,
+    focusScore,
+    doneChapters,
+    totalChapters,
+    weakChapters,
+  } = useMemo(() => {
+    const totalMins = last7.reduce((sum, d) => sum + d.totalMinutes, 0);
+    const totalSessions = sessions.length;
+    const completedSessions = sessions.filter(s => s.completed).length;
+    const focusScore = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
+    const activeChapters = chapters.filter(c => !c.isDeleted);
+    const doneChapters = activeChapters.filter(c => c.status === 'done').length;
+    const weakChapters = activeChapters.filter(c => c.status === 'weak');
+    return {
+      totalMins,
+      totalSessions,
+      completedSessions,
+      focusScore,
+      doneChapters,
+      totalChapters: activeChapters.length,
+      weakChapters,
+    };
+  }, [chapters, last7, sessions]);
 
   // ── Today Goal Progress ───────────────────────────────────────────────────
   const todaySummary = getDailySummary(today);
@@ -92,14 +109,14 @@ export default function AnalyticsScreen() {
       duration: 900,
       useNativeDriver: false,
     }).start();
-  }, [goalProgress]);
+  }, [goalProgress, progressAnim]);
 
   const progressColor = progressAnim.interpolate({
     inputRange: [0, 0.5, 1],
     outputRange: ['#FF4757', '#FFB547', '#4CAF7D'],
   });
 
-  const last7GoalMet = last7.map(d => d.goalMet);
+  const last7GoalMet = useMemo(() => last7.map(d => d.goalMet), [last7]);
 
   // ── Bar Chart: Daily Focus Minutes (last 7 days) ──────────────────────────
   const barData = useMemo(() => {

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  FlatList, View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Modal, TextInput, Pressable, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,7 +28,10 @@ export default function SubjectDetailScreen() {
   } = useApp();
 
   const subject = subjects.find(s => s.id === subjectId);
-  const chapters = getChaptersForSubject(subjectId ?? '');
+  const chapters = useMemo(
+    () => getChaptersForSubject(subjectId ?? ''),
+    [getChaptersForSubject, subjectId],
+  );
 
   // -- Chapter Modal & Form States --
   const [modalVisible, setModalVisible] = useState(false);
@@ -48,12 +51,24 @@ export default function SubjectDetailScreen() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false); 
 
-  const filtered = filterStatus === 'all'
-    ? chapters
-    : chapters.filter(c => c.status === filterStatus);
+  const chapterCounts = useMemo(() => {
+    const counts = {
+      not_started: 0,
+      in_progress: 0,
+      done: 0,
+      weak: 0,
+    } as Record<Chapter['status'], number>;
+    chapters.forEach(chapter => { counts[chapter.status] += 1; });
+    return counts;
+  }, [chapters]);
+
+  const filtered = useMemo(
+    () => filterStatus === 'all' ? chapters : chapters.filter(c => c.status === filterStatus),
+    [chapters, filterStatus],
+  );
 
   const donePct = chapters.length > 0
-    ? Math.round((chapters.filter(c => c.status === 'done').length / chapters.length) * 100)
+    ? Math.round((chapterCounts.done / chapters.length) * 100)
     : 0;
 
   // ── Subject Handlers ────────────────────────────
@@ -250,7 +265,7 @@ export default function SubjectDetailScreen() {
             <Text style={[styles.filterText, filterStatus === 'all' && styles.filterTextActive]}>All ({chapters.length})</Text>
           </Pressable>
           {STATUS_OPTIONS.map(o => {
-            const count = chapters.filter(c => c.status === o.value).length;
+            const count = chapterCounts[o.value];
             return (
               <Pressable
                 key={o.value}
@@ -277,12 +292,19 @@ export default function SubjectDetailScreen() {
           <Text style={styles.emptyText}>Add your first chapter</Text>
         </View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
-          {filtered.map(chapter => {
+        <FlatList
+          data={filtered}
+          keyExtractor={chapter => chapter.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.list}
+          initialNumToRender={12}
+          maxToRenderPerBatch={12}
+          windowSize={7}
+          removeClippedSubviews={Platform.OS !== 'web'}
+          renderItem={({ item: chapter }) => {
             const isSelected = selectedIds.includes(chapter.id);
             return (
               <TouchableOpacity
-                key={chapter.id}
                 activeOpacity={0.8}
                 onLongPress={() => {
                   setIsSelectionMode(true);
@@ -290,16 +312,16 @@ export default function SubjectDetailScreen() {
                 }}
                 onPress={() => isSelectionMode ? toggleSelection(chapter.id) : router.push(`/tracker/chapters/${chapter.id}` as any)}
                 style={[
-                  styles.chapterRowContainer, 
-                  isSelected && styles.chapterRowSelected
+                  styles.chapterRowContainer,
+                  isSelected && styles.chapterRowSelected,
                 ]}
               >
                 {isSelectionMode && (
                   <View style={styles.checkboxWrapper}>
-                    <MaterialIcons 
-                      name={isSelected ? "check-circle" : "radio-button-unchecked"} 
-                      size={24} 
-                      color={isSelected ? Colors.primary : Colors.textTertiary} 
+                    <MaterialIcons
+                      name={isSelected ? 'check-circle' : 'radio-button-unchecked'}
+                      size={24}
+                      color={isSelected ? Colors.primary : Colors.textTertiary}
                     />
                   </View>
                 )}
@@ -309,7 +331,7 @@ export default function SubjectDetailScreen() {
                     chapter={chapter}
                     onStatusChange={(status) => handleStatusChange(chapter.id, status)}
                     onPress={() => isSelectionMode ? toggleSelection(chapter.id) : router.push(`/tracker/chapters/${chapter.id}` as any)}
-                    onDelete={() => handleSingleDelete(chapter.id)} 
+                    onDelete={() => handleSingleDelete(chapter.id)}
                   />
                 </View>
 
@@ -319,9 +341,9 @@ export default function SubjectDetailScreen() {
                   </TouchableOpacity>
                 )}
               </TouchableOpacity>
-            )
-          })}
-        </ScrollView>
+            );
+          }}
+        />
       )}
 
       {/* 🚀 Edit Subject Modal */}

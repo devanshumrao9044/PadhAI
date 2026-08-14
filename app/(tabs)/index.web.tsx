@@ -1,5 +1,5 @@
 import 'react-native-web';
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
   ScrollView, View, Text, StyleSheet, RefreshControl, TouchableOpacity
 } from 'react-native';
@@ -10,111 +10,66 @@ import GreetingCard from '../../components/dashboard/GreetingCard';
 import StatsRow from '../../components/dashboard/StatsRow';
 import QuickShortcuts from '../../components/dashboard/QuickShortcuts';
 import QuoteCard from '../../components/dashboard/QuoteCard';
+import { useApp } from '@/hooks/useApp';
 
 export default function Dashboard() {
   const router = useRouter();
   
-  const [userName, setUserName] = useState('Student');
-  const [streak, setStreak] = useState(0);
-  const [todayMinutes, setTodayMinutes] = useState(0);
-  const [xpTotal, setXpTotal] = useState(0);
-  const [chaptersTotal, setChaptersTotal] = useState(0);
-  const [chaptersDone, setChaptersDone] = useState(0);
+  const { user, chapters, sessions, dailySummaries, reload } = useApp();
   const [refreshing, setRefreshing] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const channelIdRef = useRef(0);
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const userId = user?.id ?? null;
 
-  const loadUserData = useCallback(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase
-        .from('users')
-        .select('name, streak, daily_goal_minutes, xp')
-        .eq('id', user.id)
-        .single();
-      if (data) {
-        setUserName(data.name || 'Student');
-        setStreak(data.streak || 0);
-        setXpTotal(data.xp || 0);
-      }
-      setUserId(user.id);
-    } catch (error) {
-      console.log('User data error:', error);
-    }
+  const stats = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const todayMinutes = dailySummaries.find(summary => summary.date === today)?.totalMinutes
+      ?? sessions.filter(session => session.completed && session.sessionDate === today)
+        .reduce((sum, session) => sum + session.durationActualMins, 0);
+    const activeChapters = chapters.filter(chapter => !chapter.isDeleted);
+    return {
+      todayMinutes,
+      chaptersTotal: activeChapters.length,
+      chaptersDone: activeChapters.filter(chapter => chapter.status === 'done').length,
+    };
+  }, [chapters, dailySummaries, sessions]);
+
+  const scheduleReload = useCallback(() => {
+    if (reloadTimerRef.current) return;
+    reloadTimerRef.current = setTimeout(() => {
+      reloadTimerRef.current = null;
+      void reload();
+    }, 250);
+  }, [reload]);
+
+  useEffect(() => () => {
+    if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
   }, []);
-
-  const loadChaptersStats = useCallback(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase
-        .from('chapters')
-        .select('status, is_deleted')
-        .eq('user_id', user.id)
-        .eq('is_deleted', false);
-      if (data) {
-        setChaptersTotal(data.length);
-        setChaptersDone(data.filter((c: any) => c.status === 'done').length);
-      }
-    } catch (error) {
-      console.log('Chapters error:', error);
-    }
-  }, []);
-
-  const loadTodayStats = useCallback(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const { data } = await supabase
-        .from('focus_sessions')
-        .select('actual_minutes')
-        .eq('user_id', user.id)
-        .eq('broken', false)
-        .gte('started_at', today.toISOString());
-      if (data) {
-        const total = data.reduce(
-          (sum: number, s: any) => sum + (s.actual_minutes || 0), 0
-        );
-        setTodayMinutes(total);
-      }
-    } catch (error) {
-      console.log('Stats error:', error);
-    }
-  }, []);
-
-  const loadAll = useCallback(async () => {
-    await Promise.all([loadUserData(), loadTodayStats(), loadChaptersStats()]);
-  }, [loadUserData, loadTodayStats, loadChaptersStats]);
-
-  useEffect(() => {
-    void loadAll();
-  }, [loadAll]);
 
   useEffect(() => {
     if (!userId) return;
     if (channelRef.current) supabase.removeChannel(channelRef.current);
+    channelIdRef.current += 1;
     const channel = supabase
-      .channel(`dashboard-web-${userId}`)
+      .channel(`dashboard-web-${userId}-${channelIdRef.current}`)
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'focus_sessions', filter: `user_id=eq.${userId}` },
-        () => { loadTodayStats(); loadUserData(); }
+        scheduleReload,
       )
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'chapters', filter: `user_id=eq.${userId}` },
-        () => loadChaptersStats()
+        scheduleReload,
       )
       .subscribe();
     channelRef.current = channel;
     return () => { supabase.removeChannel(channel); channelRef.current = null; };
-  }, [userId, loadTodayStats, loadUserData, loadChaptersStats]);
+  }, [scheduleReload, userId]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    try { await loadAll(); } finally { setRefreshing(false); }
-  }, [loadAll]);
+    try { await reload(); } finally { setRefreshing(false); }
+  }, [reload]);
 
   return (
     <View style={styles.root}>
@@ -156,12 +111,12 @@ export default function Dashboard() {
           </View>
         </View>
 
-        <GreetingCard name={userName} streak={streak} />
+        <GreetingCard name={user?.fullName || 'Student'} streak={user?.streakCurrent || 0} />
         <StatsRow
-          todayMins={todayMinutes}
-          xp={xpTotal}
-          chaptersTotal={chaptersTotal}
-          chaptersDone={chaptersDone}
+          todayMins={stats.todayMinutes}
+          xp={user?.xpTotal || 0}
+          chaptersTotal={stats.chaptersTotal}
+          chaptersDone={stats.chaptersDone}
         />
         <QuickShortcuts />
         <QuoteCard />

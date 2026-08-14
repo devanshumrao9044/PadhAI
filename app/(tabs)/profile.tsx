@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Modal, TextInput, Alert, Platform, Image, ActivityIndicator
@@ -16,6 +16,7 @@ import XPBar from '@/components/ui/XPBar';
 export default function ProfileScreen() {
   const { user, setUser, sessions, chapters, xpLog } = useApp();
   const { signOut, signingOut } = useAuthSession();
+  const userId = user?.id;
 
   const [editVisible, setEditVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -35,13 +36,13 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     async function fetchRankInfo() {
-      if (!user) return;
+      if (!userId) return;
       try {
         const { data, error } = await supabase.rpc('get_leaderboard');
         if (!error && data) {
           const total = data.length;
           const safeTotal = Math.max(1, total);
-          const myEntry = data.find((e: any) => e.id === user.id);
+          const myEntry = data.find((e: any) => e.id === userId);
           const rank = myEntry?.rank ?? safeTotal + 1;
           const demotionCount = Math.floor(safeTotal * 0.4);
           const safetyCount = Math.floor(safeTotal * 0.35);
@@ -59,22 +60,28 @@ export default function ProfileScreen() {
       }
     }
     fetchRankInfo();
-  }, [user]);
+  }, [userId]);
+
+  const level = useMemo(() => getLevelForXP(user?.xpTotal ?? 0), [user?.xpTotal]);
+  const progress = useMemo(() => getXPProgress(user?.xpTotal ?? 0), [user?.xpTotal]);
+  const totalHours = useMemo(
+    () => Math.floor(sessions.reduce((s, x) => s + x.durationActualMins, 0) / 60),
+    [sessions],
+  );
+  const doneChapters = useMemo(
+    () => chapters.filter(c => !c.isDeleted && c.status === 'done').length,
+    [chapters],
+  );
+  const joinDate = useMemo(() => new Date(user?.createdAt || Date.now()).toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric',
+  }), [user?.createdAt]);
+  const initials = useMemo(() => user?.fullName?.split(' ')
+    .map((w: string) => w[0]).slice(0, 2).join('').toUpperCase() || 'ST', [user?.fullName]);
+  const displayAvatar = (user as any)?.avatarUrl || editAvatarUrl;
+
+  const recentXP = useMemo(() => xpLog.slice(0, 10), [xpLog]);
 
   if (!user) return null;
-
-  const level = getLevelForXP(user.xpTotal);
-  const progress = getXPProgress(user.xpTotal);
-  const totalHours = Math.floor(
-    sessions.reduce((s, x) => s + x.durationActualMins, 0) / 60
-  );
-  const doneChapters = chapters.filter(c => !c.isDeleted && c.status === 'done').length;
-  const joinDate = new Date(user.createdAt || Date.now()).toLocaleDateString('en-IN', {
-    day: 'numeric', month: 'short', year: 'numeric',
-  });
-  const initials = user.fullName?.split(' ')
-    .map((w: string) => w[0]).slice(0, 2).join('').toUpperCase() || 'ST';
-  const displayAvatar = (user as any).avatarUrl || editAvatarUrl;
 
   const showAlert = (title: string, message: string, isSignOut = false) => {
     if (Platform.OS === 'web') {
@@ -118,16 +125,12 @@ export default function ProfileScreen() {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.5,
-      base64: true, 
+      base64: false,
     });
     
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
-      if (Platform.OS === 'web' && asset.base64) {
-        setEditAvatarUrl(`data:image/jpeg;base64,${asset.base64}`);
-      } else {
-        setEditAvatarUrl(asset.uri);
-      }
+      setEditAvatarUrl(asset.uri);
     }
   };
 
@@ -155,22 +158,9 @@ export default function ProfileScreen() {
         const mimeType = 'image/jpeg';
         const filePath = `${authUser.id}/${authUser.id}-${Date.now()}.${ext}`;
 
-        let fileBody: ArrayBuffer | Uint8Array;
-
-        // ✅ Web/Onspace data-uri bypass logic to prevent "Failed to fetch"
-        if (Platform.OS === 'web' || editAvatarUrl.startsWith('data:image')) {
-          const base64Data = editAvatarUrl.split(',')[1];
-          const byteCharacters = atob(base64Data);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
-          fileBody = new Uint8Array(byteNumbers);
-        } else {
-          // Pure mobile raw data buffers
-          const response = await fetch(editAvatarUrl);
-          fileBody = await response.arrayBuffer();
-        }
+                const response = await fetch(editAvatarUrl);
+        if (!response.ok) throw new Error('Unable to read the selected image.');
+        const fileBody = await response.arrayBuffer();
 
         const { error: uploadError } = await supabase.storage
           .from('avatars')
@@ -216,8 +206,6 @@ export default function ProfileScreen() {
       setLoading(false);
     }
   };
-
-  const recentXP = xpLog.slice(0, 10);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
