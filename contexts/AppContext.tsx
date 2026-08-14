@@ -17,8 +17,17 @@ import {
   UserProfile, Subject, Chapter, Topic,
   FocusSession, DailySummary, XPTransaction, ActiveSession
 } from '@/types/models';
-import { calculateSessionXP, XP_REWARDS, getLevelForXP } from '@/constants/levels';
+import { calculateSessionXP, XP_REWARDS, getLevelForUser } from '@/constants/levels';
 import { processReferralOnFirstSession } from '@/services/referralService';
+import {
+  buildBaselineMarker,
+  buildWeeklySettlement,
+  createWeeklyMarkerReason,
+  getEffectiveLevelRank,
+  getLatestWeeklyMarker,
+  getWeekStart,
+  type WeeklySettlementResult,
+} from '@/services/weeklyXp';
 
 export type AppContextType = {
   comebackPending: boolean;
@@ -94,6 +103,7 @@ const mapUser = (u: any): UserProfile => ({
   classLevel: u.class ?? '12th',
   dailyGoalMinutes: u.daily_goal_minutes ?? 120,
   xpTotal: u.xp ?? 0,
+  levelRank: typeof u.level_rank === 'number' ? u.level_rank : undefined,
   streakCurrent: u.streak ?? 0,
   streakLongest: u.longest_streak ?? 0,
   lastStudyDate: u.last_study_date ?? null,
@@ -165,6 +175,14 @@ const mapXP = (x: any): XPTransaction => ({
   createdAt: x.created_at,
 });
 
+const createWeeklyMarkerTransaction = (userId: string, marker: WeeklySettlementResult) => ({
+  id: marker.markerId,
+  user_id: userId,
+  amount: 0,
+  reason: createWeeklyMarkerReason(marker),
+  created_at: new Date().toISOString(),
+});
+
 // ── Offline Queue ─────────────────────────────────────────────────────────────
 const OFFLINE_QUEUE_KEY = '@app_offline_sync_queue';
 type SyncTask = {
@@ -200,6 +218,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [lostStreakCount, setLostStreakCount] = useState(0);
   const authGenerationRef = useRef(0);
   const syncInFlightRef = useRef(false);
+  const weeklySettlementInFlightRef = useRef(false);
 
   const addToSyncQueue = async (task: Omit<SyncTask, 'id'>) => {
     const existingQueue = (await getItem<SyncTask[]>(OFFLINE_QUEUE_KEY)) || [];
@@ -248,6 +267,81 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.error('[Sync] Manager error:', e);
     } finally {
       syncInFlightRef.current = false;
+    }
+  };
+
+  const persistWeeklyMarker = async (userId: string, marker: WeeklySettlementResult) => {
+    const txPayload = createWeeklyMarkerTransaction(userId, marker);
+    try {
+      const { error } = await supabase
+        .from('xp_transactions')
+        .upsert([txPayload], { onConflict: 'id', ignoreDuplicates: true });
+      if (error) throw error;
+    } catch {
+      await addToSyncQueue({ table: 'xp_transactions', action: 'upsert', payload: txPayload });
+    }
+    return mapXP(txPayload);
+  };
+
+  const settleWeeklyXPIfNeeded = async (
+    profile: UserProfile,
+    transactions: XPTransaction[],
+  ): Promise<{ user: UserProfile; xpLog: XPTransaction[] }> => {
+    if (weeklySettlementInFlightRef.current) return { user: profile, xpLog: transactions };
+    weeklySettlementInFlightRef.current = true;
+    try {
+      const weekStart = getWeekStart();
+      const latestMarker = getLatestWeeklyMarker(transactions);
+      if (latestMarker && latestMarker.weekStart >= weekStart) {
+        return {
+          user: {
+            ...profile,
+            xpTotal: latestMarker.kind === 'settlement' ? 0 : profile.xpTotal,
+            levelRank: latestMarker.toLevelRank,
+          },
+          xpLog: transactions,
+        };
+      }
+
+      if (!latestMarker) {
+        const baseline = buildBaselineMarker(profile.id, profile, weekStart);
+        const markerXP = await persistWeeklyMarker(profile.id, baseline);
+        return {
+          user: { ...profile, levelRank: baseline.toLevelRank },
+          xpLog: [markerXP, ...transactions.filter(transaction => transaction.id !== markerXP.id)],
+        };
+      }
+
+      const { data: leaderboardData, error: leaderboardError } = await supabase.rpc('get_leaderboard');
+      if (leaderboardError || !Array.isArray(leaderboardData) || leaderboardData.length === 0) {
+        return { user: { ...profile, levelRank: latestMarker.toLevelRank }, xpLog: transactions };
+      }
+
+      const myEntry = leaderboardData.find((entry: any) => entry.id === profile.id);
+      if (!myEntry) {
+        return { user: { ...profile, levelRank: latestMarker.toLevelRank }, xpLog: transactions };
+      }
+
+      const rank = Number(myEntry.rank ?? leaderboardData.findIndex((entry: any) => entry.id === profile.id) + 1);
+      const settlement = buildWeeklySettlement({
+        userId: profile.id,
+        weekStart,
+        currentLevelRank: latestMarker.toLevelRank || getEffectiveLevelRank(profile),
+        rank,
+        totalPlayers: leaderboardData.length,
+      });
+      const markerXP = await persistWeeklyMarker(profile.id, settlement);
+      const updatedUser = {
+        ...profile,
+        xpTotal: 0,
+        levelRank: settlement.toLevelRank,
+      };
+      return {
+        user: updatedUser,
+        xpLog: [markerXP, ...transactions.filter(transaction => transaction.id !== markerXP.id)],
+      };
+    } finally {
+      weeklySettlementInFlightRef.current = false;
     }
   };
 
@@ -303,6 +397,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
 
         // Load user profile from DB
+        let loadedProfile: UserProfile | null = null;
         const { data: profileData } = await supabase
           .from('users')
           .select('id,name,target_exam,class,daily_goal_minutes,xp,streak,longest_streak,last_study_date,created_at,avatar_url,my_referral_code,has_unlocked_reward')
@@ -311,10 +406,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (loadGeneration !== authGenerationRef.current) return;
         if (profileData) {
-          const mappedUser = mapUser({ ...profileData, email: authData.user.email });
-          setUserState(mappedUser);
+          loadedProfile = mapUser({ ...profileData, email: authData.user.email });
+          setUserState(loadedProfile);
           setIsOnboardedState(!!(profileData.name && profileData.name !== 'Student'));
-          await setItem(StorageKeys.USER, mappedUser);
+          await setItem(StorageKeys.USER, loadedProfile);
         }
 
         // Load referral count and check jackpot
@@ -353,10 +448,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setDailySummaries(cloudSum);
           setItem(StorageKeys.DAILY_SUMMARY, cloudSum);
         }
+        let loadedXP = savedXP ?? [];
         if (xpRes.data) {
-          const cloudXP = xpRes.data.map(mapXP);
-          setXpLog(cloudXP);
-          setItem(StorageKeys.XP_LOG, cloudXP);
+          loadedXP = xpRes.data.map(mapXP);
+          setXpLog(loadedXP);
+          setItem(StorageKeys.XP_LOG, loadedXP);
+        }
+        if (loadedProfile) {
+          const settlementResult = await settleWeeklyXPIfNeeded(loadedProfile, loadedXP);
+          if (loadGeneration !== authGenerationRef.current) return;
+          const userChanged = settlementResult.user.xpTotal !== loadedProfile.xpTotal
+            || settlementResult.user.levelRank !== loadedProfile.levelRank;
+          if (userChanged) await setUser(settlementResult.user);
+          else setUserState(settlementResult.user);
+          setXpLog(settlementResult.xpLog);
+          await setItem(StorageKeys.XP_LOG, settlementResult.xpLog);
         }
       } else {
         if (loadGeneration !== authGenerationRef.current) return;
@@ -636,8 +742,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
         }
       }
-      const oldLevelRank = activeUser ? getLevelForXP(activeUser.xpTotal).rank : 1;
-      const newLevelRank = getLevelForXP(newXPTotal).rank;
+      const oldLevelRank = activeUser ? getLevelForUser(activeUser).rank : 1;
+      const newLevelRank = activeUser ? getLevelForUser({ ...activeUser, xpTotal: newXPTotal }).rank : 1;
       const leveledUp = newLevelRank > oldLevelRank;
       processSyncQueue();
       return { ...sessionObj, leveledUp, newLevelRank, totalXP: newXPTotal };

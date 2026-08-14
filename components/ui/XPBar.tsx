@@ -1,16 +1,17 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Colors, Radius, FontSize, FontWeight } from '@/constants/theme';
-import { getLevelForXP, getXPProgress } from '@/constants/levels';
+import { getLevelForUser, getXPProgressForUser } from '@/constants/levels';
 
 interface XPBarProps {
   xp: number;
   compact?: boolean;
+  levelRank?: number;
 }
 
-export default function XPBar({ xp, compact = false }: XPBarProps) {
-  const level = getLevelForXP(xp);
-  const { current, needed, progress } = getXPProgress(xp);
+export default function XPBar({ xp, compact = false, levelRank }: XPBarProps) {
+  const level = getLevelForUser({ xpTotal: xp, levelRank });
+  const { current, needed, progress } = getXPProgressForUser({ xpTotal: xp, levelRank });
 
   return (
     <View style={styles.container}>

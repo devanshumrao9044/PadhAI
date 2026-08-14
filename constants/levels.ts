@@ -24,6 +24,26 @@ export function getLevelForXP(xp: number): LevelDef {
   return LEVELS[0];
 }
 
+export function getLevelForRank(rank: number): LevelDef {
+  const safeRank = Math.min(Math.max(1, Math.floor(rank)), LEVELS.length);
+  return LEVELS[safeRank - 1] ?? LEVELS[0];
+}
+
+export function getLevelForUser(user: { xpTotal: number; levelRank?: number }): LevelDef {
+  return user.levelRank ? getLevelForRank(user.levelRank) : getLevelForXP(user.xpTotal);
+}
+
+export function getXPProgressForLevel(xp: number, levelRank: number): { current: number; needed: number; progress: number } {
+  const level = getLevelForRank(levelRank);
+  const current = Math.max(0, Math.min(xp, level.maxXP - level.minXP + 1));
+  const needed = level.maxXP - level.minXP + 1;
+  return { current, needed, progress: Math.min(current / needed, 1) };
+}
+
+export function getXPProgressForUser(user: { xpTotal: number; levelRank?: number }): { current: number; needed: number; progress: number } {
+  return user.levelRank ? getXPProgressForLevel(user.xpTotal, user.levelRank) : getXPProgress(user.xpTotal);
+}
+
 export function getXPProgress(xp: number): { current: number; needed: number; progress: number } {
   const level = getLevelForXP(xp);
   const current = xp - level.minXP;

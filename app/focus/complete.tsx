@@ -5,7 +5,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
-import { getLevelForXP } from '@/constants/levels';
+import { getLevelForUser } from '@/constants/levels';
 import { COMPLETION_MESSAGES } from '@/constants/messages';
 import { supabase } from '@/services/supabase';
 import { processReferralOnFirstSession } from '@/services/referralService';
@@ -88,7 +88,7 @@ export default function FocusCompleteScreen() {
   const messageRef = useRef(
     COMPLETION_MESSAGES[Math.floor(Math.random() * COMPLETION_MESSAGES.length)]
   );
-  const level = user ? getLevelForXP(user.xpTotal) : null;
+  const level = user ? getLevelForUser(user) : null;
   const recoveryAppliedRef = useRef(false);
 
   // ✅ Restore half-streak when this is a recovery session
@@ -290,7 +290,7 @@ export default function FocusCompleteScreen() {
               <Text style={[styles.levelName, { color: level.color }]}>
                 {level.realisticTitle}
               </Text>
-              <Text style={styles.levelTotal}>{user?.xpTotal ?? 0} XP total</Text>
+              <Text style={styles.levelTotal}>{user?.xpTotal ?? 0} Weekly XP</Text>
             </View>
           ) : null}
         </Animated.View>

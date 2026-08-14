@@ -6,6 +6,8 @@ export interface UserProfile {
   classLevel: '11th' | '12th' | 'Dropper';
   dailyGoalMinutes: number;
   xpTotal: number;
+  /** Current week XP; reset to zero after Sunday settlement. */
+  levelRank?: number;
   streakCurrent: number;
   streakLongest: number;
   lastStudyDate: string | null;

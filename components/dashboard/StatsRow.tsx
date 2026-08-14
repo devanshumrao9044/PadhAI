@@ -32,7 +32,7 @@ export default function StatsRow({ todayMins = 0, xp = 0, chaptersTotal = 0, cha
         <View style={styles.card}>
           <Text style={styles.emoji}>⚡</Text>
           <Text style={[styles.value, { color: '#FACC15' }]}>{xp || user?.xpTotal || 0}</Text>
-          <Text style={styles.label}>Total XP</Text>
+          <Text style={styles.label}>Weekly XP</Text>
         </View>
 
         <View style={styles.card}>

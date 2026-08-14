@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
-import { LEVELS, getLevelForXP } from '@/constants/levels';
+import { LEVELS, getLevelForUser } from '@/constants/levels';
 import { useApp } from '@/hooks/useApp';
 import { supabase } from '@/services/supabase';
 
@@ -154,9 +154,12 @@ export default function LeaderboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const currentLevel = user ? getLevelForXP(user.xpTotal) : LEVELS[0];
+  const currentLevel = user ? getLevelForUser(user) : LEVELS[0];
   const myEntry = entries.find(e => e.id === user?.id);
   const myRank = myEntry?.rank ?? entries.length + 1;
+  const displayEntries = entries.map(entry => entry.id === user?.id && user
+    ? { ...entry, xp: user.xpTotal, level: currentLevel.rank }
+    : entry);
 
   const fetchLeaderboard = async () => {
     try {
@@ -280,7 +283,7 @@ export default function LeaderboardScreen() {
           ) : (
             <View style={styles.listContainer}>
               {/* Show top 3 always, then entries around user */}
-              {entries.map((entry, idx) => {
+              {displayEntries.map((entry, idx) => {
                 const isMe = entry.id === user?.id;
                 const isTop3 = idx < 3;
                 const isNearMe = myRank > 3 && Math.abs(entry.rank - myRank) <= 3;

@@ -10,8 +10,9 @@ import { supabase } from '@/services/supabase';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { useAuthSession } from '@/auth/AuthSessionProvider';
-import { getLevelForXP, getXPProgress, LEVELS } from '@/constants/levels';
+import { getLevelForUser, getXPProgressForUser, LEVELS } from '@/constants/levels';
 import XPBar from '@/components/ui/XPBar';
+import { WEEKLY_MARKER_PREFIX } from '@/services/weeklyXp';
 
 export default function ProfileScreen() {
   const { user, setUser, sessions, chapters, xpLog } = useApp();
@@ -62,8 +63,8 @@ export default function ProfileScreen() {
     fetchRankInfo();
   }, [userId]);
 
-  const level = useMemo(() => getLevelForXP(user?.xpTotal ?? 0), [user?.xpTotal]);
-  const progress = useMemo(() => getXPProgress(user?.xpTotal ?? 0), [user?.xpTotal]);
+  const level = useMemo(() => getLevelForUser({ xpTotal: user?.xpTotal ?? 0, levelRank: user?.levelRank }), [user?.xpTotal, user?.levelRank]);
+  const progress = useMemo(() => getXPProgressForUser({ xpTotal: user?.xpTotal ?? 0, levelRank: user?.levelRank }), [user?.xpTotal, user?.levelRank]);
   const totalHours = useMemo(
     () => Math.floor(sessions.reduce((s, x) => s + x.durationActualMins, 0) / 60),
     [sessions],
@@ -79,7 +80,10 @@ export default function ProfileScreen() {
     .map((w: string) => w[0]).slice(0, 2).join('').toUpperCase() || 'ST', [user?.fullName]);
   const displayAvatar = (user as any)?.avatarUrl || editAvatarUrl;
 
-  const recentXP = useMemo(() => xpLog.slice(0, 10), [xpLog]);
+  const recentXP = useMemo(
+    () => xpLog.filter(transaction => !transaction.reason.startsWith(WEEKLY_MARKER_PREFIX)).slice(0, 10),
+    [xpLog],
+  );
 
   if (!user) return null;
 
@@ -274,10 +278,10 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.xpBadge}>
               <MaterialIcons name="bolt" size={16} color={Colors.warning} />
-              <Text style={styles.xpBadgeText}>{user.xpTotal} XP</Text>
+              <Text style={styles.xpBadgeText}>{user.xpTotal} Weekly XP</Text>
             </View>
           </View>
-          <XPBar xp={user.xpTotal} />
+          <XPBar xp={user.xpTotal} levelRank={user.levelRank} />
           <Text style={styles.xpNeeded}>
             {progress.needed - progress.current} XP more to next level
           </Text>
@@ -305,20 +309,20 @@ export default function ProfileScreen() {
           {LEVELS.map(l => (
             <View
               key={l.rank}
-              style={[styles.levelRow, user.xpTotal >= l.minXP ? styles.levelRowUnlocked : null]}
+              style={[styles.levelRow, level.rank >= l.rank ? styles.levelRowUnlocked : null]}
             >
               <View style={[styles.levelDot, {
-                backgroundColor: user.xpTotal >= l.minXP ? l.color : Colors.textTertiary,
+                backgroundColor: level.rank >= l.rank ? l.color : Colors.textTertiary,
               }]} />
               <View style={styles.levelRowInfo}>
                 <Text style={[styles.levelRowTitle, {
-                  color: user.xpTotal >= l.minXP ? l.color : Colors.textTertiary,
+                  color: level.rank >= l.rank ? l.color : Colors.textTertiary,
                 }]}>
                   {l.realisticTitle}
                 </Text>
                 <Text style={styles.levelRowSub}>{l.examTitle} • {l.minXP}+ XP</Text>
               </View>
-              {user.xpTotal >= l.minXP
+              {level.rank >= l.rank
                 ? <MaterialIcons name="check-circle" size={18} color={l.color} />
                 : null}
             </View>

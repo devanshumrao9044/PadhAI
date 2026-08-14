@@ -8,7 +8,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
-import { getLevelForXP } from '@/constants/levels';
+import { getLevelForUser } from '@/constants/levels';
 
 const DRAWER_WIDTH = Math.min(Dimensions.get('window').width * 0.78, 300);
 
@@ -35,7 +35,7 @@ export default function SideDrawer({ visible, onClose }: Props) {
   // mounted keeps the component in the tree during the close animation
   const [mounted, setMounted] = useState(false);
 
-  const level = user ? getLevelForXP(user.xpTotal) : null;
+  const level = user ? getLevelForUser(user) : null;
 
   useEffect(() => {
     if (visible) {
@@ -116,7 +116,7 @@ export default function SideDrawer({ visible, onClose }: Props) {
         {user ? (
           <View style={styles.xpStrip}>
             <MaterialIcons name="bolt" size={14} color={Colors.warning} />
-            <Text style={styles.xpText}>{user.xpTotal} XP</Text>
+            <Text style={styles.xpText}>{user.xpTotal} Weekly XP</Text>
             <View style={styles.xpDivider} />
             <MaterialIcons name="local-fire-department" size={14} color={Colors.danger} />
             <Text style={styles.xpText}>{user.streakCurrent} day streak</Text>
