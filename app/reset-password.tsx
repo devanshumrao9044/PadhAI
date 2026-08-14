@@ -14,9 +14,11 @@ import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/services/supabase';
+import { useAuthSession } from '@/auth/AuthSessionProvider';
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
+  const { signOut } = useAuthSession();
   const [checking, setChecking] = useState(true);
   const [ready, setReady] = useState(false);
   const [password, setPassword] = useState('');
@@ -104,7 +106,7 @@ export default function ResetPasswordScreen() {
     }
 
     setSuccess(true);
-    await supabase.auth.signOut();
+    await signOut();
   };
 
   if (checking) {

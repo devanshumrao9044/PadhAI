@@ -4,18 +4,18 @@ import {
   Modal, TextInput, Alert, Platform, Image, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/services/supabase';
 import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
+import { useAuthSession } from '@/auth/AuthSessionProvider';
 import { getLevelForXP, getXPProgress, LEVELS } from '@/constants/levels';
 import XPBar from '@/components/ui/XPBar';
 
 export default function ProfileScreen() {
-  const router = useRouter();
   const { user, setUser, sessions, chapters, xpLog } = useApp();
+  const { signOut, signingOut } = useAuthSession();
 
   const [editVisible, setEditVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -32,7 +32,6 @@ export default function ProfileScreen() {
   const [alertConfig, setAlertConfig] = useState<{
     visible: boolean; title: string; message: string; isSignOut?: boolean;
   }>({ visible: false, title: '', message: '' });
-  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     async function fetchRankInfo() {
@@ -92,13 +91,9 @@ export default function ProfileScreen() {
 
   const handleSignOut = async () => {
     setAlertConfig(p => ({ ...p, visible: false }));
-    setSigningOut(true);
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      setTimeout(() => router.replace('/'), 50);
+      await signOut();
     } catch (error: any) {
-      setSigningOut(false);
       showAlert('Sign Out Failed', error?.message ?? 'Please try again.');
     }
   };

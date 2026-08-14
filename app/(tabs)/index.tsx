@@ -10,6 +10,7 @@ import StatsRow from '../../components/dashboard/StatsRow';
 import QuickShortcuts from '../../components/dashboard/QuickShortcuts';
 import QuoteCard from '../../components/dashboard/QuoteCard';
 import SideDrawer from '../../components/ui/SideDrawer';
+import { useAuthSession } from '@/auth/AuthSessionProvider';
 
 export default function Dashboard() {
   const [userName, setUserName] = useState('Student');
@@ -22,6 +23,7 @@ export default function Dashboard() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const { session } = useAuthSession();
 
   const loadUserData = useCallback(async () => {
     try {
@@ -89,25 +91,23 @@ export default function Dashboard() {
   }, [loadUserData, loadTodayStats, loadChaptersStats]);
 
   useEffect(() => {
-    void loadAll();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT') {
-        setUserName('Student');
-        setStreak(0);
-        setTodayMinutes(0);
-        setXpTotal(0);
-        setChaptersTotal(0);
-        setChaptersDone(0);
-        setUserId(null);
-        setDrawerOpen(false);
-        if (channelRef.current) {
-          supabase.removeChannel(channelRef.current);
-          channelRef.current = null;
-        }
+    if (!session) {
+      setUserName('Student');
+      setStreak(0);
+      setTodayMinutes(0);
+      setXpTotal(0);
+      setChaptersTotal(0);
+      setChaptersDone(0);
+      setUserId(null);
+      setDrawerOpen(false);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
       }
-    });
-    return () => subscription.unsubscribe();
-  }, [loadAll]);
+      return;
+    }
+    void loadAll();
+  }, [loadAll, session]);
 
   const channelIdRef = useRef(0);
 
