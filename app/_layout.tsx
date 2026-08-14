@@ -81,6 +81,7 @@ function NavigationGuard() {
     const onIndex = routeSegments.length === 0;
     if (!session || !onIndex || bootRedirectDone.current || !coldStartHasSession.current) return;
 
+    let cancelled = false;
     bootRedirectDone.current = true;
     const uid = session.user.id;
     (async () => {
@@ -91,6 +92,7 @@ function NavigationGuard() {
           .eq('id', uid)
           .single();
 
+        if (cancelled) return;
         if (profile && profile.streak > 0) {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
@@ -101,6 +103,7 @@ function NavigationGuard() {
 
           if (!lastStudy || lastStudy < yesterday) {
             await supabase.from('users').update({ streak: 0 }).eq('id', uid);
+            if (cancelled) return;
             appCtx?.setComebackPending(true);
             router.replace({ pathname: '/streak-broken', params: { lost: profile.streak } });
             return;
@@ -110,17 +113,23 @@ function NavigationGuard() {
         console.log('Streak guard error:', error);
       }
 
+      if (cancelled) return;
       try {
         const { data: profile } = await supabase
           .from('users')
           .select('name')
           .eq('id', uid)
           .single();
+        if (cancelled) return;
         router.replace(!profile?.name || profile.name === 'Student' ? '/onboarding' : '/(tabs)');
       } catch {
-        router.replace('/(tabs)');
+        if (!cancelled) router.replace('/(tabs)');
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [appCtx, routeSegments, router, session]);
 
   return null;
