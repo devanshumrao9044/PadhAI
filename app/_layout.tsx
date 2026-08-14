@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useContext } from 'react';
-import { Redirect, Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider, AppContext } from '@/contexts/AppContext';
@@ -13,6 +13,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // Expo Router's generated tuple type excludes the root empty segment even
   // though it is returned at runtime, so use a string view for guard logic.
   const routeSegments = segments as string[];
+  const rootNavigationState = useRootNavigationState();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [checking, setChecking] = useState(true);
   const appCtx = useContext(AppContext);
@@ -52,16 +53,19 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }, []);
 
   // ── 2. Guard: kick unauthenticated users off protected routes ─────────────
-  //    This is the ONLY place that fires router.replace('/') on sign-out.
-  //    Post-login redirects are handled by app/index.tsx itself.
+  //    Wait for the root navigator to be ready, then replace only the current
+  //    route. Dismissing the whole stack or rendering Redirect before Stack
+  //    mounts can leave native builds on a blank screen.
+  useEffect(() => {
+    if (!checking && !session && isProtected && rootNavigationState?.key) {
+      router.replace('/');
+    }
+  }, [checking, isProtected, rootNavigationState?.key, router, session]);
+
+  // ── 3. Cold-start redirect and profile checks ─────────────────────────────
   useEffect(() => {
     if (checking) return;
 
-    if (!session && isProtected) {
-      // The render-level Redirect below is the source of truth. Keep this
-      // effect free of stack mutations so it cannot race the router state.
-      return;
-    }
 
     // Cold-start: session already exists and we are on the root index.
     // Run the streak check + profile check exactly once so the user lands
@@ -115,10 +119,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       })();
     }
   }, [session, routeSegments, checking, isProtected]);
-
-  if (!checking && !session && isProtected) {
-    return <Redirect href="/" />;
-  }
 
   if (checking) {
     return (
