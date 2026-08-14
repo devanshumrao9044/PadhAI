@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { AppState } from 'react-native';
 // Cross-platform UUID generator (no native crypto dependency)
 function uuidv4(): string {
@@ -189,6 +189,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [referralCount, setReferralCount] = useState(0);
   const [streakRecoveryPending, setStreakRecoveryPendingState] = useState(false);
   const [lostStreakCount, setLostStreakCount] = useState(0);
+  const authGenerationRef = useRef(0);
 
   const addToSyncQueue = async (task: Omit<SyncTask, 'id'>) => {
     const existingQueue = (await getItem<SyncTask[]>(OFFLINE_QUEUE_KEY)) || [];
@@ -253,6 +254,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // ── Core Load ─────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
+    const loadGeneration = authGenerationRef.current;
     setIsLoading(true);
     try {
       const [savedUser, savedTopics, savedActive, savedSessions, savedSummaries, savedXP] = await Promise.all([
@@ -265,6 +267,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ]);
 
       const { data: authData } = await supabase.auth.getUser();
+      if (loadGeneration !== authGenerationRef.current) return;
       if (authData?.user) {
         const userId = authData.user.id;
         const sameAccount = savedUser?.id === userId;
@@ -292,6 +295,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           .eq('id', userId)
           .single();
 
+        if (loadGeneration !== authGenerationRef.current) return;
         if (profileData) {
           const mappedUser = mapUser({ ...profileData, email: authData.user.email });
           setUserState(mappedUser);
@@ -313,6 +317,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           // ignore
         }
 
+        if (loadGeneration !== authGenerationRef.current) return;
         const [subRes, chapRes, sessRes, sumRes, xpRes] = await Promise.all([
           supabase.from('subjects').select('*').eq('user_id', userId).eq('is_deleted', false).order('display_order', { ascending: true }),
           supabase.from('chapters').select('*').eq('user_id', userId).eq('is_deleted', false).order('display_order', { ascending: true }),
@@ -321,6 +326,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           supabase.from('xp_transactions').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
         ]);
 
+        if (loadGeneration !== authGenerationRef.current) return;
         if (subRes.data) setSubjects(subRes.data.map(mapSubject));
         if (chapRes.data) setChapters(chapRes.data.map(mapChapter));
         if (sessRes.data) {
@@ -339,6 +345,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setItem(StorageKeys.XP_LOG, cloudXP);
         }
       } else {
+        if (loadGeneration !== authGenerationRef.current) return;
         setUserState(null);
         setIsOnboardedState(false);
         setSubjects([]);
@@ -367,6 +374,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (event === 'SIGNED_IN') {
         load();
       } else if (event === 'SIGNED_OUT') {
+        authGenerationRef.current += 1;
         setUserState(null);
         setIsOnboardedState(false);
         setSubjects([]);

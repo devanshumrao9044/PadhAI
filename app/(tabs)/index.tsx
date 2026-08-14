@@ -90,6 +90,23 @@ export default function Dashboard() {
 
   useEffect(() => {
     void loadAll();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        setUserName('Student');
+        setStreak(0);
+        setTodayMinutes(0);
+        setXpTotal(0);
+        setChaptersTotal(0);
+        setChaptersDone(0);
+        setUserId(null);
+        setDrawerOpen(false);
+        if (channelRef.current) {
+          supabase.removeChannel(channelRef.current);
+          channelRef.current = null;
+        }
+      }
+    });
+    return () => subscription.unsubscribe();
   }, [loadAll]);
 
   const channelIdRef = useRef(0);
