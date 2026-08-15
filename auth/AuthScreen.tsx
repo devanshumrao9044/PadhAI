@@ -100,18 +100,7 @@ export default function AuthScreen() {
             {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>{buttonLabel}</Text>}
           </Pressable>
 
-          {mode !== 'forgot' ? (
-            <>
-              <View style={styles.dividerRow}>
-                <View style={styles.divider} />
-                <Text style={styles.dividerText}>OR</Text>
-                <View style={styles.divider} />
-              </View>
-              <View style={styles.googleButton}>
-                <Text style={styles.googleText}>Google signup — Coming Soon</Text>
-              </View>
-            </>
-          ) : null}
+          {mode !== 'forgot' ? <Text style={styles.comingSoonText}>Google signup — Coming Soon</Text> : null}
 
           {mode === 'login' ? (
             <Pressable onPress={() => { clearFeedback(); setMode('forgot'); }} style={styles.secondaryAction}>
@@ -153,15 +142,11 @@ const styles = StyleSheet.create({
   subtitle: { color: '#9CA3AF', fontSize: 15, textAlign: 'center', marginTop: 8, marginBottom: 28 },
   input: { backgroundColor: '#151521', borderColor: 'rgba(255,255,255,0.1)', borderRadius: 14, borderWidth: 1, color: '#FFFFFF', paddingHorizontal: 16, paddingVertical: 15, marginBottom: 12 },
   primaryButton: { minHeight: 52, borderRadius: 14, backgroundColor: '#7C5CFC', alignItems: 'center', justifyContent: 'center', marginTop: 6 },
-  googleButton: { minHeight: 52, borderRadius: 14, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  googleText: { color: '#111827', fontSize: 16, fontWeight: '800' },
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 18 },
-  divider: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.12)' },
-  dividerText: { color: '#737384', fontSize: 12, fontWeight: '800' },
   disabled: { opacity: 0.6 },
   primaryText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
   secondaryAction: { alignItems: 'center', paddingVertical: 14 },
   secondaryText: { color: '#B5A6FF', fontSize: 14, fontWeight: '600' },
+  comingSoonText: { color: '#737384', fontSize: 12, textAlign: 'center', marginTop: 16 },
   policyAction: { alignItems: 'center', paddingVertical: 12, marginTop: 4 },
   policyText: { color: '#8F8FA3', fontSize: 13, textDecorationLine: 'underline' },
   error: { color: '#FF6675', lineHeight: 20, textAlign: 'center', marginVertical: 12 },

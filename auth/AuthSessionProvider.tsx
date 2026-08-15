@@ -61,15 +61,34 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     password: string,
     referralCode = '',
   ) => {
+    const normalizedReferralCode = referralCode.trim().toUpperCase();
+    if (normalizedReferralCode) {
+      const { data: isValid, error: validationError } = await supabase.rpc(
+        'validate_referral_code',
+        { code: normalizedReferralCode },
+      );
+      if (validationError) throw validationError;
+      if (!isValid) {
+        throw new Error('Invalid referral code. Please check it and try again.');
+      }
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
       password: password.trim(),
-      options: { data: { name: name.trim() } },
+      options: {
+        data: {
+          name: name.trim(),
+          ...(normalizedReferralCode
+            ? { referral_code: normalizedReferralCode }
+            : {}),
+        },
+      },
     });
     if (error) throw error;
 
-    if (data.user && referralCode.trim() && data.session) {
-      await applyReferralCode(data.user.id, referralCode);
+    if (data.user && normalizedReferralCode && data.session) {
+      await applyReferralCode(data.user.id, normalizedReferralCode);
     }
 
     return { requiresEmailConfirmation: !data.session };
