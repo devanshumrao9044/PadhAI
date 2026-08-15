@@ -1,14 +1,13 @@
-import { makeRedirectUri } from 'expo-auth-session';
 import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 import { supabase } from '@/services/supabase';
 
-WebBrowser.maybeCompleteAuthSession();
+if (Platform.OS === 'web') {
+  WebBrowser.maybeCompleteAuthSession();
+}
 
-const NATIVE_REDIRECT_URI = makeRedirectUri({
-  path: 'auth/callback',
-});
+const NATIVE_REDIRECT_URI = 'PadhAI://auth/callback';
 
 const handledCallbackUrls = new Set<string>();
 
