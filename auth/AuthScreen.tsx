@@ -18,7 +18,7 @@ type Mode = 'login' | 'signup' | 'forgot';
 
 export default function AuthScreen() {
   const router = useRouter();
-  const { signIn, signInWithGoogle, signUp, sendPasswordReset } = useAuthSession();
+  const { signIn, signUp, sendPasswordReset } = useAuthSession();
   const [mode, setMode] = useState<Mode>('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -31,18 +31,6 @@ export default function AuthScreen() {
   const clearFeedback = () => {
     setError(null);
     setMessage(null);
-  };
-
-  const continueWithGoogle = async () => {
-    clearFeedback();
-    setBusy(true);
-    try {
-      await signInWithGoogle();
-    } catch (googleError: any) {
-      setError(googleError?.message ?? 'Google sign-in failed. Please try again.');
-    } finally {
-      setBusy(false);
-    }
   };
 
   const submit = async () => {
@@ -119,9 +107,9 @@ export default function AuthScreen() {
                 <Text style={styles.dividerText}>OR</Text>
                 <View style={styles.divider} />
               </View>
-              <Pressable style={[styles.googleButton, busy && styles.disabled]} onPress={continueWithGoogle} disabled={busy}>
-                {busy ? <ActivityIndicator color="#111827" /> : <Text style={styles.googleText}>Continue with Google</Text>}
-              </Pressable>
+              <View style={styles.googleButton}>
+                <Text style={styles.googleText}>Google signup — Coming Soon</Text>
+              </View>
             </>
           ) : null}
 

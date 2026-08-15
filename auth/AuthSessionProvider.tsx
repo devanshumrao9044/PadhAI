@@ -2,14 +2,12 @@ import React, { createContext, ReactNode, useCallback, useContext, useEffect, us
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/services/supabase';
 import { applyReferralCode } from '@/services/referralService';
-import { signInWithGoogle } from './googleOAuth';
 
 type AuthContextValue = {
   session: Session | null;
   ready: boolean;
   signingOut: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
   signUp: (name: string, email: string, password: string, referralCode?: string) => Promise<{ requiresEmailConfirmation: boolean }>;
   sendPasswordReset: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -55,10 +53,6 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       password: password.trim(),
     });
     if (error) throw error;
-  }, []);
-
-  const continueWithGoogle = useCallback(async () => {
-    await signInWithGoogle();
   }, []);
 
   const signUp = useCallback(async (
@@ -107,7 +101,6 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       ready,
       signingOut,
       signIn,
-      signInWithGoogle: continueWithGoogle,
       signUp,
       sendPasswordReset,
       signOut,
