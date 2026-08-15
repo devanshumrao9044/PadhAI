@@ -4,6 +4,7 @@ import {
   Modal, TextInput, Alert, Platform, Image, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/services/supabase';
@@ -16,6 +17,7 @@ import { WEEKLY_MARKER_PREFIX } from '@/services/weeklyXp';
 
 export default function ProfileScreen() {
   const { user, setUser, sessions, chapters, xpLog } = useApp();
+  const router = useRouter();
   const { signOut, signingOut } = useAuthSession();
   const userId = user?.id;
 
@@ -348,6 +350,19 @@ export default function ProfileScreen() {
               <Text style={styles.settingValue}>{joinDate}</Text>
             </View>
           </View>
+
+          <TouchableOpacity
+            style={styles.settingRow}
+            onPress={() => router.push('/privacy-policy' as Parameters<typeof router.push>[0])}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="privacy-tip" size={20} color={Colors.primary} />
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Privacy Policy</Text>
+              <Text style={styles.settingValue}>How PadhAI uses and protects your data</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color={Colors.textSecondary} />
+          </TouchableOpacity>
 
           {(user as any).myReferralCode ? (
             <View style={styles.settingRow}>
