@@ -28,6 +28,9 @@ export default function AuthRouteGuard() {
     routeSegments[0] === 'tracker' ||
     routeSegments[0] === 'streak-broken' ||
     routeSegments[0] === 'referral';
+  const isSessionAllowedPublicRoute =
+    routeSegments[0] === 'privacy-policy' ||
+    routeSegments[0] === 'reset-password';
 
   useEffect(() => {
     if (!ready || !navigationReady || appLoading) return;
@@ -54,7 +57,7 @@ export default function AuthRouteGuard() {
       checkedSessionId.current = null;
       return;
     }
-    if (isProtected || checkedSessionId.current === session.user.id) return;
+    if (isProtected || isSessionAllowedPublicRoute || checkedSessionId.current === session.user.id) return;
 
     checkedSessionId.current = session.user.id;
     let cancelled = false;
@@ -99,7 +102,7 @@ export default function AuthRouteGuard() {
     return () => {
       cancelled = true;
     };
-  }, [appContext, appLoading, appUser, isProtected, navigationReady, ready, router, session]);
+  }, [appContext, appLoading, appUser, isProtected, isSessionAllowedPublicRoute, navigationReady, ready, router, session]);
 
   return null;
 }

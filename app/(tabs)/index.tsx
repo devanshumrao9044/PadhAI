@@ -18,7 +18,7 @@ import { ThemeColors } from '@/constants/theme';
 export default function Dashboard() {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { user, chapters, sessions, dailySummaries, chapterAnalytics, reload } = useApp();
+  const { user, isLoading, chapters, sessions, dailySummaries, chapterAnalytics, reload } = useApp();
   const [refreshing, setRefreshing] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -57,6 +57,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!userId) return;
+    void reload();
+  }, [reload, userId]);
+
+  useEffect(() => {
+    if (!userId) return;
     if (channelRef.current) supabase.removeChannel(channelRef.current);
 
     channelIdRef.current += 1;
@@ -83,6 +88,16 @@ export default function Dashboard() {
     setRefreshing(true);
     try { await reload(); } finally { setRefreshing(false); }
   }, [reload]);
+
+  if (isLoading || !user) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <Text style={{ color: colors.textSecondary, textAlign: 'center', marginTop: 80 }}>
+          Loading your profile…
+        </Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

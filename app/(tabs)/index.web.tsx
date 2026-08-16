@@ -19,7 +19,7 @@ export default function Dashboard() {
   const router = useRouter();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { user, chapters, sessions, dailySummaries, chapterAnalytics, reload } = useApp();
+  const { user, isLoading, chapters, sessions, dailySummaries, chapterAnalytics, reload } = useApp();
   const [refreshing, setRefreshing] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const channelIdRef = useRef(0);
@@ -53,6 +53,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!userId) return;
+    void reload();
+  }, [reload, userId]);
+
+  useEffect(() => {
+    if (!userId) return;
     if (channelRef.current) supabase.removeChannel(channelRef.current);
     channelIdRef.current += 1;
     const channel = supabase
@@ -74,6 +79,16 @@ export default function Dashboard() {
     setRefreshing(true);
     try { await reload(); } finally { setRefreshing(false); }
   }, [reload]);
+
+  if (isLoading || !user) {
+    return (
+      <View style={styles.root}>
+        <Text style={{ color: colors.textSecondary, textAlign: 'center', marginTop: 80 }}>
+          Loading your profile…
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>

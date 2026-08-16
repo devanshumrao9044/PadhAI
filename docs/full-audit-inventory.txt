@@ -1,0 +1,78 @@
+## routes
+app/(tabs)/analytics.tsx
+app/(tabs)/focus.tsx
+app/(tabs)/index.tsx
+app/(tabs)/index.web.tsx
+app/(tabs)/leaderboard.tsx
+app/(tabs)/profile.tsx
+app/(tabs)/stats.tsx
+app/(tabs)/tracker.tsx
+app/+not-found.tsx
+app/focus/active.tsx
+app/focus/broken.tsx
+app/focus/complete.tsx
+app/focus/levelup.tsx
+app/index.tsx
+app/login.tsx
+app/onboarding.tsx
+app/privacy-policy.tsx
+app/referral.tsx
+app/reset-password.tsx
+app/streak-broken.tsx
+app/tracker/[subjectId].tsx
+app/tracker/chapters/[chapterId].tsx
+
+## tests
+./components/dashboard/ChapterAnalyticsCard.test.ts
+./constants/dailyThoughts.test.ts
+./contexts/AppContext.test.ts
+./services/sessionHistory.test.ts
+./services/signupReferralRegression.test.ts
+./services/weeklyXp.test.ts
+
+## migrations
+supabase/migrations/20260815_avatar_storage_hardening.sql
+supabase/migrations/20260815_referral_code_preflight.sql
+supabase/migrations/20260815_remaining_security_hardening.sql
+supabase/migrations/20260815_security_performance_hardening.sql
+supabase/migrations/20260815_signup_referral_validation.sql
+supabase/migrations/20260816_add_chapter_analytics_rpc.sql
+supabase/migrations/20260816_add_focus_session_chapter_id.sql
+supabase/migrations/20260816_add_process_referral_bonus_rpc.sql
+supabase/migrations/20260816_fix_signup_trigger.sql
+supabase/migrations/20260816_fix_signup_trigger_referred_by_uuid.sql
+supabase/migrations/20260816_fix_subjects_rls.sql
+supabase/migrations/20260816_grant_referrals_authenticated_access.sql
+supabase/migrations/20260816_remove_referral_expiration.sql
+
+## package scripts
+{
+  "name": "PadhAI",
+  "main": "expo-router/entry",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "lint": "expo lint"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^14.1.0",
+    "@react-native-async-storage/async-storage": "2.1.2",
+    "@react-native-community/datetimepicker": "^8.2.0",
+    "@supabase/supabase-js": "^2.50.0",
+    "expo": "~53.0.9",
+    "expo-clipboard": "~7.1.4",
+    "expo-image-picker": "~16.1.4",
+    "expo-linear-gradient": "~14.1.4",
+    "expo-linking": "^7.1.5",
+    "expo-router": "~5.0.7",
+    "expo-splash-screen": "~0.30.8",
+    "expo-status-bar": "~2.2.3",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-native": "0.79.3",
+    "react-native-chart-kit": "^6.12.0",
+    "react-native-gesture-handler": "~2.24.0",
+    "react-native-reanimated": "3.17.4",
+    "react-native-safe-area-context": "5.4.0",

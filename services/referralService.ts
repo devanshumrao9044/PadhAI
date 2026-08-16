@@ -21,51 +21,6 @@ export async function processReferralOnFirstSession(
   }
 }
 
-// ── applyReferralCode: Validates and attaches a referral to a new user ─────────
-export async function applyReferralCode(
-  refereeId: string,
-  code: string,
-): Promise<boolean> {
-  const normalizedCode = code.trim().toUpperCase();
-  if (!normalizedCode) return false;
-
-  try {
-    const { data: referrerId, error: lookupError } = await supabase.rpc(
-      'get_referrer_id',
-      { code: normalizedCode },
-    );
-
-    if (lookupError || !referrerId || referrerId === refereeId) return false;
-
-    const { data: existingReferral, error: existingError } = await supabase
-      .from('referrals')
-      .select('id')
-      .eq('referee_id', refereeId)
-      .maybeSingle();
-
-    if (existingError) throw existingError;
-    if (existingReferral) return true;
-
-    const { error: userError } = await supabase
-      .from('users')
-      .update({ referred_by: referrerId })
-      .eq('id', refereeId);
-    if (userError) throw userError;
-
-    const { error: referralError } = await supabase.from('referrals').insert({
-      referrer_id: referrerId,
-      referee_id: refereeId,
-      status: 'pending',
-    });
-    if (referralError) throw referralError;
-
-    return true;
-  } catch (err) {
-    console.log('applyReferralCode error:', err);
-    return false;
-  }
-}
-
 // ── fetchReferralStats: Retrieves referral counts and code for the user ────────
 export async function fetchReferralStats(userId: string): Promise<{
   myCode: string | null;

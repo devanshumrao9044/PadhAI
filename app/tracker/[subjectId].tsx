@@ -30,10 +30,10 @@ export default function SubjectDetailScreen() {
   } = useApp();
 
   const subject = subjects.find(s => s.id === subjectId);
-  const chapters = useMemo(
-    () => getChaptersForSubject(subjectId ?? ''),
-    [getChaptersForSubject, subjectId],
-  );
+  // getChaptersForSubject is intentionally stable, so a useMemo depending only on
+  // that callback can retain the pre-insert chapter list. Recompute on each render
+  // to read the latest AppContext state after add/update/delete operations.
+  const chapters = getChaptersForSubject(subjectId ?? '');
 
   // -- Chapter Modal & Form States --
   const [modalVisible, setModalVisible] = useState(false);

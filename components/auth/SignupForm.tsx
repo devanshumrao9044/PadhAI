@@ -4,7 +4,6 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
-import { applyReferralCode } from '@/services/referralService';
 import AuthInput from './AuthInput';
 import AuthButton from './AuthButton';
 
@@ -71,28 +70,22 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
       const trimmedPassword = password.trim();
       const normalizedReferralCode = referralCode.trim().toUpperCase();
 
-      if (normalizedReferralCode) {
-        const { data: referrerId, error: referralLookupError } = await supabase.rpc(
-          'get_referrer_id',
-          { code: normalizedReferralCode },
-        );
-        if (referralLookupError || !referrerId) {
-          setApiError('Invalid referral code. Please check and try again.');
-          return;
-        }
-      }
-
       const { data: signupData, error: signupError } = await supabase.auth.signUp({
         email: trimmedEmail,
         password: trimmedPassword,
         options: {
-          data: { name: name.trim() },
+          data: {
+            name: name.trim(),
+            ...(normalizedReferralCode ? { referral_code: normalizedReferralCode } : {}),
+          },
         },
       });
 
       if (signupError) {
         const msg = signupError.message.toLowerCase();
-        if (
+        if (msg.includes('referral code') || (normalizedReferralCode && msg.includes('database error saving new user'))) {
+          setApiError('Invalid referral code. Please check and try again.');
+        } else if (
           msg.includes('already registered') ||
           msg.includes('already exists') ||
           msg.includes('user already')
@@ -105,11 +98,6 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
       }
 
       const signupUser = signupData?.user;
-
-      // Referral code check aur execute
-      if (normalizedReferralCode && signupUser) {
-        await applyReferralCode(signupUser.id, normalizedReferralCode);
-      }
 
       if (signupData?.session && signupUser) {
         const { data: profile } = await supabase

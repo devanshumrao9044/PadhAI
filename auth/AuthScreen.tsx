@@ -65,7 +65,9 @@ export default function AuthScreen() {
     try {
       if (mode === 'login') {
         await signIn(normalizedEmail, password);
-        router.replace('/(tabs)');
+        // AuthRouteGuard performs the redirect after AppContext has hydrated the profile.
+        // Navigating here would mount the dashboard one render too early and briefly show
+        // its generic Student fallback after relogin.
       } else if (mode === 'signup') {
         const result = await signUp(name, normalizedEmail, password, referralCode);
         if (result.requiresEmailConfirmation) {
@@ -78,10 +80,18 @@ export default function AuthScreen() {
       }
     } catch (submitError: any) {
       const errorMessage = submitError?.message ?? 'Something went wrong. Please try again.';
-      if (errorMessage.toLowerCase().includes('referral code')) {
-        setFieldErrors({ referralCode: errorMessage });
-      } else if (mode === 'login' && errorMessage.toLowerCase().includes('invalid login')) {
+      const normalizedError = errorMessage.toLowerCase();
+      if (
+        normalizedError.includes('referral code') ||
+        (mode === 'signup' && referralCode.trim().length > 0 && normalizedError.includes('database error saving new user'))
+      ) {
+        setFieldErrors({ referralCode: 'Invalid referral code. Please check it and try again.' });
+      } else if (mode === 'login' && normalizedError.includes('invalid login')) {
         setFieldErrors({ password: 'Email or password is incorrect.' });
+      } else if (mode === 'signup' && (normalizedError.includes('already registered') || normalizedError.includes('already been registered') || normalizedError.includes('user already exists'))) {
+        setFieldErrors({ email: 'An account with this email already exists. Try signing in instead.' });
+      } else if (mode === 'forgot' && normalizedError.includes('email address') && normalizedError.includes('invalid')) {
+        setFieldErrors({ email: 'We could not send a reset link to this address. Please check the email and try again.' });
       } else {
         setMessage(errorMessage);
       }

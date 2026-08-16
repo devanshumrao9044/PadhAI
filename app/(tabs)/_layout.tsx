@@ -105,12 +105,6 @@ export default function TabLayout() {
           href: null,
         }}
       />
-      <Tabs.Screen
-        name="index.web"
-        options={{
-          href: null,
-        }}
-      />
     </Tabs>
   );
 }
