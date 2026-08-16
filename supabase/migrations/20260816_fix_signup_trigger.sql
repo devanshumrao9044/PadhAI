@@ -59,7 +59,7 @@ BEGIN
     coalesce(new.raw_user_meta_data->>'name', 'Student'),
     new.email,
     ref_code,
-    referred_by_code
+    referrer_id
   )
   ON CONFLICT (id) DO UPDATE
     SET name = EXCLUDED.name,

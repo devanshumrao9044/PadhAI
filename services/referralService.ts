@@ -127,7 +127,7 @@ export async function applyReferralCode(
 
     const { error: userError } = await supabase
       .from('users')
-      .update({ referred_by: normalizedCode })
+      .update({ referred_by: referrerId })
       .eq('id', refereeId);
     if (userError) throw userError;
 

@@ -1,7 +1,5 @@
--- Enforce referral-code validation inside the auth trigger.
--- Invalid codes abort the signup transaction, so no auth account or public
--- profile is created for an invalid referral.
-BEGIN;
+-- Fix the auth signup trigger to store users.referred_by as the referrer's UUID.
+-- The production column is UUID and also references public.users(id).
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
@@ -62,7 +60,10 @@ BEGIN
     new.email,
     ref_code,
     referrer_id
-  );
+  )
+  ON CONFLICT (id) DO UPDATE
+    SET name = EXCLUDED.name,
+        email = EXCLUDED.email;
 
   IF referrer_id IS NOT NULL THEN
     INSERT INTO public.referrals (referrer_id, referee_id, status)
@@ -77,6 +78,8 @@ $function$;
 ALTER FUNCTION public.handle_new_user()
   SET search_path = pg_catalog, public;
 
-REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.handle_new_user()
+  FROM PUBLIC, anon, authenticated;
 
-COMMIT;
+-- The client-side referral helper must write the same UUID type to users.referred_by.
+-- See services/referralService.ts for the corresponding application fix.
