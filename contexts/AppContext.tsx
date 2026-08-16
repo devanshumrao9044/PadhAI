@@ -134,7 +134,7 @@ const mapChapter = (c: any): Chapter => ({
   completedDate: c.completed_date,
   displayOrder: c.display_order,
   createdAt: c.created_at,
-  isDeleted: c.is_deleted,
+  isDeleted: c.is_deleted === true || c.is_deleted === 'true' || c.is_deleted === 1,
 });
 
 const mapSession = (s: any): FocusSession => ({
@@ -219,6 +219,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const authGenerationRef = useRef(0);
   const syncInFlightRef = useRef(false);
   const weeklySettlementInFlightRef = useRef(false);
+  const deletedChapterIdsRef = useRef(new Set<string>());
 
   const addToSyncQueue = async (task: Omit<SyncTask, 'id'>) => {
     const existingQueue = (await getItem<SyncTask[]>(OFFLINE_QUEUE_KEY)) || [];
@@ -437,7 +438,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (loadGeneration !== authGenerationRef.current) return;
         if (subRes.data) setSubjects(subRes.data.map(mapSubject));
-        if (chapRes.data) setChapters(chapRes.data.map(mapChapter));
+        if (chapRes.data) {
+          const activeChapters = chapRes.data
+            .map(mapChapter)
+            .filter(chapter => !deletedChapterIdsRef.current.has(chapter.id) && chapter.isDeleted === false);
+          setChapters(activeChapters);
+          await setItem(StorageKeys.CHAPTERS, activeChapters);
+        }
         if (sessRes.data) {
           const cloudSess = sessRes.data.map(mapSession);
           setSessions(cloudSess);
@@ -470,6 +477,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setIsOnboardedState(false);
         setSubjects([]);
         setChapters([]);
+        deletedChapterIdsRef.current.clear();
         setTopics([]);
         setSessions([]);
         setDailySummaries([]);
@@ -499,6 +507,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setIsOnboardedState(false);
         setSubjects([]);
         setChapters([]);
+        deletedChapterIdsRef.current.clear();
         setTopics([]);
         setSessions([]);
         setDailySummaries([]);
@@ -614,6 +623,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteChapter = async (id: string) => {
     const { error } = await supabase.from('chapters').update({ is_deleted: true }).eq('id', id);
     if (error) throw error;
+    deletedChapterIdsRef.current.add(id);
     setChapters(prev => prev.filter(c => c.id !== id));
   };
 
@@ -621,6 +631,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!ids.length) return;
     const { error } = await supabase.from('chapters').update({ is_deleted: true }).in('id', ids);
     if (error) throw error;
+    ids.forEach(id => deletedChapterIdsRef.current.add(id));
     setChapters(prev => prev.filter(c => !ids.includes(c.id)));
   };
 

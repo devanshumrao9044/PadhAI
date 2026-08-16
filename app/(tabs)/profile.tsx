@@ -15,6 +15,7 @@ import { useAuthSession } from '@/auth/AuthSessionProvider';
 import { getLevelForUser, getXPProgressForUser, LEVELS } from '@/constants/levels';
 import XPBar from '@/components/ui/XPBar';
 import { WEEKLY_MARKER_PREFIX } from '@/services/weeklyXp';
+import { getRecentSessions } from '@/services/sessionHistory';
 
 export default function ProfileScreen() {
   const { colors, mode, toggleTheme } = useTheme();
@@ -85,6 +86,7 @@ export default function ProfileScreen() {
     .map((w: string) => w[0]).slice(0, 2).join('').toUpperCase() || 'ST', [user?.fullName]);
   const displayAvatar = (user as any)?.avatarUrl || editAvatarUrl;
 
+  const recentSessions = useMemo(() => getRecentSessions(sessions, 3), [sessions]);
   const recentXP = useMemo(
     () => xpLog.filter(transaction => !transaction.reason.startsWith(WEEKLY_MARKER_PREFIX)).slice(0, 10),
     [xpLog],
@@ -405,10 +407,10 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {sessions.length > 0 ? (
+        {recentSessions.length > 0 ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>RECENT SESSIONS</Text>
-            {sessions.slice(0, 3).map(session => (
+            <Text style={styles.cardTitle}>RECENT SESSIONS (LATEST 3)</Text>
+            {recentSessions.map(session => (
               <View key={session.id} style={styles.sessionRow}>
                 <MaterialIcons name={session.completed ? 'check-circle' : 'cancel'} size={17} color={session.completed ? colors.success : colors.danger} />
                 <View style={styles.settingInfo}>

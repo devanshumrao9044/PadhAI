@@ -13,7 +13,9 @@ type ThemeContextValue = {
 };
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
-const THEME_MODE_KEY = 'padhai_theme_mode';
+// Versioned key prevents the old light-mode test value from overriding the
+// restored original-dark default after this theme correction ships.
+const THEME_MODE_KEY = 'padhai_theme_mode_v2';
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>('dark');

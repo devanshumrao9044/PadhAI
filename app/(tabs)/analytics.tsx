@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, Dimensions, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { BarChart, LineChart } from 'react-native-chart-kit';
@@ -81,6 +82,13 @@ export default function AnalyticsScreen() {
     if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      void reload();
+      return undefined;
+    }, [reload]),
+  );
+
   useEffect(() => {
     if (!userId) return;
     if (channelRef.current) supabase.removeChannel(channelRef.current);
@@ -122,7 +130,7 @@ export default function AnalyticsScreen() {
     const totalSessions = sessions.length;
     const completedSessions = sessions.filter(s => s.completed).length;
     const focusScore = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
-    const activeChapters = chapters.filter(c => !c.isDeleted);
+    const activeChapters = chapters.filter(c => c.isDeleted === false);
     const doneChapters = activeChapters.filter(c => c.status === 'done').length;
     const weakChapters = activeChapters.filter(c => c.status === 'weak');
     return {
@@ -180,7 +188,7 @@ export default function AnalyticsScreen() {
 
     const doneCounts = dates.map(date => {
       return chapters.filter(
-        c => !c.isDeleted && c.status === 'done' && c.completedDate && c.completedDate <= date
+        c => c.isDeleted === false && c.status === 'done' && c.completedDate && c.completedDate <= date
       ).length;
     });
 
