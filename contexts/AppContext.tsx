@@ -138,8 +138,8 @@ const mapChapter = (c: any): Chapter => ({
 });
 
 const mapSession = (s: any): FocusSession => {
-  // Production focus_sessions has no chapter_id, broken_at_percent, or created_at.
-  // Local session objects may still provide those fields for UI-only context.
+  // chapter_id is supported by the production focus_sessions schema.
+  // broken_at_percent and created_at remain local/derived compatibility fields.
   const startedAt = s.started_at ?? s.startedAt ?? new Date().toISOString();
   const endedAt = s.ended_at ?? s.endedAt ?? startedAt;
   return {
@@ -169,6 +169,7 @@ const toFocusSessionDbPayload = (s: any) => {
     id: s.id,
     user_id: s.user_id ?? s.userId,
     subject_id: s.subject_id ?? s.subjectId ?? null,
+    chapter_id: s.chapter_id ?? s.chapterId ?? null,
     planned_minutes: s.planned_minutes ?? s.durationPlannedMins ?? 0,
     actual_minutes: s.actual_minutes ?? s.durationActualMins ?? 0,
     completed: typeof s.completed === 'boolean' ? s.completed : !broken,
@@ -461,7 +462,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const [subRes, chapRes, sessRes, sumRes, xpRes] = await Promise.all([
           supabase.from('subjects').select('id,user_id,name,color_hex,icon_name,display_order,created_at,is_deleted').eq('user_id', userId).eq('is_deleted', false).order('display_order', { ascending: true }),
           supabase.from('chapters').select('id,subject_id,user_id,name,status,planned_date,completed_date,display_order,created_at,is_deleted').eq('user_id', userId).eq('is_deleted', false).order('display_order', { ascending: true }),
-          supabase.from('focus_sessions').select('id,user_id,subject_id,planned_minutes,actual_minutes,completed,broken,xp_earned,xp_deducted,break_reason,started_at,ended_at,comeback_bonus').eq('user_id', userId).order('started_at', { ascending: false }).limit(200),
+          supabase.from('focus_sessions').select('id,user_id,subject_id,chapter_id,planned_minutes,actual_minutes,completed,broken,xp_earned,xp_deducted,break_reason,started_at,ended_at,comeback_bonus').eq('user_id', userId).order('started_at', { ascending: false }).limit(200),
           supabase.from('daily_summary').select('id,user_id,date,total_focus_minutes,sessions_completed,sessions_broken,goal_minutes,goal_met,xp_earned').eq('user_id', userId).order('date', { ascending: false }).limit(100),
           supabase.from('xp_transactions').select('id,user_id,amount,reason,created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
         ]);
@@ -745,6 +746,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         id: sessionId,
         user_id: activeUser?.id ?? '',
         subject_id: activeSession?.subjectId ?? null,
+        chapter_id: activeSession?.chapterId ?? null,
         planned_minutes: activeSession?.plannedMins ?? actualMins,
         actual_minutes: actualMins,
         completed: true,
@@ -758,7 +760,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       const sessionObj = mapSession({
         ...sessionPayload,
-        chapter_id: activeSession?.chapterId ?? null,
         broken_at_percent: 100,
       });
       
@@ -807,6 +808,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         id: sessionId,
         user_id: activeUser?.id ?? '',
         subject_id: activeSession?.subjectId ?? null,
+        chapter_id: activeSession?.chapterId ?? null,
         planned_minutes: planned,
         actual_minutes: actualMins,
         completed: false,
@@ -820,7 +822,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       const sessionObj = mapSession({
         ...sessionPayload,
-        chapter_id: activeSession?.chapterId ?? null,
         broken_at_percent: brokenAt,
       });
       
