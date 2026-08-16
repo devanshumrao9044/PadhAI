@@ -14,13 +14,14 @@ import { useApp } from '@/hooks/useApp';
 import { useAuthSession } from '@/auth/AuthSessionProvider';
 import { getLevelForUser, getXPProgressForUser, LEVELS } from '@/constants/levels';
 import XPBar from '@/components/ui/XPBar';
-import { WEEKLY_MARKER_PREFIX } from '@/services/weeklyXp';
 import { getRecentSessions } from '@/services/sessionHistory';
+import { fetchReferralStats } from '@/services/referralService';
+import { getWeeklyZone } from '@/services/weeklyXp';
 
 export default function ProfileScreen() {
   const { colors, mode, toggleTheme } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { user, setUser, sessions, chapters, xpLog } = useApp();
+  const { user, setUser, sessions, chapters } = useApp();
   const router = useRouter();
   const { signOut, signingOut } = useAuthSession();
   const userId = user?.id;
@@ -40,6 +41,12 @@ export default function ProfileScreen() {
   const [alertConfig, setAlertConfig] = useState<{
     visible: boolean; title: string; message: string; isSignOut?: boolean;
   }>({ visible: false, title: '', message: '' });
+  const [referralStats, setReferralStats] = useState({
+    myCode: null as string | null,
+    completed: 0,
+    pending: 0,
+    hasUnlockedReward: false,
+  });
 
   useEffect(() => {
     async function fetchRankInfo() {
@@ -50,16 +57,10 @@ export default function ProfileScreen() {
           const total = data.length;
           const safeTotal = Math.max(1, total);
           const myEntry = data.find((e: any) => e.id === userId);
-          const rank = myEntry?.rank ?? safeTotal + 1;
-          const demotionCount = Math.floor(safeTotal * 0.4);
-          const safetyCount = Math.floor(safeTotal * 0.35);
-          const demotionPct = (demotionCount / safeTotal) * 100;
-          const safetyPct = (safetyCount / safeTotal) * 100;
-          const rankPct = ((safeTotal - rank) / safeTotal) * 100;
-          let zone = 'Demotion';
-          let color = colors.danger;
-          if (rankPct >= demotionPct + safetyPct) { zone = 'Promotion'; color = colors.success; }
-          else if (rankPct >= demotionPct) { zone = 'Safety'; color = colors.warning; }
+          const rank = Math.min(safeTotal, Math.max(1, Number(myEntry?.rank ?? safeTotal)));
+          const weeklyZone = getWeeklyZone(rank, safeTotal);
+          const zone = weeklyZone === 'promotion' ? 'Promotion' : weeklyZone === 'safety' ? 'Safety' : 'Demotion';
+          const color = weeklyZone === 'promotion' ? colors.success : weeklyZone === 'safety' ? colors.warning : colors.danger;
           setRankInfo({ rank, total, zone, color });
         }
       } catch (e) {
@@ -68,6 +69,18 @@ export default function ProfileScreen() {
     }
     fetchRankInfo();
   }, [userId, colors]);
+
+  useEffect(() => {
+    if (!userId) {
+      setReferralStats({ myCode: null, completed: 0, pending: 0, hasUnlockedReward: false });
+      return;
+    }
+    let active = true;
+    fetchReferralStats(userId).then(stats => {
+      if (active) setReferralStats(stats);
+    });
+    return () => { active = false; };
+  }, [userId]);
 
   const level = useMemo(() => getLevelForUser({ xpTotal: user?.xpTotal ?? 0, levelRank: user?.levelRank }), [user?.xpTotal, user?.levelRank]);
   const progress = useMemo(() => getXPProgressForUser({ xpTotal: user?.xpTotal ?? 0, levelRank: user?.levelRank }), [user?.xpTotal, user?.levelRank]);
@@ -87,11 +100,6 @@ export default function ProfileScreen() {
   const displayAvatar = (user as any)?.avatarUrl || editAvatarUrl;
 
   const recentSessions = useMemo(() => getRecentSessions(sessions, 3), [sessions]);
-  const recentXP = useMemo(
-    () => xpLog.filter(transaction => !transaction.reason.startsWith(WEEKLY_MARKER_PREFIX)).slice(0, 10),
-    [xpLog],
-  );
-
   if (!user) return null;
 
   const showAlert = (title: string, message: string, isSignOut = false) => {
@@ -423,27 +431,28 @@ export default function ProfileScreen() {
           </View>
         ) : null}
 
-        {/* Recent XP */}
-        {recentXP.length > 0 ? (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>RECENT XP</Text>
-            {recentXP.map(tx => (
-              <View key={tx.id} style={styles.xpRow}>
-                <MaterialIcons
-                  name={tx.amount > 0 ? 'add-circle' : 'remove-circle'}
-                  size={16}
-                  color={tx.amount > 0 ? colors.success : colors.danger}
-                />
-                <Text style={styles.xpReason}>{tx.reason.replace(/_/g, ' ')}</Text>
-                <Text style={[styles.xpAmount, {
-                  color: tx.amount > 0 ? colors.success : colors.danger,
-                }]}>
-                  {tx.amount > 0 ? '+' : ''}{tx.amount} XP
-                </Text>
-              </View>
-            ))}
+        {/* Referral Rewards */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>REFERRAL REWARDS</Text>
+          <View style={styles.xpRow}>
+            <MaterialIcons name="group" size={16} color={colors.primary} />
+            <Text style={styles.xpReason}>Completed referrals</Text>
+            <Text style={[styles.xpAmount, { color: colors.primary }]}>{referralStats.completed}</Text>
           </View>
-        ) : null}
+          <View style={styles.xpRow}>
+            <MaterialIcons name="hourglass-empty" size={16} color={colors.warning} />
+            <Text style={styles.xpReason}>Pending referrals</Text>
+            <Text style={[styles.xpAmount, { color: colors.warning }]}>{referralStats.pending}</Text>
+          </View>
+          <Text style={styles.referralStatus}>
+            {referralStats.hasUnlockedReward
+              ? 'Reward unlocked'
+              : `${Math.max(0, 5 - referralStats.completed)} more completed referral${Math.max(0, 5 - referralStats.completed) === 1 ? '' : 's'} to unlock your reward`}
+          </Text>
+          {referralStats.myCode ? (
+            <Text style={styles.referralCode}>Code: {referralStats.myCode.toUpperCase()}</Text>
+          ) : null}
+        </View>
       </ScrollView>
 
       {/* Edit Modal */}
@@ -638,6 +647,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   sessionRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.border },
   xpReason: { flex: 1, fontSize: FontSize.sm, color: colors.textSecondary, textTransform: 'capitalize' },
   xpAmount: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
+  referralStatus: { fontSize: FontSize.xs, color: colors.textSecondary, marginTop: 6 },
+  referralCode: { fontSize: FontSize.xs, color: colors.primary, fontWeight: FontWeight.bold, marginTop: 8 },
   modalOverlay: { flex: 1, backgroundColor: colors.overlay },
   modalSheet: { backgroundColor: colors.surface, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.lg, paddingBottom: Spacing.xxl, marginTop: 'auto', borderWidth: 1, borderColor: colors.border },
   modalTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: colors.textPrimary, marginBottom: Spacing.lg, textAlign: 'center' },

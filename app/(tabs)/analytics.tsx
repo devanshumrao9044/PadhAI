@@ -65,7 +65,7 @@ export default function AnalyticsScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const chartConfig = useMemo(() => createChartConfig(colors), [colors]);
   const lineChartConfig = useMemo(() => createLineChartConfig(colors), [colors]);
-  const { user, sessions, last7Days: last7, last90Days: last90, chapters, getDailySummary, reload } = useApp();
+  const { user, sessions, last7Days: last7, last90Days: last90, chapters, chapterAnalytics, getDailySummary, reload } = useApp();
   const userId = user?.id ?? null;
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -131,8 +131,13 @@ export default function AnalyticsScreen() {
     const completedSessions = sessions.filter(s => s.completed).length;
     const focusScore = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
     const activeChapters = chapters.filter(c => c.isDeleted === false);
+    const trackedChapterIds = new Set(
+      chapterAnalytics
+        .filter(row => row.totalSessions > 0 || row.totalMinutes > 0)
+        .map(row => row.chapterId),
+    );
     const doneChapters = activeChapters.filter(c => c.status === 'done').length;
-    const weakChapters = activeChapters.filter(c => c.status === 'weak');
+    const weakChapters = activeChapters.filter(c => c.status === 'weak' && trackedChapterIds.has(c.id));
     return {
       totalMins,
       totalSessions,
@@ -142,7 +147,7 @@ export default function AnalyticsScreen() {
       totalChapters: activeChapters.length,
       weakChapters,
     };
-  }, [chapters, last7, sessions]);
+  }, [chapterAnalytics, chapters, last7, sessions]);
 
   // ── Today Goal Progress ───────────────────────────────────────────────────
   const todaySummary = getDailySummary(today);

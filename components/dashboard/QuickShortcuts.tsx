@@ -5,7 +5,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeColors } from '@/constants/theme';
 
 const shortcuts = [
-  { emoji: '⏱️', label: 'Focus', route: '/(tabs)/focus', color: 'primary' as const },
+  { emoji: '⏱️', label: 'Study Session', route: '/(tabs)/focus', color: 'primary' as const },
   { emoji: '📚', label: 'Tracker', route: '/(tabs)/tracker', color: 'accent' as const },
   { emoji: '📊', label: 'Analytics', route: '/(tabs)/analytics', color: 'success' as const },
   { emoji: '👤', label: 'Profile', route: '/(tabs)/profile', color: 'warning' as const },

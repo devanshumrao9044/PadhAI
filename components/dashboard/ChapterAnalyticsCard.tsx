@@ -19,7 +19,11 @@ function getStatusColor(status: ChapterAnalytics['chapterStatus'], colors: Theme
 export default function ChapterAnalyticsCard({ analytics }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const visibleRows = useMemo(() => buildChapterAnalyticsViewModel(analytics), [analytics]);
+  const studiedAnalytics = useMemo(
+    () => analytics.filter(row => row.totalSessions > 0 || row.totalMinutes > 0),
+    [analytics],
+  );
+  const visibleRows = useMemo(() => buildChapterAnalyticsViewModel(studiedAnalytics), [studiedAnalytics]);
 
   return (
     <View style={styles.card}>
@@ -32,7 +36,7 @@ export default function ChapterAnalyticsCard({ analytics }: Props) {
       </View>
 
       {visibleRows.length === 0 ? (
-        <Text style={styles.empty}>No active chapters yet.</Text>
+        <Text style={styles.empty}>No chapter-linked sessions yet. Start a Study Session from Tracker.</Text>
       ) : (
         <>
           {visibleRows.map(view => {
@@ -55,8 +59,8 @@ export default function ChapterAnalyticsCard({ analytics }: Props) {
               </View>
             );
           })}
-          {analytics.length > visibleRows.length ? (
-            <Text style={styles.more}>+{analytics.length - visibleRows.length} more chapters</Text>
+          {studiedAnalytics.length > visibleRows.length ? (
+            <Text style={styles.more}>+{studiedAnalytics.length - visibleRows.length} more studied chapters</Text>
           ) : null}
         </>
       )}

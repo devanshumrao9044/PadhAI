@@ -20,7 +20,7 @@ interface Props {
 
 const MENU_ITEMS = [
   { icon: 'home' as const,           label: 'Home',          route: '/(tabs)'           },
-  { icon: 'timer' as const,          label: 'Focus Timer',   route: '/(tabs)/focus'     },
+  { icon: 'timer' as const,          label: 'Study Session', route: '/(tabs)/focus'     },
   { icon: 'menu-book' as const,      label: 'Study Tracker', route: '/(tabs)/tracker'   },
   { icon: 'bar-chart' as const,      label: 'Analytics',     route: '/(tabs)/analytics' },
   { icon: 'leaderboard' as const,    label: 'Leaderboard',   route: '/(tabs)/leaderboard' },

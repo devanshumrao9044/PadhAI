@@ -235,6 +235,12 @@ export default function SubjectDetailScreen() {
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <TouchableOpacity
               style={[styles.addBtn, { backgroundColor: colors.surfaceVariant }]}
+              onPress={() => router.push({ pathname: '/(tabs)/focus', params: { subjectId: subject.id } } as any)}
+            >
+              <MaterialIcons name="timer" size={20} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.addBtn, { backgroundColor: colors.surfaceVariant }]}
               onPress={() => setIsSelectionMode(true)}
             >
               <MaterialIcons name="checklist" size={20} color={colors.textPrimary} />

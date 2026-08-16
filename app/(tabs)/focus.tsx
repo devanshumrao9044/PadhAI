@@ -1,10 +1,10 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable,
   TextInput, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
@@ -18,11 +18,15 @@ export default function FocusScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
-  const { subjects, startSession } = useApp();
+  const { subjectId: routeSubjectId, chapterId: routeChapterId } = useLocalSearchParams<{ subjectId?: string; chapterId?: string }>();
+  const { subjects, chapters, startSession } = useApp();
+  const initialSubjectId = typeof routeSubjectId === 'string' ? routeSubjectId : null;
+  const initialChapterId = typeof routeChapterId === 'string' ? routeChapterId : null;
   const [selectedMins, setSelectedMins] = useState(25);
   const [customMode, setCustomMode] = useState(false);
   const [customInput, setCustomInput] = useState('');
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(initialSubjectId);
+  const [selectedChapterId, setSelectedChapterId] = useState<string | null>(initialChapterId);
   const [starting, setStarting] = useState(false);
   const inputRef = useRef<TextInput>(null);
 
@@ -50,7 +54,16 @@ export default function FocusScreen() {
     ? (parseInt(customInput, 10) || 0)
     : selectedMins;
 
-  const activeSubjects = subjects.filter(s => !s.isDeleted);
+  const activeSubjects = useMemo(() => subjects.filter(s => !s.isDeleted), [subjects]);
+  const activeChapters = useMemo(
+    () => chapters.filter(chapter => !chapter.isDeleted && chapter.subjectId === selectedSubjectId),
+    [chapters, selectedSubjectId],
+  );
+  useEffect(() => {
+    if (selectedChapterId && !activeChapters.some(chapter => chapter.id === selectedChapterId)) {
+      setSelectedChapterId(null);
+    }
+  }, [activeChapters, selectedChapterId]);
   const expectedXP = calculateSessionXP(effectiveMins);
   const isCustomSelected = customMode;
   const isLockInDisabled = starting || effectiveMins < 1 || effectiveMins > 480;
@@ -59,7 +72,7 @@ export default function FocusScreen() {
     if (isLockInDisabled) return;
     setStarting(true);
     try {
-      await startSession(effectiveMins, selectedSubjectId, null);
+      await startSession(effectiveMins, selectedSubjectId, selectedChapterId);
       router.push('/focus/active');
     } catch {
       Alert.alert('Could Not Start Session', 'Please check your connection and try again.');
@@ -72,8 +85,8 @@ export default function FocusScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
-        <Text style={styles.title}>Focus Session</Text>
-        <Text style={styles.subtitle}>Kitne der padna hai?</Text>
+        <Text style={styles.title}>Study Session</Text>
+        <Text style={styles.subtitle}>Study Tracker ke chapter ke saath session link karo.</Text>
 
         {/* Duration selector */}
         <Text style={styles.sectionLabel}>DURATION CHUNO</Text>
@@ -148,7 +161,7 @@ export default function FocusScreen() {
               <View style={styles.subjectRow}>
                 <Pressable
                   style={[styles.subjectChip, selectedSubjectId === null ? styles.subjectChipActive : null]}
-                  onPress={() => setSelectedSubjectId(null)}
+                    onPress={() => { setSelectedSubjectId(null); setSelectedChapterId(null); }}
                 >
                   <Text style={[styles.subjectChipText, selectedSubjectId === null ? styles.subjectChipTextActive : null]}>
                     General
@@ -159,7 +172,7 @@ export default function FocusScreen() {
                     key={s.id}
                     style={[styles.subjectChip, selectedSubjectId === s.id ? styles.subjectChipActive : null,
                       selectedSubjectId === s.id ? { borderColor: s.colorHex, backgroundColor: s.colorHex + '22' } : null]}
-                    onPress={() => setSelectedSubjectId(s.id)}
+                    onPress={() => { setSelectedSubjectId(s.id); setSelectedChapterId(null); }}
                   >
                     <View style={[styles.subjectDot, { backgroundColor: s.colorHex }]} />
                     <Text style={[styles.subjectChipText, selectedSubjectId === s.id ? styles.subjectChipTextActive : null]}>
@@ -171,6 +184,40 @@ export default function FocusScreen() {
             </ScrollView>
           </View>
         ) : null}
+
+        {selectedSubjectId && activeChapters.length > 0 ? (
+          <View>
+            <Text style={styles.sectionLabel}>TRACKER CHAPTER (OPTIONAL)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.subjectScroll}>
+              <View style={styles.subjectRow}>
+                <Pressable
+                  style={[styles.subjectChip, selectedChapterId === null ? styles.subjectChipActive : null]}
+                  onPress={() => setSelectedChapterId(null)}
+                >
+                  <Text style={[styles.subjectChipText, selectedChapterId === null ? styles.subjectChipTextActive : null]}>
+                    General
+                  </Text>
+                </Pressable>
+                {activeChapters.map(chapter => (
+                  <Pressable
+                    key={chapter.id}
+                    style={[styles.subjectChip, selectedChapterId === chapter.id ? styles.subjectChipActive : null]}
+                    onPress={() => setSelectedChapterId(chapter.id)}
+                  >
+                    <MaterialIcons name="menu-book" size={14} color={selectedChapterId === chapter.id ? colors.primary : colors.textSecondary} />
+                    <Text style={[styles.subjectChipText, selectedChapterId === chapter.id ? styles.subjectChipTextActive : null]} numberOfLines={1}>
+                      {chapter.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        ) : selectedSubjectId ? (
+          <Text style={styles.trackerHint}>No active chapters in this subject. Add one in Study Tracker to link your session.</Text>
+        ) : (
+          <Text style={styles.trackerHint}>Select a Study Tracker subject and chapter to keep this session synced with your tracker.</Text>
+        )}
 
         {/* Rules reminder */}
         <View style={styles.rulesCard}>
@@ -299,6 +346,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   subjectDot: { width: 8, height: 8, borderRadius: 4 },
   subjectChipText: { fontSize: FontSize.sm, color: colors.textSecondary, fontWeight: FontWeight.medium },
   subjectChipTextActive: { color: colors.textPrimary },
+  trackerHint: { fontSize: FontSize.sm, color: colors.textSecondary, marginBottom: Spacing.lg, lineHeight: 20 },
   rulesCard: {
     backgroundColor: colors.surface, borderRadius: Radius.lg,
     borderWidth: 1, borderColor: colors.border,

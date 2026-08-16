@@ -10,6 +10,7 @@ import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/
 import { LEVELS, getLevelForUser } from '@/constants/levels';
 import { useApp } from '@/hooks/useApp';
 import { supabase } from '@/services/supabase';
+import { getWeeklyZone } from '@/services/weeklyXp';
 
 interface LeaderboardEntry {
   id: string;
@@ -75,7 +76,8 @@ function LevelBadge({
 function RankZoneBar({ rank, total }: { rank: number; total: number }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const safeTotal = Math.max(1, total);
+  const safeTotal = Math.max(1, Math.floor(total));
+  const safeRank = Math.min(safeTotal, Math.max(1, Math.floor(rank)));
   const demotionCount = Math.floor(safeTotal * 0.4);
   const safetyCount = Math.floor(safeTotal * 0.35);
   const promotionCount = safeTotal - demotionCount - safetyCount;
@@ -84,11 +86,10 @@ function RankZoneBar({ rank, total }: { rank: number; total: number }) {
   const safetyPct = (safetyCount / safeTotal) * 100;
   const promotionPct = (promotionCount / safeTotal) * 100;
 
-  const rankPct = ((safeTotal - rank) / safeTotal) * 100; // higher rank = higher pct
-
-  let zone: 'demotion' | 'safety' | 'promotion' = 'demotion';
-  if (rankPct >= demotionPct + safetyPct) zone = 'promotion';
-  else if (rankPct >= demotionPct) zone = 'safety';
+  // Rank 1 is best and belongs at the promotion end of the bar.
+  // A one-player leaderboard is treated as fully promoted rather than demotion.
+  const rankPct = safeTotal <= 1 ? 100 : ((safeTotal - safeRank) / (safeTotal - 1)) * 100;
+  const zone = getWeeklyZone(safeRank, safeTotal);
 
   const zoneColor = zone === 'promotion' ? colors.success : zone === 'safety' ? colors.warning : colors.danger;
 
@@ -102,7 +103,7 @@ function RankZoneBar({ rank, total }: { rank: number; total: number }) {
 
       {/* Rank badge above bar */}
       <View style={[styles.rankBadgeAbove, { left: `${rankPct}%` as any, borderColor: zoneColor }]}>
-        <Text style={[styles.rankBadgeAboveText, { color: zoneColor }]}>Rank: {rank}</Text>
+        <Text style={[styles.rankBadgeAboveText, { color: zoneColor }]}>Rank: {safeRank}</Text>
       </View>
 
       {/* The bar */}
