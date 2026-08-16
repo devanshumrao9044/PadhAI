@@ -35,6 +35,7 @@ export default function StreakBrokenScreen() {
   const message =
     STREAK_BROKEN_MESSAGES[Math.floor(Math.random() * STREAK_BROKEN_MESSAGES.length)];
 
+  // Animation refs are stable and this recovery entrance intentionally runs once.
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
@@ -62,7 +63,7 @@ export default function StreakBrokenScreen() {
       pulse.stop();
       clearTimeout(pulseTimeout);
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleStartChallenge = async () => {
     if (starting) return;

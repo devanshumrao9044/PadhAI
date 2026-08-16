@@ -21,6 +21,7 @@ function ConfettiDot({
   const opacity = useRef(new Animated.Value(0)).current;
   const rotate = useRef(new Animated.Value(0)).current;
 
+  // Confetti inputs are fixed for the particle lifetime; this loop intentionally starts once.
   useEffect(() => {
     const anim = Animated.loop(
       Animated.sequence([
@@ -40,7 +41,7 @@ function ConfettiDot({
     );
     anim.start();
     return () => anim.stop();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const spin = rotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
@@ -114,6 +115,7 @@ export default function FocusCompleteScreen() {
     triggerReferralCheck();
   }, []);
 
+  // Animation refs are stable and route params are immutable for this mounted screen.
   useEffect(() => {
     Animated.sequence([
       Animated.spring(scaleAnim, {
@@ -156,7 +158,7 @@ export default function FocusCompleteScreen() {
         ]).start();
       }, isComeback ? 1000 : 700);
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const showConfetti = isComeback || isRecovery;
   const confettiParticles = showConfetti

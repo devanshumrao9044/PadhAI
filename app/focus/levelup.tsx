@@ -16,6 +16,7 @@ function Particle({ color, delay, x, y }: { color: string; delay: number; x: num
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0)).current;
 
+  // Particle inputs are fixed for the particle lifetime; this loop intentionally starts once.
   useEffect(() => {
     const anim = Animated.loop(
       Animated.sequence([
@@ -36,7 +37,7 @@ function Particle({ color, delay, x, y }: { color: string; delay: number; x: num
     );
     anim.start();
     return () => anim.stop();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <Animated.View
@@ -92,6 +93,7 @@ export default function LevelUpScreen() {
   const rankBadgeScale = useRef(new Animated.Value(0.6)).current;
   const rankBadgeOpacity = useRef(new Animated.Value(0)).current;
 
+  // Animation refs and route params are immutable for this mounted screen.
   useEffect(() => {
     // Flash → badge slam in → text slide up → button fade
     Animated.sequence([
@@ -131,7 +133,7 @@ export default function LevelUpScreen() {
         ])
       ).start();
     }, 700);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const spin = beamRotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   const bgColor = bgFlash.interpolate({

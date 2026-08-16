@@ -40,6 +40,7 @@ export default function SideDrawer({ visible, onClose }: Props) {
 
   const level = user ? getLevelForUser(user) : null;
 
+  // Animated refs are stable; only `visible` should control drawer open/close transitions.
   useEffect(() => {
     if (visible) {
       setMounted(true);
@@ -61,7 +62,7 @@ export default function SideDrawer({ visible, onClose }: Props) {
         }),
       ]).start(() => setMounted(false));
     }
-  }, [visible]);
+  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const navigate = (route: string) => {
     onClose();

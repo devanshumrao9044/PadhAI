@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, StyleSheet, ScrollView,
   ActivityIndicator, RefreshControl, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,6 +29,7 @@ function LevelBadge({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const scale = useRef(new Animated.Value(isCurrent ? 0.8 : 0.7)).current;
 
+  // `scale` is a stable ref and this entrance animation intentionally runs once.
   useEffect(() => {
     Animated.spring(scale, {
       toValue: 1,
@@ -36,7 +37,7 @@ function LevelBadge({
       friction: 7,
       useNativeDriver: true,
     }).start();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const badgeSize = size === 'lg' ? 80 : 54;
   const fontSize = size === 'lg' ? 32 : 20;

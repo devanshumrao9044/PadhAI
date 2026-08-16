@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, BackHandler, AppState, Platform
 } from 'react-native';
@@ -54,6 +54,27 @@ export default function FocusActiveScreen() {
   const plannedMins = activeSession?.plannedMins ?? 25;
   const plannedSecs = plannedMins * 60;
 
+  const liveStateRef = useRef({
+    activeSession,
+    completeSession,
+    breakSession,
+    streakRecoveryPending,
+    lostStreakCount,
+    setStreakRecoveryPending,
+    router,
+    plannedSecs,
+  });
+  liveStateRef.current = {
+    activeSession,
+    completeSession,
+    breakSession,
+    streakRecoveryPending,
+    lostStreakCount,
+    setStreakRecoveryPending,
+    router,
+    plannedSecs,
+  };
+
   const subjectName = activeSession?.subjectId
     ? subjects.find(s => s.id === activeSession.subjectId)?.name ?? 'General'
     : 'General';
@@ -62,8 +83,16 @@ export default function FocusActiveScreen() {
     ? subjects.find(s => s.id === activeSession.subjectId)?.colorHex ?? colors.primary
     : colors.primary;
 
-  const handleComplete = async () => {
-    if (isCompletingRef.current || !activeSession) return;
+  const handleComplete = useCallback(async () => {
+    const {
+      activeSession: sessionToComplete,
+      completeSession: complete,
+      streakRecoveryPending: isRecovery,
+      lostStreakCount: recoveredStreak,
+      setStreakRecoveryPending: setRecovery,
+      router: currentRouter,
+    } = liveStateRef.current;
+    if (isCompletingRef.current || !sessionToComplete) return;
     isCompletingRef.current = true;
     setIsProcessing(true);
 
@@ -71,30 +100,28 @@ export default function FocusActiveScreen() {
 
     try {
       const actualMins = Math.floor(elapsedRef.current / 60);
-      const session = await completeSession(activeSession.sessionId, actualMins);
-      const isRecovery = streakRecoveryPending;
-      const recoveredStreak = lostStreakCount;
+      const session = await complete(sessionToComplete.sessionId, actualMins);
 
       const comebackParam = (session as any)?.comebackBonus > 0 ? '1' : '0';
       const xpEarned = session?.xpEarned ?? 0;
 
-      if (isRecovery) setStreakRecoveryPending(false, 0);
+      if (isRecovery) setRecovery(false, 0);
 
       if (session?.leveledUp && session?.newLevelRank) {
         const { LEVELS } = await import('@/constants/levels');
         const levelDef = LEVELS.find(l => l.rank === session.newLevelRank);
         const totalXPAfter = session?.totalXP ?? xpEarned;
-        router.replace(
+        currentRouter.replace(
           `/focus/levelup?newLevel=${session.newLevelRank}&title=${encodeURIComponent(levelDef?.realisticTitle ?? '')}&examTitle=${encodeURIComponent(levelDef?.examTitle ?? '')}&color=${encodeURIComponent(levelDef?.color ?? '#A855F7')}&totalXP=${totalXPAfter}&xpEarned=${xpEarned}&recovery=${isRecovery ? '1' : '0'}&lostStreak=${recoveredStreak}`
         );
       } else {
-        router.replace(`/focus/complete?xp=${xpEarned}&comeback=${comebackParam}&recovery=${isRecovery ? '1' : '0'}&lostStreak=${recoveredStreak}`);
+        currentRouter.replace(`/focus/complete?xp=${xpEarned}&comeback=${comebackParam}&recovery=${isRecovery ? '1' : '0'}&lostStreak=${recoveredStreak}`);
       }
     } catch (error) {
-      console.error("Silent Complete Error:", error);
-      router.replace(`/focus/complete?xp=0&comeback=0`);
+      console.error('Silent Complete Error:', error);
+      currentRouter.replace('/focus/complete?xp=0&comeback=0');
     }
-  };
+  }, []);
 
   const handleBreak = async () => {
     if (isCompletingRef.current || !activeSession) return;
@@ -113,10 +140,10 @@ export default function FocusActiveScreen() {
     }
   };
 
-  const tick = () => {
+  const tick = useCallback(() => {
     if (isCompletingRef.current) return;
     const currentElapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-    const currentRemaining = Math.max(0, plannedSecs - currentElapsed);
+    const currentRemaining = Math.max(0, liveStateRef.current.plannedSecs - currentElapsed);
 
     elapsedRef.current = currentElapsed;
     setElapsed(currentElapsed);
@@ -124,20 +151,21 @@ export default function FocusActiveScreen() {
     if (currentRemaining <= 0) {
       handleComplete();
     }
-  };
+  }, [handleComplete]);
 
   useEffect(() => {
     if (isLoading) return;
-    if (!activeSession) {
-      router.replace('/(tabs)/focus');
+    const currentSession = liveStateRef.current.activeSession;
+    const currentRouter = liveStateRef.current.router;
+    if (!currentSession) {
+      currentRouter.replace('/(tabs)/focus');
       return;
     }
 
-    startTimeRef.current = activeSession.startedAt
-      ? new Date(activeSession.startedAt).getTime()
+    startTimeRef.current = currentSession.startedAt
+      ? new Date(currentSession.startedAt).getTime()
       : Date.now();
     const alreadyElapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-    const initialRemaining = Math.max(0, plannedSecs - alreadyElapsed);
     elapsedRef.current = alreadyElapsed;
     setElapsed(alreadyElapsed);
     intervalRef.current = setInterval(tick, 500);
@@ -187,10 +215,12 @@ export default function FocusActiveScreen() {
       }
       backSubRef.current = null;
     };
-  }, [isLoading]);
+  }, [isLoading, activeSession?.sessionId, activeSession?.startedAt, plannedSecs, tick]);
 
   useEffect(() => {
-    if (!activeSession?.sessionId) return;
+    const sessionId = activeSession?.sessionId;
+    const currentRouter = liveStateRef.current.router;
+    if (!sessionId) return;
 
     if (rtChannelRef.current) {
       supabase.removeChannel(rtChannelRef.current);
@@ -198,7 +228,7 @@ export default function FocusActiveScreen() {
     }
 
     rtChannelIdRef.current += 1;
-    const channelName = `focus-active-${activeSession.sessionId}-${rtChannelIdRef.current}`;
+    const channelName = `focus-active-${sessionId}-${rtChannelIdRef.current}`;
 
     const channel = supabase
       .channel(channelName)
@@ -208,7 +238,7 @@ export default function FocusActiveScreen() {
           event: 'UPDATE',
           schema: 'public',
           table: 'focus_sessions',
-          filter: `id=eq.${activeSession.sessionId}`,
+          filter: `id=eq.${sessionId}`,
         },
         (payload: any) => {
           if (isCompletingRef.current) return;
@@ -217,14 +247,14 @@ export default function FocusActiveScreen() {
           if (updated?.broken === false && updated?.ended_at) {
             isCompletingRef.current = true;
             if (intervalRef.current) clearInterval(intervalRef.current);
-            router.replace(`/focus/complete?xp=${updated.xp_earned ?? 0}`);
+            currentRouter.replace(`/focus/complete?xp=${updated.xp_earned ?? 0}`);
             return;
           }
 
           if (updated?.broken === true) {
             isCompletingRef.current = true;
             if (intervalRef.current) clearInterval(intervalRef.current);
-            router.replace(`/focus/broken?penalty=${updated.xp_deducted ?? 0}`);
+            currentRouter.replace(`/focus/broken?penalty=${updated.xp_deducted ?? 0}`);
             return;
           }
         }
