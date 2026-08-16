@@ -10,6 +10,7 @@ import GreetingCard from '../../components/dashboard/GreetingCard';
 import StatsRow from '../../components/dashboard/StatsRow';
 import QuickShortcuts from '../../components/dashboard/QuickShortcuts';
 import QuoteCard from '../../components/dashboard/QuoteCard';
+import ChapterAnalyticsCard from '../../components/dashboard/ChapterAnalyticsCard';
 import { useApp } from '@/hooks/useApp';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeColors } from '@/constants/theme';
@@ -18,7 +19,7 @@ export default function Dashboard() {
   const router = useRouter();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { user, chapters, sessions, dailySummaries, reload } = useApp();
+  const { user, chapters, sessions, dailySummaries, chapterAnalytics, reload } = useApp();
   const [refreshing, setRefreshing] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const channelIdRef = useRef(0);
@@ -121,6 +122,7 @@ export default function Dashboard() {
           chaptersTotal={stats.chaptersTotal}
           chaptersDone={stats.chaptersDone}
         />
+        <ChapterAnalyticsCard analytics={chapterAnalytics} />
         <QuickShortcuts />
         <QuoteCard />
       </ScrollView>

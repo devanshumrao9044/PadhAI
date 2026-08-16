@@ -15,7 +15,7 @@ import { getItem, setItem, removeItem, StorageKeys } from '@/services/storage';
 import { supabase } from '@/services/supabase';
 import {
   UserProfile, Subject, Chapter, Topic,
-  FocusSession, DailySummary, XPTransaction, ActiveSession
+  FocusSession, ChapterAnalytics, DailySummary, XPTransaction, ActiveSession
 } from '@/types/models';
 import { calculateSessionXP, XP_REWARDS, getLevelForUser } from '@/constants/levels';
 import { processReferralOnFirstSession } from '@/services/referralService';
@@ -47,6 +47,7 @@ export type AppContextType = {
   updateSubject: (id: string, data: Partial<Subject>) => Promise<void>;
   deleteSubject: (id: string) => Promise<void>;
   chapters: Chapter[];
+  chapterAnalytics: ChapterAnalytics[];
   getChaptersForSubject: (subjectId: string) => Chapter[];
   addChapter: (subjectId: string, name: string, plannedDate?: string | null) => Promise<Chapter>;
   updateChapter: (id: string, data: Partial<Chapter>) => Promise<void>;
@@ -183,6 +184,25 @@ const toFocusSessionDbPayload = (s: any) => {
   };
 };
 
+const mapChapterAnalytics = (row: any): ChapterAnalytics => ({
+  chapterId: row.chapter_id,
+  subjectId: row.subject_id ?? null,
+  chapterName: row.chapter_name,
+  chapterStatus: row.chapter_status,
+  totalSessions: Number(row.total_sessions ?? 0),
+  completedSessions: Number(row.completed_sessions ?? 0),
+  brokenSessions: Number(row.broken_sessions ?? 0),
+  totalMinutes: Number(row.total_minutes ?? 0),
+  plannedMinutes: Number(row.planned_minutes ?? 0),
+  xpEarned: Number(row.xp_earned ?? 0),
+  xpDeducted: Number(row.xp_deducted ?? 0),
+  averageSessionMinutes: row.average_session_minutes === null || row.average_session_minutes === undefined
+    ? null
+    : Number(row.average_session_minutes),
+  firstSessionAt: row.first_session_at ?? null,
+  lastSessionAt: row.last_session_at ?? null,
+});
+
 const mapSummary = (s: any): DailySummary => ({
   id: s.id,
   userId: s.user_id,
@@ -236,6 +256,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [sessions, setSessions] = useState<FocusSession[]>([]);
+  const [chapterAnalytics, setChapterAnalytics] = useState<ChapterAnalytics[]>([]);
   const [dailySummaries, setDailySummaries] = useState<DailySummary[]>([]);
   const [xpLog, setXpLog] = useState<XPTransaction[]>([]);
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
@@ -424,6 +445,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setTopics([]);
           setActiveSession(null);
           setSessions([]);
+          setChapterAnalytics([]);
           setDailySummaries([]);
           setXpLog([]);
         }
@@ -459,12 +481,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
 
         if (loadGeneration !== authGenerationRef.current) return;
-        const [subRes, chapRes, sessRes, sumRes, xpRes] = await Promise.all([
+        const [subRes, chapRes, sessRes, sumRes, xpRes, chapterAnalyticsRes] = await Promise.all([
           supabase.from('subjects').select('id,user_id,name,color_hex,icon_name,display_order,created_at,is_deleted').eq('user_id', userId).eq('is_deleted', false).order('display_order', { ascending: true }),
           supabase.from('chapters').select('id,subject_id,user_id,name,status,planned_date,completed_date,display_order,created_at,is_deleted').eq('user_id', userId).eq('is_deleted', false).order('display_order', { ascending: true }),
           supabase.from('focus_sessions').select('id,user_id,subject_id,chapter_id,planned_minutes,actual_minutes,completed,broken,xp_earned,xp_deducted,break_reason,started_at,ended_at,comeback_bonus').eq('user_id', userId).order('started_at', { ascending: false }).limit(200),
           supabase.from('daily_summary').select('id,user_id,date,total_focus_minutes,sessions_completed,sessions_broken,goal_minutes,goal_met,xp_earned').eq('user_id', userId).order('date', { ascending: false }).limit(100),
           supabase.from('xp_transactions').select('id,user_id,amount,reason,created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
+          supabase.rpc('get_chapter_analytics', { p_start_date: null, p_end_date: null }),
         ]);
 
         if (loadGeneration !== authGenerationRef.current) return;
@@ -485,6 +508,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const cloudSum = sumRes.data.map(mapSummary);
           setDailySummaries(cloudSum);
           setItem(StorageKeys.DAILY_SUMMARY, cloudSum);
+        }
+        if (!chapterAnalyticsRes.error && chapterAnalyticsRes.data) {
+          setChapterAnalytics(chapterAnalyticsRes.data.map(mapChapterAnalytics));
+        } else if (chapterAnalyticsRes.error) {
+          console.warn('[Analytics] Chapter analytics load failed:', chapterAnalyticsRes.error.message);
+          setChapterAnalytics([]);
         }
         let loadedXP = savedXP ?? [];
         if (xpRes.data) {
@@ -511,6 +540,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         deletedChapterIdsRef.current.clear();
         setTopics([]);
         setSessions([]);
+        setChapterAnalytics([]);
         setDailySummaries([]);
         setXpLog([]);
         setActiveSession(null);
@@ -541,6 +571,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         deletedChapterIdsRef.current.clear();
         setTopics([]);
         setSessions([]);
+        setChapterAnalytics([]);
         setDailySummaries([]);
         setXpLog([]);
         setActiveSession(null);
@@ -972,7 +1003,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const contextValue = useMemo<AppContextType>(() => ({
     user, isOnboarded, setUser: stableSetUser, setOnboarded: stableSetOnboarded,
     subjects, addSubject: stableAddSubject, updateSubject: stableUpdateSubject, deleteSubject: stableDeleteSubject,
-    chapters, getChaptersForSubject: stableGetChaptersForSubject, addChapter: stableAddChapter,
+    chapters, chapterAnalytics, getChaptersForSubject: stableGetChaptersForSubject, addChapter: stableAddChapter,
     updateChapter: stableUpdateChapter, deleteChapter: stableDeleteChapter, bulkDeleteChapters: stableBulkDeleteChapters,
     topics, getTopicsForChapter: stableGetTopicsForChapter, addTopic: stableAddTopic,
     toggleTopic: stableToggleTopic, deleteTopic: stableDeleteTopic,
@@ -984,7 +1015,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     streakRecoveryPending, lostStreakCount, setStreakRecoveryPending: stableSetStreakRecoveryPending,
     isLoading, reload: load,
   }), [
-    user, isOnboarded, subjects, chapters, topics, sessions, dailySummaries, last7Days, last90Days, activeSession, xpLog,
+    user, isOnboarded, subjects, chapters, chapterAnalytics, topics, sessions, dailySummaries, last7Days, last90Days, activeSession, xpLog,
     comebackPending, hasUnlockedReward, referralCount, streakRecoveryPending, lostStreakCount, isLoading,
     stableSetUser, stableSetOnboarded, stableAddSubject, stableUpdateSubject, stableDeleteSubject,
     stableGetChaptersForSubject, stableAddChapter, stableUpdateChapter, stableDeleteChapter, stableBulkDeleteChapters,

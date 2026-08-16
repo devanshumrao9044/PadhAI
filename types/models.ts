@@ -68,6 +68,23 @@ export interface FocusSession {
   createdAt: string;
 }
 
+export interface ChapterAnalytics {
+  chapterId: string;
+  subjectId: string | null;
+  chapterName: string;
+  chapterStatus: 'not_started' | 'in_progress' | 'done' | 'weak';
+  totalSessions: number;
+  completedSessions: number;
+  brokenSessions: number;
+  totalMinutes: number;
+  plannedMinutes: number;
+  xpEarned: number;
+  xpDeducted: number;
+  averageSessionMinutes: number | null;
+  firstSessionAt: string | null;
+  lastSessionAt: string | null;
+}
+
 export interface DailySummary {
   id: string;
   userId: string;
