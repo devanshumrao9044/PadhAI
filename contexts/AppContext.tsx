@@ -19,6 +19,7 @@ import {
 } from '@/types/models';
 import { calculateSessionXP, XP_REWARDS, getLevelForUser } from '@/constants/levels';
 import { processReferralOnFirstSession } from '@/services/referralService';
+import { normalizeChapterAnalyticsRows } from '@/services/chapterAnalytics';
 import {
   buildBaselineMarker,
   buildWeeklySettlement,
@@ -183,25 +184,6 @@ const toFocusSessionDbPayload = (s: any) => {
     comeback_bonus: s.comeback_bonus ?? s.comebackBonus ?? 0,
   };
 };
-
-const mapChapterAnalytics = (row: any): ChapterAnalytics => ({
-  chapterId: row.chapter_id,
-  subjectId: row.subject_id ?? null,
-  chapterName: row.chapter_name,
-  chapterStatus: row.chapter_status,
-  totalSessions: Number(row.total_sessions ?? 0),
-  completedSessions: Number(row.completed_sessions ?? 0),
-  brokenSessions: Number(row.broken_sessions ?? 0),
-  totalMinutes: Number(row.total_minutes ?? 0),
-  plannedMinutes: Number(row.planned_minutes ?? 0),
-  xpEarned: Number(row.xp_earned ?? 0),
-  xpDeducted: Number(row.xp_deducted ?? 0),
-  averageSessionMinutes: row.average_session_minutes === null || row.average_session_minutes === undefined
-    ? null
-    : Number(row.average_session_minutes),
-  firstSessionAt: row.first_session_at ?? null,
-  lastSessionAt: row.last_session_at ?? null,
-});
 
 const mapSummary = (s: any): DailySummary => ({
   id: s.id,
@@ -510,7 +492,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setItem(StorageKeys.DAILY_SUMMARY, cloudSum);
         }
         if (!chapterAnalyticsRes.error && chapterAnalyticsRes.data) {
-          setChapterAnalytics(chapterAnalyticsRes.data.map(mapChapterAnalytics));
+          setChapterAnalytics(normalizeChapterAnalyticsRows(chapterAnalyticsRes.data));
         } else if (chapterAnalyticsRes.error) {
           console.warn('[Analytics] Chapter analytics load failed:', chapterAnalyticsRes.error.message);
           setChapterAnalytics([]);

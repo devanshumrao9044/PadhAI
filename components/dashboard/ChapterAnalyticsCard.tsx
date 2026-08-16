@@ -2,19 +2,13 @@ import { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/contexts/ThemeContext';
-import { ChapterAnalytics } from '@/types/models';
 import { FontSize, FontWeight, Radius, Spacing, ThemeColors } from '@/constants/theme';
+import { ChapterAnalytics } from '@/types/models';
+import { buildChapterAnalyticsViewModel } from '@/services/chapterAnalytics';
 
 type Props = {
   analytics: ChapterAnalytics[];
 };
-
-function formatMinutes(minutes: number): string {
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
-  return remainder > 0 ? `${hours}h ${remainder}m` : `${hours}h`;
-}
 
 function getStatusColor(status: ChapterAnalytics['chapterStatus'], colors: ThemeColors): string {
   if (status === 'weak') return colors.warning;
@@ -25,8 +19,7 @@ function getStatusColor(status: ChapterAnalytics['chapterStatus'], colors: Theme
 export default function ChapterAnalyticsCard({ analytics }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const visibleRows = analytics.slice(0, 5);
-  const maxMinutes = Math.max(1, ...visibleRows.map(row => row.totalMinutes));
+  const visibleRows = useMemo(() => buildChapterAnalyticsViewModel(analytics), [analytics]);
 
   return (
     <View style={styles.card}>
@@ -42,9 +35,10 @@ export default function ChapterAnalyticsCard({ analytics }: Props) {
         <Text style={styles.empty}>No active chapters yet.</Text>
       ) : (
         <>
-          {visibleRows.map(row => {
+          {visibleRows.map(view => {
+            const row = view.analytics;
             const statusColor = getStatusColor(row.chapterStatus, colors);
-            const barWidth = row.totalMinutes > 0 ? `${Math.max(5, (row.totalMinutes / maxMinutes) * 100)}%` : '0%';
+            const barWidth = `${view.progressPercent}%`;
             return (
               <View key={row.chapterId} style={styles.row}>
                 <View style={styles.rowHeader}>
@@ -52,14 +46,12 @@ export default function ChapterAnalyticsCard({ analytics }: Props) {
                     <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
                     <Text style={styles.name} numberOfLines={1}>{row.chapterName}</Text>
                   </View>
-                  <Text style={styles.minutes}>{formatMinutes(row.totalMinutes)}</Text>
+                  <Text style={styles.minutes}>{view.minutesLabel}</Text>
                 </View>
                 <View style={styles.barBackground}>
                   <View style={[styles.barFill, { width: barWidth as `${number}%`, backgroundColor: statusColor }]} />
                 </View>
-                <Text style={styles.meta}>
-                  {row.totalSessions} {row.totalSessions === 1 ? 'session' : 'sessions'} · {row.completedSessions} completed
-                </Text>
+                <Text style={styles.meta}>{view.sessionLabel}</Text>
               </View>
             );
           })}
