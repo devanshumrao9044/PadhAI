@@ -3,9 +3,12 @@ import {
   View, Text, StyleSheet, ScrollView, Dimensions, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCallback } from 'react';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { BarChart, LineChart } from 'react-native-chart-kit';
-import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
+import { supabase } from '@/services/supabase';
 import { useApp } from '@/hooks/useApp';
 
 const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -18,42 +21,80 @@ function formatMins(mins: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
-function getHeatColor(mins: number): string {
-  if (mins === 0) return Colors.surfaceVariant;
-  if (mins < 30) return Colors.primaryDim + '88';
-  if (mins < 60) return Colors.primary + '66';
-  if (mins < 120) return Colors.primary + 'AA';
-  return Colors.primary;
+function getHeatColor(mins: number, colors: ThemeColors): string {
+  if (mins === 0) return colors.surfaceVariant;
+  if (mins < 30) return colors.primaryDim + '88';
+  if (mins < 60) return colors.primary + '66';
+  if (mins < 120) return colors.primary + 'AA';
+  return colors.primary;
 }
 
-const CHART_CONFIG = {
-  backgroundColor: Colors.surface,
-  backgroundGradientFrom: Colors.surface,
-  backgroundGradientTo: Colors.surface,
-  decimalPlaces: 0,
-  color: (opacity = 1) => `rgba(124, 92, 252, ${opacity})`,
-  labelColor: () => Colors.textSecondary,
-  style: { borderRadius: Radius.md },
-  propsForBackgroundLines: { stroke: Colors.border, strokeDasharray: '4' },
-  propsForLabels: { fontSize: 11 },
-  barPercentage: 0.6,
-};
+function createChartConfig(colors: ThemeColors) {
+  return {
+    backgroundColor: colors.surface,
+    backgroundGradientFrom: colors.surface,
+    backgroundGradientTo: colors.surface,
+    decimalPlaces: 0,
+    color: (opacity = 1) => `rgba(124, 92, 252, ${opacity})`,
+    labelColor: () => colors.textSecondary,
+    style: { borderRadius: Radius.md },
+    propsForBackgroundLines: { stroke: colors.border, strokeDasharray: '4' },
+    propsForLabels: { fontSize: 11 },
+    barPercentage: 0.6,
+  };
+}
 
-const LINE_CHART_CONFIG = {
-  ...CHART_CONFIG,
-  color: (opacity = 1) => `rgba(79, 195, 247, ${opacity})`,
-  fillShadowGradient: Colors.accent,
-  fillShadowGradientOpacity: 0.25,
-  propsForDots: {
-    r: '4',
-    strokeWidth: '2',
-    stroke: Colors.accent,
-    fill: Colors.surface,
-  },
-};
+function createLineChartConfig(colors: ThemeColors) {
+  return {
+    ...createChartConfig(colors),
+    color: (opacity = 1) => `rgba(79, 195, 247, ${opacity})`,
+    fillShadowGradient: colors.accent,
+    fillShadowGradientOpacity: 0.25,
+    propsForDots: {
+      r: '4',
+      strokeWidth: '2',
+      stroke: colors.accent,
+      fill: colors.surface,
+    },
+  };
+}
 
 export default function AnalyticsScreen() {
-  const { user, sessions, last7Days: last7, last90Days: last90, chapters, getDailySummary } = useApp();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const chartConfig = useMemo(() => createChartConfig(colors), [colors]);
+  const lineChartConfig = useMemo(() => createLineChartConfig(colors), [colors]);
+  const { user, sessions, last7Days: last7, last90Days: last90, chapters, getDailySummary, reload } = useApp();
+  const userId = user?.id ?? null;
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleReload = useCallback(() => {
+    if (reloadTimerRef.current) return;
+    reloadTimerRef.current = setTimeout(() => {
+      reloadTimerRef.current = null;
+      void reload();
+    }, 250);
+  }, [reload]);
+
+  useEffect(() => () => {
+    if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    if (channelRef.current) supabase.removeChannel(channelRef.current);
+    const channel = supabase
+      .channel(`analytics-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chapters', filter: `user_id=eq.${userId}` }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'focus_sessions', filter: `user_id=eq.${userId}` }, scheduleReload)
+      .subscribe();
+    channelRef.current = channel;
+    return () => {
+      supabase.removeChannel(channel);
+      channelRef.current = null;
+    };
+  }, [scheduleReload, userId]);
 
   // SSR-safe dimensions
   const [screenWidth, setScreenWidth] = useState(() => Math.max(320, Dimensions.get('window').width));
@@ -164,22 +205,22 @@ export default function AnalyticsScreen() {
         {/* ── Top Stats Grid ─────────────────────────────────────────────── */}
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <MaterialIcons name="local-fire-department" size={20} color={Colors.danger} />
+            <MaterialIcons name="local-fire-department" size={20} color={colors.danger} />
             <Text style={styles.statVal}>{user?.streakCurrent ?? 0}</Text>
             <Text style={styles.statLabel}>Current Streak</Text>
           </View>
           <View style={styles.statCard}>
-            <MaterialIcons name="schedule" size={20} color={Colors.accent} />
+            <MaterialIcons name="schedule" size={20} color={colors.accent} />
             <Text style={styles.statVal}>{formatMins(totalMins)}</Text>
             <Text style={styles.statLabel}>This Week</Text>
           </View>
           <View style={styles.statCard}>
-            <MaterialIcons name="bolt" size={20} color={Colors.warning} />
+            <MaterialIcons name="bolt" size={20} color={colors.warning} />
             <Text style={styles.statVal}>{focusScore}%</Text>
             <Text style={styles.statLabel}>Focus Score</Text>
           </View>
           <View style={styles.statCard}>
-            <MaterialIcons name="check-circle" size={20} color={Colors.success} />
+            <MaterialIcons name="check-circle" size={20} color={colors.success} />
             <Text style={styles.statVal}>{doneChapters}/{totalChapters}</Text>
             <Text style={styles.statLabel}>Chapters Done</Text>
           </View>
@@ -191,7 +232,7 @@ export default function AnalyticsScreen() {
             <View>
               <Text style={styles.goalLabel}>{"TODAY'S GOAL"}</Text>
               <Text style={styles.goalFraction}>
-                <Text style={[styles.goalCurrent, goalMet && { color: Colors.success }]}>
+                <Text style={[styles.goalCurrent, goalMet && { color: colors.success }]}>
                   {formatMins(todayMins)}
                 </Text>
                 <Text style={styles.goalSeparator}> / </Text>
@@ -240,7 +281,7 @@ export default function AnalyticsScreen() {
                       <View style={styles.weekDotInner} />
                     )}
                   </View>
-                  <Text style={[styles.weekDayLabel, isToday && { color: Colors.textPrimary }]}>
+                  <Text style={[styles.weekDayLabel, isToday && { color: colors.textPrimary }]}>
                     {dayLabel}
                   </Text>
                 </View>
@@ -259,7 +300,7 @@ export default function AnalyticsScreen() {
             data={barData}
             width={CHART_WIDTH}
             height={200}
-            chartConfig={CHART_CONFIG}
+            chartConfig={chartConfig}
             style={styles.chart}
             showValuesOnTopOfBars
             fromZero
@@ -280,7 +321,7 @@ export default function AnalyticsScreen() {
             data={lineData}
             width={CHART_WIDTH}
             height={180}
-            chartConfig={LINE_CHART_CONFIG}
+            chartConfig={lineChartConfig}
             style={styles.chart}
             bezier
             fromZero
@@ -290,7 +331,7 @@ export default function AnalyticsScreen() {
             yAxisSuffix={""}
           />
           <View style={styles.legendRow}>
-            <View style={[styles.legendDot, { backgroundColor: Colors.accent }]} />
+            <View style={[styles.legendDot, { backgroundColor: colors.accent }]} />
             <Text style={styles.legendText}>Chapters completed (cumulative)</Text>
           </View>
         </View>
@@ -306,7 +347,7 @@ export default function AnalyticsScreen() {
             width={CHART_WIDTH}
             height={180}
             chartConfig={{
-              ...CHART_CONFIG,
+              ...chartConfig,
               color: (opacity = 1) => `rgba(255, 181, 71, ${opacity})`,
             }}
             style={styles.chart}
@@ -351,7 +392,7 @@ export default function AnalyticsScreen() {
                       <View
                         key={dayIdx}
                         style={[styles.heatCell, {
-                          backgroundColor: entry ? getHeatColor(entry.totalMinutes) : Colors.surfaceVariant,
+                          backgroundColor: entry ? getHeatColor(entry.totalMinutes, colors) : colors.surfaceVariant,
                         }]}
                       />
                     );
@@ -363,7 +404,7 @@ export default function AnalyticsScreen() {
           <View style={styles.heatLegend}>
             <Text style={styles.heatLegendText}>Less</Text>
             {[0, 30, 60, 120, 180].map(v => (
-              <View key={v} style={[styles.heatLegendDot, { backgroundColor: getHeatColor(v) }]} />
+              <View key={v} style={[styles.heatLegendDot, { backgroundColor: getHeatColor(v, colors) }]} />
             ))}
             <Text style={styles.heatLegendText}>More</Text>
           </View>
@@ -375,7 +416,7 @@ export default function AnalyticsScreen() {
             <Text style={styles.cardTitle}>WEAK CHAPTERS ({weakChapters.length})</Text>
             {weakChapters.map(c => (
               <View key={c.id} style={styles.weakRow}>
-                <MaterialIcons name="warning" size={14} color={Colors.warning} />
+                <MaterialIcons name="warning" size={14} color={colors.warning} />
                 <Text style={styles.weakText}>{c.name}</Text>
               </View>
             ))}
@@ -387,38 +428,38 @@ export default function AnalyticsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scroll: { padding: Spacing.md, paddingBottom: 110 },
   title: {
     fontSize: FontSize.xxl, fontWeight: FontWeight.bold,
-    color: Colors.textPrimary, marginBottom: Spacing.md, includeFontPadding: false,
+    color: colors.textPrimary, marginBottom: Spacing.md, includeFontPadding: false,
   },
 
   // Stats Grid
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: Spacing.md },
   statCard: {
     flex: 1, minWidth: '45%',
-    backgroundColor: Colors.surface, borderRadius: Radius.lg,
-    borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: colors.surface, borderRadius: Radius.lg,
+    borderWidth: 1, borderColor: colors.border,
     padding: Spacing.md, alignItems: 'center', gap: 4,
   },
-  statVal: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.textPrimary, includeFontPadding: false },
-  statLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'center' },
+  statVal: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: colors.textPrimary, includeFontPadding: false },
+  statLabel: { fontSize: FontSize.xs, color: colors.textSecondary, textAlign: 'center' },
 
   // Card
   card: {
-    backgroundColor: Colors.surface, borderRadius: Radius.lg,
-    borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: colors.surface, borderRadius: Radius.lg,
+    borderWidth: 1, borderColor: colors.border,
     padding: Spacing.md, marginBottom: Spacing.md, overflow: 'hidden',
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   cardTitle: {
     fontSize: FontSize.xs, fontWeight: FontWeight.semiBold,
-    color: Colors.textTertiary, letterSpacing: 1.2, textTransform: 'uppercase',
+    color: colors.textTertiary, letterSpacing: 1.2, textTransform: 'uppercase',
   },
-  cardSubtitle: { fontSize: FontSize.xs, color: Colors.textTertiary },
+  cardSubtitle: { fontSize: FontSize.xs, color: colors.textTertiary },
 
   // Chart
   chart: { marginLeft: -Spacing.md, borderRadius: Radius.md },
@@ -426,54 +467,54 @@ const styles = StyleSheet.create({
   // Legend
   legendRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendText: { fontSize: FontSize.xs, color: Colors.textSecondary },
+  legendText: { fontSize: FontSize.xs, color: colors.textSecondary },
 
   // Focus Score
   focusScoreRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.sm },
-  focusScoreVal: { fontSize: 44, fontWeight: FontWeight.extraBold, color: Colors.primary, includeFontPadding: false },
+  focusScoreVal: { fontSize: 44, fontWeight: FontWeight.extraBold, color: colors.primary, includeFontPadding: false },
   focusScoreDetails: { gap: 4 },
-  focusScoreDetail: { fontSize: FontSize.sm, color: Colors.textSecondary },
-  focusScoreGreen: { color: Colors.success, fontWeight: FontWeight.semiBold },
-  focusScoreRed: { color: Colors.danger, fontWeight: FontWeight.semiBold },
-  focusBar: { height: 8, backgroundColor: Colors.surfaceVariant, borderRadius: Radius.full, overflow: 'hidden' },
-  focusFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: Radius.full },
+  focusScoreDetail: { fontSize: FontSize.sm, color: colors.textSecondary },
+  focusScoreGreen: { color: colors.success, fontWeight: FontWeight.semiBold },
+  focusScoreRed: { color: colors.danger, fontWeight: FontWeight.semiBold },
+  focusBar: { height: 8, backgroundColor: colors.surfaceVariant, borderRadius: Radius.full, overflow: 'hidden' },
+  focusFill: { height: '100%', backgroundColor: colors.primary, borderRadius: Radius.full },
 
   // Heatmap
   heatmap: { flexDirection: 'row', gap: 3 },
   heatCol: { gap: 3 },
   heatCell: { width: 18, height: 18, borderRadius: 3 },
   heatLegend: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: Spacing.sm },
-  heatLegendText: { fontSize: FontSize.xs, color: Colors.textTertiary },
+  heatLegendText: { fontSize: FontSize.xs, color: colors.textTertiary },
   heatLegendDot: { width: 12, height: 12, borderRadius: 2 },
 
   // Weak
   weakRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
-  weakText: { fontSize: FontSize.base, color: Colors.warning, flex: 1 },
+  weakText: { fontSize: FontSize.base, color: colors.warning, flex: 1 },
 
   // Today Goal Progress Card
   goalCard: {
-    backgroundColor: Colors.surface, borderRadius: Radius.lg,
-    borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: colors.surface, borderRadius: Radius.lg,
+    borderWidth: 1, borderColor: colors.border,
     padding: Spacing.md, marginBottom: Spacing.md,
   },
   goalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12 },
   goalLabel: {
     fontSize: FontSize.xs, fontWeight: FontWeight.semiBold,
-    color: Colors.textTertiary, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4,
+    color: colors.textTertiary, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4,
   },
   goalFraction: { flexDirection: 'row', alignItems: 'baseline' } as any,
-  goalCurrent: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.primary, includeFontPadding: false },
-  goalSeparator: { fontSize: FontSize.base, color: Colors.textTertiary },
-  goalTotal: { fontSize: FontSize.base, color: Colors.textSecondary, fontWeight: FontWeight.medium },
+  goalCurrent: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: colors.primary, includeFontPadding: false },
+  goalSeparator: { fontSize: FontSize.base, color: colors.textTertiary },
+  goalTotal: { fontSize: FontSize.base, color: colors.textSecondary, fontWeight: FontWeight.medium },
   goalBadge: {
     paddingHorizontal: 12, paddingVertical: 5, borderRadius: Radius.full,
-    backgroundColor: Colors.surfaceVariant, borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: colors.surfaceVariant, borderWidth: 1, borderColor: colors.border,
   },
-  goalBadgeMet: { backgroundColor: Colors.success + '22', borderColor: Colors.success + '55' },
-  goalBadgeText: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: Colors.textSecondary },
-  goalBadgeTextMet: { color: Colors.success },
+  goalBadgeMet: { backgroundColor: colors.success + '22', borderColor: colors.success + '55' },
+  goalBadgeText: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: colors.textSecondary },
+  goalBadgeTextMet: { color: colors.success },
   goalBarBg: {
-    height: 10, backgroundColor: Colors.surfaceVariant, borderRadius: Radius.full,
+    height: 10, backgroundColor: colors.surfaceVariant, borderRadius: Radius.full,
     overflow: 'hidden', marginBottom: 16,
   },
   goalBarFill: { height: '100%', borderRadius: Radius.full },
@@ -484,10 +525,10 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5,
   },
-  weekDotMet: { backgroundColor: Colors.success + '22', borderColor: Colors.success },
-  weekDotMiss: { backgroundColor: Colors.surfaceVariant, borderColor: Colors.border },
-  weekDotToday: { borderColor: Colors.primary, borderWidth: 2 },
-  weekDotInner: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.textTertiary },
-  weekCheck: { fontSize: 14, color: Colors.success, fontWeight: FontWeight.bold },
-  weekDayLabel: { fontSize: 10, color: Colors.textTertiary, fontWeight: FontWeight.medium },
+  weekDotMet: { backgroundColor: colors.success + '22', borderColor: colors.success },
+  weekDotMiss: { backgroundColor: colors.surfaceVariant, borderColor: colors.border },
+  weekDotToday: { borderColor: colors.primary, borderWidth: 2 },
+  weekDotInner: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.textTertiary },
+  weekCheck: { fontSize: 14, color: colors.success, fontWeight: FontWeight.bold },
+  weekDayLabel: { fontSize: 10, color: colors.textTertiary, fontWeight: FontWeight.medium },
 });

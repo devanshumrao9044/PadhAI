@@ -1,11 +1,12 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, RefreshControl, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { LEVELS, getLevelForUser } from '@/constants/levels';
 import { useApp } from '@/hooks/useApp';
 import { supabase } from '@/services/supabase';
@@ -23,6 +24,8 @@ interface LeaderboardEntry {
 function LevelBadge({
   levelDef, isCurrent, size,
 }: { levelDef: typeof LEVELS[0]; isCurrent: boolean; size: 'sm' | 'lg' }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const scale = useRef(new Animated.Value(isCurrent ? 0.8 : 0.7)).current;
 
   useEffect(() => {
@@ -70,6 +73,8 @@ function LevelBadge({
 
 // ── Rank Zone Bar ─────────────────────────────────────────────────────────────
 function RankZoneBar({ rank, total }: { rank: number; total: number }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const safeTotal = Math.max(1, total);
   const demotionCount = Math.floor(safeTotal * 0.4);
   const safetyCount = Math.floor(safeTotal * 0.35);
@@ -85,14 +90,14 @@ function RankZoneBar({ rank, total }: { rank: number; total: number }) {
   if (rankPct >= demotionPct + safetyPct) zone = 'promotion';
   else if (rankPct >= demotionPct) zone = 'safety';
 
-  const zoneColor = zone === 'promotion' ? Colors.success : zone === 'safety' ? Colors.warning : Colors.danger;
+  const zoneColor = zone === 'promotion' ? colors.success : zone === 'safety' ? colors.warning : colors.danger;
 
   return (
     <View style={styles.zoneBarContainer}>
       <View style={styles.zoneLabels}>
-        <Text style={[styles.zoneLabel, { color: Colors.danger }]}>Demotion zone</Text>
-        <Text style={[styles.zoneLabel, { color: Colors.warning }]}>Safety zone</Text>
-        <Text style={[styles.zoneLabel, { color: Colors.success }]}>Promotion zone</Text>
+        <Text style={[styles.zoneLabel, { color: colors.danger }]}>Demotion zone</Text>
+        <Text style={[styles.zoneLabel, { color: colors.warning }]}>Safety zone</Text>
+        <Text style={[styles.zoneLabel, { color: colors.success }]}>Promotion zone</Text>
       </View>
 
       {/* Rank badge above bar */}
@@ -102,9 +107,9 @@ function RankZoneBar({ rank, total }: { rank: number; total: number }) {
 
       {/* The bar */}
       <View style={styles.zoneBarTrack}>
-        <View style={[styles.zoneSegment, { flex: demotionPct, backgroundColor: Colors.danger + '88' }]} />
-        <View style={[styles.zoneSegment, { flex: safetyPct, backgroundColor: Colors.warning + '88' }]} />
-        <View style={[styles.zoneSegment, { flex: promotionPct, backgroundColor: Colors.success + '88' }]} />
+        <View style={[styles.zoneSegment, { flex: demotionPct, backgroundColor: colors.danger + '88' }]} />
+        <View style={[styles.zoneSegment, { flex: safetyPct, backgroundColor: colors.warning + '88' }]} />
+        <View style={[styles.zoneSegment, { flex: promotionPct, backgroundColor: colors.success + '88' }]} />
         {/* Indicator dot */}
         <View style={[styles.zoneDot, { left: `${rankPct}%` as any, backgroundColor: zoneColor }]} />
       </View>
@@ -126,6 +131,8 @@ function RankZoneBar({ rank, total }: { rank: number; total: number }) {
 
 // ── Leaderboard row ───────────────────────────────────────────────────────────
 function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const levelDef = LEVELS.find(l => l.rank === entry.level) ?? LEVELS[0];
   const rankColors: Record<number, string> = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32' };
   const rankBg = rankColors[entry.rank] ?? levelDef.color;
@@ -149,6 +156,8 @@ function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
 }
 
 export default function LeaderboardScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user } = useApp();
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -199,8 +208,8 @@ export default function LeaderboardScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={Colors.primary}
-            colors={[Colors.primary]}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
           />
         }
       >
@@ -251,8 +260,8 @@ export default function LeaderboardScreen() {
                 <Text style={styles.infoPillLabel}>Rank: </Text>
                 <Text style={styles.infoPillVal}>{myRank}</Text>
               </View>
-              <View style={[styles.infoPill, { backgroundColor: Colors.warning + '22', borderColor: Colors.warning + '55' }]}>
-                <Text style={[styles.infoPillVal, { color: Colors.warning }]}>{user?.xpTotal ?? 0}</Text>
+              <View style={[styles.infoPill, { backgroundColor: colors.warning + '22', borderColor: colors.warning + '55' }]}>
+                <Text style={[styles.infoPillVal, { color: colors.warning }]}>{user?.xpTotal ?? 0}</Text>
                 <View style={styles.xpMiniTag}>
                   <Text style={styles.xpMiniText}>XP</Text>
                 </View>
@@ -272,12 +281,12 @@ export default function LeaderboardScreen() {
 
           {loading ? (
             <View style={styles.loadingBox}>
-              <ActivityIndicator size="large" color={Colors.primary} />
+              <ActivityIndicator size="large" color={colors.primary} />
               <Text style={styles.loadingText}>Loading rankings...</Text>
             </View>
           ) : entries.length === 0 ? (
             <View style={styles.emptyBox}>
-              <MaterialIcons name="emoji-events" size={48} color={Colors.textTertiary} />
+              <MaterialIcons name="emoji-events" size={48} color={colors.textTertiary} />
               <Text style={styles.emptyText}>No rankings yet.{'\n'}Complete a session to appear!</Text>
             </View>
           ) : (
@@ -309,8 +318,8 @@ export default function LeaderboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 100 },
 
@@ -382,12 +391,12 @@ const styles = StyleSheet.create({
 
   // ── Section 2 Rank Card ────────────────────────────────────────────────────
   rankCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Radius.xl,
     marginHorizontal: Spacing.md,
     marginBottom: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     padding: Spacing.md,
   },
   rankCardTop: {
@@ -425,22 +434,22 @@ const styles = StyleSheet.create({
   infoPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surfaceVariant,
+    backgroundColor: colors.surfaceVariant,
     borderRadius: Radius.md,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     gap: 4,
   },
   infoPillLabel: {
     fontSize: FontSize.sm,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   infoPillVal: {
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     includeFontPadding: false,
   },
 
@@ -461,7 +470,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 20,
     marginLeft: -32,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1.5,
     borderRadius: Radius.sm,
     paddingHorizontal: 8,
@@ -491,7 +500,7 @@ const styles = StyleSheet.create({
     top: -3,
     marginLeft: -8,
     borderWidth: 2,
-    borderColor: Colors.surface,
+    borderColor: colors.surface,
   },
   zoneRankNums: {
     flexDirection: 'row',
@@ -500,7 +509,7 @@ const styles = StyleSheet.create({
   },
   zoneRankNum: {
     fontSize: FontSize.xs,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     fontWeight: FontWeight.semiBold,
   },
   zoneRankLabels: {
@@ -509,7 +518,7 @@ const styles = StyleSheet.create({
   },
   zoneRankLabel: {
     fontSize: 9,
-    color: Colors.textTertiary,
+    color: colors.textTertiary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -521,7 +530,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.extraBold,
-    color: Colors.textTertiary,
+    color: colors.textTertiary,
     letterSpacing: 1.5,
     marginBottom: Spacing.sm,
     textTransform: 'uppercase',
@@ -531,15 +540,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Radius.lg,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   boardRowMe: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primary + '12',
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + '12',
   },
   boardRankBadge: {
     width: 36,
@@ -558,10 +567,10 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: FontSize.base,
     fontWeight: FontWeight.semiBold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   boardNameMe: {
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: FontWeight.bold,
   },
   boardXPBadge: {
@@ -572,21 +581,21 @@ const styles = StyleSheet.create({
   boardXPText: {
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     includeFontPadding: false,
   },
   xpMiniTag: {
-    backgroundColor: Colors.surfaceVariant,
+    backgroundColor: colors.surfaceVariant,
     borderRadius: Radius.sm,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   xpMiniText: {
     fontSize: 9,
     fontWeight: FontWeight.bold,
-    color: Colors.textTertiary,
+    color: colors.textTertiary,
     letterSpacing: 0.5,
   },
   separator: {
@@ -595,7 +604,7 @@ const styles = StyleSheet.create({
   },
   separatorText: {
     fontSize: FontSize.base,
-    color: Colors.textTertiary,
+    color: colors.textTertiary,
     letterSpacing: 4,
   },
 
@@ -606,7 +615,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: FontSize.base,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   emptyBox: {
     alignItems: 'center',
@@ -615,7 +624,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: FontSize.base,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 24,
   },

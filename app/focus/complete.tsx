@@ -1,9 +1,10 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { getLevelForUser } from '@/constants/levels';
 import { COMPLETION_MESSAGES } from '@/constants/messages';
@@ -60,6 +61,8 @@ const CONFETTI_COLORS = [
 ];
 
 export default function FocusCompleteScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const params = useLocalSearchParams<{
     xp: string; comeback: string; recovery: string; lostStreak: string;
@@ -178,7 +181,7 @@ export default function FocusCompleteScreen() {
     : messageRef.current;
 
   const heroIcon = isRecovery ? 'local-fire-department' : isComeback ? 'whatshot' : 'emoji-events';
-  const heroColor = isRecovery ? Colors.success : isComeback ? '#F97316' : Colors.warning;
+  const heroColor = isRecovery ? colors.success : isComeback ? '#F97316' : colors.warning;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -218,7 +221,7 @@ export default function FocusCompleteScreen() {
           <Text style={styles.message}>{screenMessage}</Text>
 
           <View style={[styles.xpCard, (isComeback || isRecovery) && { backgroundColor: heroColor + '22', borderColor: heroColor + '55' }]}>
-            <MaterialIcons name="bolt" size={28} color={Colors.warning} />
+            <MaterialIcons name="bolt" size={28} color={colors.warning} />
             <Text style={styles.xpAmount}>+{xp} XP</Text>
             <Text style={styles.xpLabel}>earned</Text>
           </View>
@@ -299,7 +302,7 @@ export default function FocusCompleteScreen() {
           <TouchableOpacity
             style={[
               styles.continueBtn,
-              isRecovery && { backgroundColor: Colors.success },
+              isRecovery && { backgroundColor: colors.success },
               !isRecovery && isComeback && styles.continueBtnComeback,
             ]}
             onPress={() => router.replace('/(tabs)')}
@@ -314,7 +317,7 @@ export default function FocusCompleteScreen() {
             onPress={() => router.replace('/(tabs)/focus')}
             activeOpacity={0.85}
           >
-            <MaterialIcons name="replay" size={18} color={Colors.primary} />
+            <MaterialIcons name="replay" size={18} color={colors.primary} />
             <Text style={styles.anotherBtnText}>One More Session</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -323,8 +326,8 @@ export default function FocusCompleteScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   confettiLayer: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     zIndex: 10, overflow: 'hidden',
@@ -336,36 +339,36 @@ const styles = StyleSheet.create({
   },
   trophyGlow: {
     position: 'absolute', width: 160, height: 160,
-    borderRadius: 80, backgroundColor: Colors.warning + '33',
+    borderRadius: 80, backgroundColor: colors.warning + '33',
   },
   trophyGlowComeback: { width: 180, height: 180, borderRadius: 90 },
   textSection: { alignItems: 'center', width: '100%', marginBottom: Spacing.xl },
   completeTitle: {
     fontSize: FontSize.xxl, fontWeight: FontWeight.extraBold,
-    color: Colors.textPrimary, textAlign: 'center',
+    color: colors.textPrimary, textAlign: 'center',
     includeFontPadding: false, marginBottom: Spacing.sm,
   },
   message: {
-    fontSize: FontSize.md, color: Colors.textSecondary,
+    fontSize: FontSize.md, color: colors.textSecondary,
     textAlign: 'center', lineHeight: 26, marginBottom: Spacing.lg,
   },
   xpCard: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: Colors.warning + '22', borderRadius: Radius.lg,
+    backgroundColor: colors.warning + '22', borderRadius: Radius.lg,
     paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md,
-    borderWidth: 1, borderColor: Colors.warning + '44', marginBottom: Spacing.sm,
+    borderWidth: 1, borderColor: colors.warning + '44', marginBottom: Spacing.sm,
   },
   xpAmount: {
     fontSize: 40, fontWeight: FontWeight.extraBold,
-    color: Colors.warning, includeFontPadding: false,
+    color: colors.warning, includeFontPadding: false,
   },
-  xpLabel: { fontSize: FontSize.base, color: Colors.warning + 'AA' },
+  xpLabel: { fontSize: FontSize.base, color: colors.warning + 'AA' },
 
   // ── Streak Recovery Banner ──
   recoveryBanner: {
     width: '100%', borderRadius: Radius.lg, overflow: 'hidden',
     marginBottom: Spacing.md, borderWidth: 1.5,
-    borderColor: Colors.success + '66', backgroundColor: Colors.success + '18',
+    borderColor: colors.success + '66', backgroundColor: colors.success + '18',
   },
   recoveryBannerInner: {
     flexDirection: 'row', alignItems: 'center',
@@ -375,11 +378,11 @@ const styles = StyleSheet.create({
   recoveryTextBlock: { flex: 1 },
   recoveryTitle: {
     fontSize: FontSize.xs, fontWeight: FontWeight.extraBold,
-    color: Colors.success, letterSpacing: 1.5, marginBottom: 2, textTransform: 'uppercase',
+    color: colors.success, letterSpacing: 1.5, marginBottom: 2, textTransform: 'uppercase',
   },
-  recoverySub: { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 18 },
+  recoverySub: { fontSize: FontSize.sm, color: colors.textSecondary, lineHeight: 18 },
   recoveryStreakBadge: {
-    alignItems: 'center', backgroundColor: Colors.success,
+    alignItems: 'center', backgroundColor: colors.success,
     borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 6, minWidth: 52,
   },
   recoveryStreakNum: {
@@ -411,7 +414,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs, fontWeight: FontWeight.extraBold,
     color: '#F97316', letterSpacing: 1.5, marginBottom: 2, textTransform: 'uppercase',
   },
-  comebackSub: { fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 18 },
+  comebackSub: { fontSize: FontSize.sm, color: colors.textSecondary, lineHeight: 18 },
   comebackXPBadge: {
     alignItems: 'center', backgroundColor: '#F97316',
     borderRadius: Radius.md, paddingHorizontal: 12, paddingVertical: 6, minWidth: 56,
@@ -427,18 +430,18 @@ const styles = StyleSheet.create({
 
   levelRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: 4 },
   levelName: { fontSize: FontSize.md, fontWeight: FontWeight.semiBold },
-  levelTotal: { fontSize: FontSize.sm, color: Colors.textTertiary },
+  levelTotal: { fontSize: FontSize.sm, color: colors.textTertiary },
   actions: { width: '100%', gap: 10 },
   continueBtn: {
-    backgroundColor: Colors.primary, borderRadius: Radius.md,
+    backgroundColor: colors.primary, borderRadius: Radius.md,
     paddingVertical: 16, alignItems: 'center',
   },
   continueBtnComeback: { backgroundColor: '#F97316' },
-  continueBtnText: { color: Colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
+  continueBtnText: { color: colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
   anotherBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, backgroundColor: Colors.surface, borderRadius: Radius.md,
-    paddingVertical: 14, borderWidth: 1, borderColor: Colors.primary + '55',
+    gap: 6, backgroundColor: colors.surface, borderRadius: Radius.md,
+    paddingVertical: 14, borderWidth: 1, borderColor: colors.primary + '55',
   },
-  anotherBtnText: { color: Colors.primary, fontSize: FontSize.md, fontWeight: FontWeight.semiBold },
+  anotherBtnText: { color: colors.primary, fontSize: FontSize.md, fontWeight: FontWeight.semiBold },
 });

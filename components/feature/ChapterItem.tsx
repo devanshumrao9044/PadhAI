@@ -1,15 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Pressable, Modal } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import type { Chapter } from '@/types/models';
-
-const STATUS_COLORS: Record<Chapter['status'], string> = {
-  not_started: Colors.textTertiary,
-  in_progress: Colors.accent,
-  done: Colors.success,
-  weak: Colors.warning,
-};
 
 const STATUS_LABELS: Record<Chapter['status'], string> = {
   not_started: 'Not Started',
@@ -35,8 +29,16 @@ interface ChapterItemProps {
 }
 
 export default function ChapterItem({ chapter, onStatusChange, onPress, onDelete }: ChapterItemProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const statusColors = useMemo(() => ({
+    not_started: colors.textTertiary,
+    in_progress: colors.accent,
+    done: colors.success,
+    weak: colors.warning,
+  }), [colors]);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
-  const color = STATUS_COLORS[chapter.status];
+  const color = statusColors[chapter.status];
   const isOverdue = chapter.plannedDate && chapter.status !== 'done' && chapter.plannedDate < new Date().toISOString().split('T')[0];
 
   return (
@@ -62,7 +64,7 @@ export default function ChapterItem({ chapter, onStatusChange, onPress, onDelete
             </View>
             {isOverdue ? (
               <View style={styles.overduePill}>
-                <MaterialIcons name="schedule" size={10} color={Colors.danger} />
+                <MaterialIcons name="schedule" size={10} color={colors.danger} />
                 <Text style={styles.overdueText}>Overdue</Text>
               </View>
             ) : null}
@@ -77,9 +79,9 @@ export default function ChapterItem({ chapter, onStatusChange, onPress, onDelete
             onPress={onDelete}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <MaterialIcons name="delete-outline" size={16} color={Colors.textTertiary} />
+            <MaterialIcons name="delete-outline" size={16} color={colors.textTertiary} />
           </TouchableOpacity>
-          <MaterialIcons name="chevron-right" size={18} color={Colors.textTertiary} />
+          <MaterialIcons name="chevron-right" size={18} color={colors.textTertiary} />
         </View>
       </Pressable>
 
@@ -93,7 +95,7 @@ export default function ChapterItem({ chapter, onStatusChange, onPress, onDelete
           <View style={styles.menuCard}>
             <Text style={styles.menuTitle}>Status change karo</Text>
             {STATUS_OPTIONS.map(s => {
-              const sc = STATUS_COLORS[s];
+              const sc = statusColors[s];
               return (
                 <TouchableOpacity
                   key={s}
@@ -113,17 +115,17 @@ export default function ChapterItem({ chapter, onStatusChange, onPress, onDelete
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   row: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: Colors.surface, borderRadius: Radius.md,
-    borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: colors.surface, borderRadius: Radius.md,
+    borderWidth: 1, borderColor: colors.border,
     padding: Spacing.md, marginBottom: Spacing.sm, gap: 10,
   },
   rowPressed: { opacity: 0.85 },
   info: { flex: 1 },
-  name: { fontSize: FontSize.base, fontWeight: FontWeight.medium, color: Colors.textPrimary, includeFontPadding: false },
-  nameDone: { color: Colors.textTertiary, textDecorationLine: 'line-through' },
+  name: { fontSize: FontSize.base, fontWeight: FontWeight.medium, color: colors.textPrimary, includeFontPadding: false },
+  nameDone: { color: colors.textTertiary, textDecorationLine: 'line-through' },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' },
   statusPill: {
     borderRadius: Radius.full, paddingHorizontal: 8, paddingVertical: 2, borderWidth: 1,
@@ -131,30 +133,30 @@ const styles = StyleSheet.create({
   statusText: { fontSize: FontSize.xs, fontWeight: FontWeight.semiBold },
   overduePill: {
     flexDirection: 'row', alignItems: 'center', gap: 2,
-    backgroundColor: Colors.danger + '22', borderRadius: Radius.full,
+    backgroundColor: colors.danger + '22', borderRadius: Radius.full,
     paddingHorizontal: 6, paddingVertical: 2,
   },
-  overdueText: { fontSize: FontSize.xs, color: Colors.danger },
-  dateText: { fontSize: FontSize.xs, color: Colors.textTertiary },
+  overdueText: { fontSize: FontSize.xs, color: colors.danger },
+  dateText: { fontSize: FontSize.xs, color: colors.textTertiary },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   menuOverlay: {
-    flex: 1, backgroundColor: Colors.overlay,
+    flex: 1, backgroundColor: colors.overlay,
     justifyContent: 'center', alignItems: 'center', padding: Spacing.xl,
   },
   menuCard: {
-    backgroundColor: Colors.surface, borderRadius: Radius.xl,
-    borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: colors.surface, borderRadius: Radius.xl,
+    borderWidth: 1, borderColor: colors.border,
     padding: Spacing.lg, width: '100%',
   },
   menuTitle: {
     fontSize: FontSize.base, fontWeight: FontWeight.semiBold,
-    color: Colors.textSecondary, marginBottom: Spacing.sm,
+    color: colors.textSecondary, marginBottom: Spacing.sm,
   },
   menuItem: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingVertical: 12, borderRadius: Radius.md,
     paddingHorizontal: 8,
   },
-  menuItemActive: { backgroundColor: Colors.surfaceVariant },
+  menuItemActive: { backgroundColor: colors.surfaceVariant },
   menuItemText: { flex: 1, fontSize: FontSize.md, fontWeight: FontWeight.medium },
 });

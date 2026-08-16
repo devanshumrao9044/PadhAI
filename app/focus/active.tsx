@@ -1,11 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, BackHandler, AppState, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { supabase } from '@/services/supabase';
 
@@ -16,6 +17,8 @@ function formatTime(secs: number): string {
 }
 
 export default function FocusActiveScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const {
     activeSession,
@@ -56,8 +59,8 @@ export default function FocusActiveScreen() {
     : 'General';
 
   const subjectColor = activeSession?.subjectId
-    ? subjects.find(s => s.id === activeSession.subjectId)?.colorHex ?? Colors.primary
-    : Colors.primary;
+    ? subjects.find(s => s.id === activeSession.subjectId)?.colorHex ?? colors.primary
+    : colors.primary;
 
   const handleComplete = async () => {
     if (isCompletingRef.current || !activeSession) return;
@@ -284,7 +287,7 @@ export default function FocusActiveScreen() {
         </Text>
 
         <View style={styles.motivationStrip}>
-          <MaterialIcons name="lock" size={14} color={Colors.primary} />
+          <MaterialIcons name="lock" size={14} color={colors.primary} />
           <Text style={styles.motivationText}>Locked In — Focus Mode Active</Text>
         </View>
       </TouchableOpacity>
@@ -292,7 +295,7 @@ export default function FocusActiveScreen() {
       {showExit && (
         <View style={styles.exitOverlay}>
           <View style={styles.exitCard}>
-            <MaterialIcons name="warning" size={36} color={Colors.danger} />
+            <MaterialIcons name="warning" size={36} color={colors.danger} />
             <Text style={styles.exitTitle}>Do you want to break the session? </Text>
             <Text style={styles.exitSub}>
               The streak will be reset.{'\n'}XP will be deducted.{'\n'} There is a need to focus well
@@ -318,29 +321,29 @@ export default function FocusActiveScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   fullScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl },
-  subjectTag: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.surface, borderRadius: Radius.full, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: Colors.border, marginBottom: Spacing.xxl },
+  subjectTag: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surface, borderRadius: Radius.full, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: colors.border, marginBottom: Spacing.xxl },
   subjectDot: { width: 8, height: 8, borderRadius: 4 },
-  subjectText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.medium },
+  subjectText: { fontSize: FontSize.sm, color: colors.textSecondary, fontWeight: FontWeight.medium },
   timerSection: { alignItems: 'center', marginBottom: Spacing.xxl },
-  timerLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, color: Colors.textTertiary, letterSpacing: 2, marginBottom: Spacing.sm, textTransform: 'uppercase' },
-  timerText: { fontSize: 96, fontWeight: FontWeight.extraBold, color: Colors.textPrimary, letterSpacing: -2, includeFontPadding: false },
-  timerSub: { fontSize: FontSize.base, color: Colors.textSecondary, marginTop: Spacing.sm },
+  timerLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, color: colors.textTertiary, letterSpacing: 2, marginBottom: Spacing.sm, textTransform: 'uppercase' },
+  timerText: { fontSize: 96, fontWeight: FontWeight.extraBold, color: colors.textPrimary, letterSpacing: -2, includeFontPadding: false },
+  timerSub: { fontSize: FontSize.base, color: colors.textSecondary, marginTop: Spacing.sm },
   progressContainer: { width: '100%', marginBottom: Spacing.md },
-  progressTrack: { height: 6, backgroundColor: Colors.surfaceVariant, borderRadius: Radius.full, overflow: 'hidden', marginBottom: 8 },
-  progressFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: Radius.full },
-  progressPct: { fontSize: FontSize.sm, color: Colors.textTertiary, textAlign: 'center' },
-  hint: { fontSize: FontSize.xs, color: Colors.textTertiary, marginTop: Spacing.xl, textAlign: 'center' },
+  progressTrack: { height: 6, backgroundColor: colors.surfaceVariant, borderRadius: Radius.full, overflow: 'hidden', marginBottom: 8 },
+  progressFill: { height: '100%', backgroundColor: colors.primary, borderRadius: Radius.full },
+  progressPct: { fontSize: FontSize.sm, color: colors.textTertiary, textAlign: 'center' },
+  hint: { fontSize: FontSize.xs, color: colors.textTertiary, marginTop: Spacing.xl, textAlign: 'center' },
   motivationStrip: { position: 'absolute', bottom: Spacing.xl, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  motivationText: { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.medium, letterSpacing: 0.5 },
-  exitOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: Colors.overlay, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
-  exitCard: { backgroundColor: Colors.surface, borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.danger + '44', padding: Spacing.xl, alignItems: 'center', width: '100%' },
-  exitTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.textPrimary, marginVertical: Spacing.sm, includeFontPadding: false },
-  exitSub: { fontSize: FontSize.base, color: Colors.textSecondary, textAlign: 'center', lineHeight: 24, marginBottom: Spacing.lg },
-  exitConfirm: { width: '100%', backgroundColor: Colors.danger, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center', marginBottom: Spacing.sm },
-  exitConfirmText: { color: Colors.textPrimary, fontSize: FontSize.md, fontWeight: FontWeight.bold },
-  exitCancel: { width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center' },
-  exitCancelText: { color: Colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
+  motivationText: { fontSize: FontSize.xs, color: colors.primary, fontWeight: FontWeight.medium, letterSpacing: 0.5 },
+  exitOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.overlay, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
+  exitCard: { backgroundColor: colors.surface, borderRadius: Radius.xl, borderWidth: 1, borderColor: colors.danger + '44', padding: Spacing.xl, alignItems: 'center', width: '100%' },
+  exitTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: colors.textPrimary, marginVertical: Spacing.sm, includeFontPadding: false },
+  exitSub: { fontSize: FontSize.base, color: colors.textSecondary, textAlign: 'center', lineHeight: 24, marginBottom: Spacing.lg },
+  exitConfirm: { width: '100%', backgroundColor: colors.danger, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center', marginBottom: Spacing.sm },
+  exitConfirmText: { color: colors.textPrimary, fontSize: FontSize.md, fontWeight: FontWeight.bold },
+  exitCancel: { width: '100%', backgroundColor: colors.primary, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center' },
+  exitCancelText: { color: colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
 });

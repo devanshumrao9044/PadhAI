@@ -1,6 +1,33 @@
-// ZiddiStudent Design System — Dark Mode Only
+// PadhAI design system with persisted dark/light palettes.
 
-export const Colors = {
+export type ThemeColors = {
+  background: string;
+  surface: string;
+  surfaceVariant: string;
+  surfaceElevated: string;
+  primary: string;
+  primaryGlow: string;
+  primaryDim: string;
+  accent: string;
+  success: string;
+  danger: string;
+  dangerDim: string;
+  warning: string;
+  warningDim: string;
+  textPrimary: string;
+  textSecondary: string;
+  textTertiary: string;
+  border: string;
+  borderStrong: string;
+  overlay: string;
+  levelBeginner: string;
+  levelGrinder: string;
+  levelConsistent: string;
+  levelBeast: string;
+  levelLegend: string;
+};
+
+export const DarkColors: ThemeColors = {
   background: '#0A0A0F',
   surface: '#12121A',
   surfaceVariant: '#1C1C28',
@@ -20,13 +47,42 @@ export const Colors = {
   border: 'rgba(255,255,255,0.08)',
   borderStrong: 'rgba(255,255,255,0.15)',
   overlay: 'rgba(0,0,0,0.7)',
-  // Level colors
   levelBeginner: '#8888AA',
   levelGrinder: '#4FC3F7',
   levelConsistent: '#4CAF7D',
   levelBeast: '#FFB547',
   levelLegend: '#FFD700',
 };
+
+export const LightColors: ThemeColors = {
+  background: '#F7F8FC',
+  surface: '#FFFFFF',
+  surfaceVariant: '#EEF0F7',
+  surfaceElevated: '#FFFFFF',
+  primary: '#6547E8',
+  primaryGlow: '#816AF5',
+  primaryDim: '#DCD6FF',
+  accent: '#1687B5',
+  success: '#238A58',
+  danger: '#D93649',
+  dangerDim: '#F9D9DE',
+  warning: '#B76A00',
+  warningDim: '#FBE5BF',
+  textPrimary: '#171A24',
+  textSecondary: '#5B6272',
+  textTertiary: '#8A91A2',
+  border: 'rgba(23,26,36,0.10)',
+  borderStrong: 'rgba(23,26,36,0.18)',
+  overlay: 'rgba(17,20,30,0.45)',
+  levelBeginner: '#737B8C',
+  levelGrinder: '#1687B5',
+  levelConsistent: '#238A58',
+  levelBeast: '#B76A00',
+  levelLegend: '#B28700',
+};
+
+// Kept for non-React helpers and as the default palette for legacy imports.
+export const Colors = DarkColors;
 
 export const Spacing = {
   xs: 4,

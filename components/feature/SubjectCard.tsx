@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Pressable, Modal } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import type { Subject } from '@/types/models';
 
 interface SubjectCardProps {
@@ -16,6 +17,8 @@ interface SubjectCardProps {
 export default function SubjectCard({
   subject, chapterCount, doneCount, weakCount, onPress, onDelete,
 }: SubjectCardProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const progress = chapterCount > 0 ? doneCount / chapterCount : 0;
 
@@ -39,9 +42,9 @@ export default function SubjectCard({
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={styles.deleteBtn}
           >
-            <MaterialIcons name="delete-outline" size={18} color={Colors.textTertiary} />
+            <MaterialIcons name="delete-outline" size={18} color={colors.textTertiary} />
           </TouchableOpacity>
-          <MaterialIcons name="chevron-right" size={20} color={Colors.textTertiary} />
+          <MaterialIcons name="chevron-right" size={20} color={colors.textTertiary} />
         </View>
 
         {/* Progress bar */}
@@ -82,46 +85,46 @@ export default function SubjectCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   card: {
-    backgroundColor: Colors.surface, borderRadius: Radius.lg,
-    borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: colors.surface, borderRadius: Radius.lg,
+    borderWidth: 1, borderColor: colors.border,
     padding: Spacing.md, marginBottom: Spacing.sm,
   },
   cardPressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   colorBar: { width: 4, height: 44, borderRadius: 2 },
   info: { flex: 1 },
-  name: { fontSize: FontSize.md, fontWeight: FontWeight.semiBold, color: Colors.textPrimary, includeFontPadding: false },
-  meta: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
+  name: { fontSize: FontSize.md, fontWeight: FontWeight.semiBold, color: colors.textPrimary, includeFontPadding: false },
+  meta: { fontSize: FontSize.sm, color: colors.textSecondary, marginTop: 2 },
   deleteBtn: { padding: 4 },
   progressSection: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     marginTop: Spacing.sm, paddingLeft: 14,
   },
   progressTrack: {
-    flex: 1, height: 3, backgroundColor: Colors.surfaceVariant,
+    flex: 1, height: 3, backgroundColor: colors.surfaceVariant,
     borderRadius: Radius.full, overflow: 'hidden',
   },
   progressFill: { height: '100%', borderRadius: Radius.full },
-  progressText: { fontSize: FontSize.xs, color: Colors.textTertiary, width: 60, textAlign: 'right' },
-  modalOverlay: { flex: 1, backgroundColor: Colors.overlay, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
+  progressText: { fontSize: FontSize.xs, color: colors.textTertiary, width: 60, textAlign: 'right' },
+  modalOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
   confirmCard: {
-    backgroundColor: Colors.surface, borderRadius: Radius.xl,
-    borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: colors.surface, borderRadius: Radius.xl,
+    borderWidth: 1, borderColor: colors.border,
     padding: Spacing.lg, width: '100%',
   },
-  confirmTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.textPrimary, marginBottom: 6 },
-  confirmSub: { fontSize: FontSize.base, color: Colors.textSecondary, marginBottom: Spacing.lg },
+  confirmTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: colors.textPrimary, marginBottom: 6 },
+  confirmSub: { fontSize: FontSize.base, color: colors.textSecondary, marginBottom: Spacing.lg },
   confirmBtns: { flexDirection: 'row', gap: 10 },
   cancelBtn: {
-    flex: 1, backgroundColor: Colors.surfaceVariant,
+    flex: 1, backgroundColor: colors.surfaceVariant,
     borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center',
   },
-  cancelText: { color: Colors.textSecondary, fontWeight: FontWeight.semiBold },
+  cancelText: { color: colors.textSecondary, fontWeight: FontWeight.semiBold },
   deleteConfirmBtn: {
-    flex: 1, backgroundColor: Colors.danger,
+    flex: 1, backgroundColor: colors.danger,
     borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center',
   },
-  deleteConfirmText: { color: Colors.textPrimary, fontWeight: FontWeight.bold },
+  deleteConfirmText: { color: colors.textPrimary, fontWeight: FontWeight.bold },
 });

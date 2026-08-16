@@ -1,21 +1,24 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { STREAK_BROKEN_MESSAGES } from '@/constants/messages';
 import { useApp } from '@/hooks/useApp';
 
 const RECOVERY_MINS = 30;
 
 export default function StreakBrokenScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const params = useLocalSearchParams<{ lost?: string }>();
   const { user, startSession, setStreakRecoveryPending } = useApp();
-  
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const challengeSlide = useRef(new Animated.Value(40)).current;
@@ -99,13 +102,13 @@ export default function StreakBrokenScreen() {
           {displayLost > 0 ? (
             <View style={styles.infoCard}>
               <View style={styles.infoRow}>
-                <MaterialIcons name="local-fire-department" size={18} color={Colors.danger} />
+                <MaterialIcons name="local-fire-department" size={18} color={colors.danger} />
                 <Text style={styles.infoText}>
                   <Text style={styles.infoBold}>{displayLost} day</Text> ki streak gayi.
                 </Text>
               </View>
               <View style={styles.infoRow}>
-                <MaterialIcons name="emoji-events" size={18} color={Colors.warning} />
+                <MaterialIcons name="emoji-events" size={18} color={colors.warning} />
                 <Text style={styles.infoText}>
                   Best: <Text style={styles.infoBold}>{user?.streakLongest ?? 0} days</Text>
                 </Text>
@@ -139,24 +142,24 @@ export default function StreakBrokenScreen() {
               <Text style={styles.recoveryNum}>0</Text>
               <Text style={styles.recoveryLabel}>Abhi streak</Text>
             </View>
-            <MaterialIcons name="arrow-forward" size={20} color={Colors.textTertiary} />
+            <MaterialIcons name="arrow-forward" size={20} color={colors.textTertiary} />
             <View style={styles.recoveryItem}>
-              <Text style={[styles.recoveryNum, { color: Colors.success }]}>
+              <Text style={[styles.recoveryNum, { color: colors.success }]}>
                 {halfRecovered}
               </Text>
               <Text style={styles.recoveryLabel}>Recover hogi</Text>
             </View>
-            <MaterialIcons name="info-outline" size={14} color={Colors.textTertiary} />
+            <MaterialIcons name="info-outline" size={14} color={colors.textTertiary} />
             <Text style={styles.recoveryNote}>Half back</Text>
           </View>
 
           <View style={styles.rulePillRow}>
             <View style={styles.rulePill}>
-              <MaterialIcons name="timer" size={13} color={Colors.primary} />
+              <MaterialIcons name="timer" size={13} color={colors.primary} />
               <Text style={styles.rulePillText}>30 minutes full</Text>
             </View>
             <View style={styles.rulePill}>
-              <MaterialIcons name="close" size={13} color={Colors.danger} />
+              <MaterialIcons name="close" size={13} color={colors.danger} />
               <Text style={styles.rulePillText}>Break allowed nahi</Text>
             </View>
           </View>
@@ -168,7 +171,7 @@ export default function StreakBrokenScreen() {
               disabled={starting}
               activeOpacity={0.88}
             >
-              <MaterialIcons name="bolt" size={20} color={Colors.background} />
+              <MaterialIcons name="bolt" size={20} color={colors.background} />
               <Text style={styles.challengeBtnText}>
                 {starting ? 'Starting...' : `Abhi Shuru Karo — ${RECOVERY_MINS} Min`}
               </Text>
@@ -191,8 +194,8 @@ export default function StreakBrokenScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0A0A0F' },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   content: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
     padding: Spacing.lg, paddingBottom: Spacing.xxl,
@@ -202,43 +205,43 @@ const styles = StyleSheet.create({
   iconSection: { alignItems: 'center', marginBottom: Spacing.lg },
   iconBg: {
     width: 120, height: 120, borderRadius: 60,
-    backgroundColor: Colors.danger + '15',
-    borderWidth: 2, borderColor: Colors.danger + '33',
+    backgroundColor: colors.danger + '15',
+    borderWidth: 2, borderColor: colors.danger + '33',
     alignItems: 'center', justifyContent: 'center',
   },
   zeroText: {
     fontSize: 68, fontWeight: FontWeight.extraBold,
-    color: Colors.danger, includeFontPadding: false, lineHeight: 70,
+    color: colors.danger, includeFontPadding: false, lineHeight: 70,
   },
   dayLabel: {
     fontSize: FontSize.xs, fontWeight: FontWeight.semiBold,
-    color: Colors.danger, letterSpacing: 3, marginTop: 8, textTransform: 'uppercase',
+    color: colors.danger, letterSpacing: 3, marginTop: 8, textTransform: 'uppercase',
   },
 
   // Text
   textSection: { alignItems: 'center', width: '100%', marginBottom: Spacing.md },
   title: {
     fontSize: FontSize.xxl, fontWeight: FontWeight.extraBold,
-    color: Colors.textPrimary, textAlign: 'center',
+    color: colors.textPrimary, textAlign: 'center',
     includeFontPadding: false, marginBottom: 6,
   },
   subtitle: {
-    fontSize: FontSize.base, color: Colors.textSecondary,
+    fontSize: FontSize.base, color: colors.textSecondary,
     textAlign: 'center', lineHeight: 24, marginBottom: Spacing.md,
     fontStyle: 'italic',
   },
   infoCard: {
-    width: '100%', backgroundColor: Colors.surface,
-    borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border,
+    width: '100%', backgroundColor: colors.surface,
+    borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border,
     padding: Spacing.md, gap: 8,
   },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  infoText: { fontSize: FontSize.sm, color: Colors.textSecondary },
-  infoBold: { color: Colors.textPrimary, fontWeight: FontWeight.semiBold },
+  infoText: { fontSize: FontSize.sm, color: colors.textSecondary },
+  infoBold: { color: colors.textPrimary, fontWeight: FontWeight.semiBold },
 
   // Challenge card
   challengeCard: {
-    width: '100%', backgroundColor: Colors.surface,
+    width: '100%', backgroundColor: colors.surface,
     borderRadius: Radius.xl,
     borderWidth: 1.5, borderColor: '#F97316' + '66',
     padding: Spacing.md, marginBottom: Spacing.sm,
@@ -259,31 +262,31 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs, fontWeight: FontWeight.extraBold,
     color: '#F97316', letterSpacing: 1.5, textTransform: 'uppercase',
   },
-  challengeSub: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
+  challengeSub: { fontSize: FontSize.sm, color: colors.textSecondary, marginTop: 2 },
 
   // Recovery numbers
   recoveryRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: Colors.surfaceVariant, borderRadius: Radius.md,
+    backgroundColor: colors.surfaceVariant, borderRadius: Radius.md,
     paddingHorizontal: Spacing.md, paddingVertical: 10,
   },
   recoveryItem: { alignItems: 'center', minWidth: 44 },
   recoveryNum: {
     fontSize: FontSize.xl, fontWeight: FontWeight.extraBold,
-    color: Colors.textPrimary, includeFontPadding: false,
+    color: colors.textPrimary, includeFontPadding: false,
   },
-  recoveryLabel: { fontSize: 10, color: Colors.textTertiary, marginTop: 2 },
-  recoveryNote: { fontSize: FontSize.xs, color: Colors.textTertiary, flex: 1 },
+  recoveryLabel: { fontSize: 10, color: colors.textTertiary, marginTop: 2 },
+  recoveryNote: { fontSize: FontSize.xs, color: colors.textTertiary, flex: 1 },
 
   // Rule pills
   rulePillRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   rulePill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: Colors.surfaceVariant, borderRadius: Radius.full,
+    backgroundColor: colors.surfaceVariant, borderRadius: Radius.full,
     paddingHorizontal: 10, paddingVertical: 5,
-    borderWidth: 1, borderColor: Colors.border,
+    borderWidth: 1, borderColor: colors.border,
   },
-  rulePillText: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
+  rulePillText: { fontSize: FontSize.xs, color: colors.textSecondary, fontWeight: FontWeight.medium },
 
   // CTA
   challengeBtn: {
@@ -292,17 +295,17 @@ const styles = StyleSheet.create({
   },
   challengeBtnDisabled: { opacity: 0.55 },
   challengeBtnText: {
-    color: Colors.background, fontSize: FontSize.md, fontWeight: FontWeight.extraBold,
+    color: colors.background, fontSize: FontSize.md, fontWeight: FontWeight.extraBold,
     letterSpacing: 0.5,
   },
 
   // Skip
   skipSection: { width: '100%', marginTop: 4 },
   homeBtn: {
-    backgroundColor: Colors.surface, borderRadius: Radius.md,
+    backgroundColor: colors.surface, borderRadius: Radius.md,
     paddingVertical: 13, alignItems: 'center',
-    borderWidth: 1, borderColor: Colors.border,
+    borderWidth: 1, borderColor: colors.border,
   },
-  homeBtnText: { color: Colors.textTertiary, fontSize: FontSize.sm, fontWeight: FontWeight.medium },
+  homeBtnText: { color: colors.textTertiary, fontSize: FontSize.sm, fontWeight: FontWeight.medium },
 });
 

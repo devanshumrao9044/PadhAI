@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable,
   TextInput, Alert,
@@ -6,7 +6,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { calculateSessionXP } from '@/constants/levels';
 
@@ -14,6 +15,8 @@ const DURATIONS = [15, 25, 45, 60, 90];
 const CUSTOM_KEY = -1;
 
 export default function FocusScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { subjects, startSession } = useApp();
   const [selectedMins, setSelectedMins] = useState(25);
@@ -97,7 +100,7 @@ export default function FocusScreen() {
             <MaterialIcons
               name="edit"
               size={22}
-              color={isCustomSelected ? Colors.primary : Colors.textTertiary}
+              color={isCustomSelected ? colors.primary : colors.textTertiary}
             />
             <Text style={[styles.durationLabel, isCustomSelected ? styles.durationLabelActive : null]}>
               custom
@@ -115,14 +118,14 @@ export default function FocusScreen() {
               onChangeText={handleCustomChange}
               keyboardType="number-pad"
               placeholder="e.g. 50"
-              placeholderTextColor={Colors.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               maxLength={3}
               returnKeyType="done"
             />
             <Text style={styles.customInputLabel}>minutes</Text>
             {customInput.length > 0 && parseInt(customInput, 10) > 0 ? (
               <View style={styles.customXPPreview}>
-                <MaterialIcons name="bolt" size={14} color={Colors.warning} />
+                <MaterialIcons name="bolt" size={14} color={colors.warning} />
                 <Text style={styles.customXPText}>+{calculateSessionXP(parseInt(customInput, 10))} XP</Text>
               </View>
             ) : null}
@@ -131,7 +134,7 @@ export default function FocusScreen() {
 
         {/* XP preview */}
         <View style={styles.xpPreview}>
-          <MaterialIcons name="bolt" size={18} color={Colors.warning} />
+          <MaterialIcons name="bolt" size={18} color={colors.warning} />
           <Text style={styles.xpPreviewText}>
             Is session mein milega: <Text style={styles.xpPreviewBold}>+{expectedXP} XP</Text>
           </Text>
@@ -173,15 +176,15 @@ export default function FocusScreen() {
         <View style={styles.rulesCard}>
           <Text style={styles.rulesTitle}>Focus Rules</Text>
           <View style={styles.ruleRow}>
-            <MaterialIcons name="lock" size={14} color={Colors.primary} />
+            <MaterialIcons name="lock" size={14} color={colors.primary} />
             <Text style={styles.ruleText}>Session ke beech app band karna = streak reset</Text>
           </View>
           <View style={styles.ruleRow}>
-            <MaterialIcons name="warning" size={14} color={Colors.warning} />
+            <MaterialIcons name="warning" size={14} color={colors.warning} />
             <Text style={styles.ruleText}>Session todne par XP kata jayega</Text>
           </View>
           <View style={styles.ruleRow}>
-            <MaterialIcons name="touch-app" size={14} color={Colors.textSecondary} />
+            <MaterialIcons name="touch-app" size={14} color={colors.textSecondary} />
             <Text style={styles.ruleText}>Emergency exit: screen par triple tap</Text>
           </View>
         </View>
@@ -193,7 +196,7 @@ export default function FocusScreen() {
           disabled={isLockInDisabled}
           activeOpacity={0.85}
         >
-          <MaterialIcons name="lock" size={24} color={Colors.background} />
+          <MaterialIcons name="lock" size={24} color={colors.background} />
           <Text style={styles.lockInText}>
             {starting ? 'Starting...' : (isCustomSelected && effectiveMins > 0 ? `LOCK IN — ${effectiveMins} MIN` : 'LOCK IN')}
           </Text>
@@ -204,18 +207,18 @@ export default function FocusScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scroll: { padding: Spacing.md, paddingBottom: 100 },
   title: {
     fontSize: FontSize.xxl, fontWeight: FontWeight.bold,
-    color: Colors.textPrimary, includeFontPadding: false,
+    color: colors.textPrimary, includeFontPadding: false,
   },
-  subtitle: { fontSize: FontSize.base, color: Colors.textSecondary, marginTop: 4, marginBottom: Spacing.lg },
+  subtitle: { fontSize: FontSize.base, color: colors.textSecondary, marginTop: 4, marginBottom: Spacing.lg },
   sectionLabel: {
     fontSize: FontSize.xs, fontWeight: FontWeight.semiBold,
-    color: Colors.textTertiary, letterSpacing: 1.2,
+    color: colors.textTertiary, letterSpacing: 1.2,
     marginBottom: Spacing.sm, textTransform: 'uppercase',
   },
   durationGrid: {
@@ -225,33 +228,33 @@ const styles = StyleSheet.create({
   durationChip: {
     alignItems: 'center', justifyContent: 'center',
     width: 72, height: 72,
-    backgroundColor: Colors.surface, borderRadius: Radius.lg,
-    borderWidth: 1.5, borderColor: Colors.border,
+    backgroundColor: colors.surface, borderRadius: Radius.lg,
+    borderWidth: 1.5, borderColor: colors.border,
   },
   durationChipActive: {
-    backgroundColor: Colors.primary + '22',
-    borderColor: Colors.primary,
+    backgroundColor: colors.primary + '22',
+    borderColor: colors.primary,
   },
-  durationMins: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.textSecondary, includeFontPadding: false },
-  durationMinsActive: { color: Colors.primary },
-  durationLabel: { fontSize: FontSize.xs, color: Colors.textTertiary },
-  durationLabelActive: { color: Colors.primary },
+  durationMins: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: colors.textSecondary, includeFontPadding: false },
+  durationMinsActive: { color: colors.primary },
+  durationLabel: { fontSize: FontSize.xs, color: colors.textTertiary },
+  durationLabelActive: { color: colors.primary },
   xpPreview: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: Colors.surface, borderRadius: Radius.md,
+    backgroundColor: colors.surface, borderRadius: Radius.md,
     padding: Spacing.sm, marginBottom: Spacing.lg,
-    borderWidth: 1, borderColor: Colors.border,
+    borderWidth: 1, borderColor: colors.border,
   },
-  xpPreviewText: { fontSize: FontSize.base, color: Colors.textSecondary },
-  xpPreviewBold: { color: Colors.warning, fontWeight: FontWeight.bold },
+  xpPreviewText: { fontSize: FontSize.base, color: colors.textSecondary },
+  xpPreviewBold: { color: colors.warning, fontWeight: FontWeight.bold },
   customInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Radius.md,
     borderWidth: 1.5,
-    borderColor: Colors.primary + '88',
+    borderColor: colors.primary + '88',
     paddingHorizontal: Spacing.md,
     paddingVertical: 10,
     marginBottom: Spacing.sm,
@@ -259,14 +262,14 @@ const styles = StyleSheet.create({
   customInput: {
     fontSize: 32,
     fontWeight: FontWeight.extraBold,
-    color: Colors.primary,
+    color: colors.primary,
     includeFontPadding: false,
     minWidth: 70,
     padding: 0,
   },
   customInputLabel: {
     fontSize: FontSize.base,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     fontWeight: FontWeight.medium,
   },
   customXPPreview: {
@@ -274,7 +277,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 3,
     marginLeft: 'auto' as any,
-    backgroundColor: Colors.warning + '22',
+    backgroundColor: colors.warning + '22',
     borderRadius: Radius.full,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -282,33 +285,33 @@ const styles = StyleSheet.create({
   customXPText: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.bold,
-    color: Colors.warning,
+    color: colors.warning,
   },
   subjectScroll: { marginBottom: Spacing.lg },
   subjectRow: { flexDirection: 'row', gap: 8, paddingVertical: 4 },
   subjectChip: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 14, paddingVertical: 8,
-    backgroundColor: Colors.surface, borderRadius: Radius.full,
-    borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: colors.surface, borderRadius: Radius.full,
+    borderWidth: 1, borderColor: colors.border,
   },
-  subjectChipActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '22' },
+  subjectChipActive: { borderColor: colors.primary, backgroundColor: colors.primary + '22' },
   subjectDot: { width: 8, height: 8, borderRadius: 4 },
-  subjectChipText: { fontSize: FontSize.sm, color: Colors.textSecondary, fontWeight: FontWeight.medium },
-  subjectChipTextActive: { color: Colors.textPrimary },
+  subjectChipText: { fontSize: FontSize.sm, color: colors.textSecondary, fontWeight: FontWeight.medium },
+  subjectChipTextActive: { color: colors.textPrimary },
   rulesCard: {
-    backgroundColor: Colors.surface, borderRadius: Radius.lg,
-    borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: colors.surface, borderRadius: Radius.lg,
+    borderWidth: 1, borderColor: colors.border,
     padding: Spacing.md, marginBottom: Spacing.lg, gap: 10,
   },
-  rulesTitle: { fontSize: FontSize.base, fontWeight: FontWeight.semiBold, color: Colors.textPrimary, marginBottom: 4 },
+  rulesTitle: { fontSize: FontSize.base, fontWeight: FontWeight.semiBold, color: colors.textPrimary, marginBottom: 4 },
   ruleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  ruleText: { fontSize: FontSize.sm, color: Colors.textSecondary, flex: 1 },
+  ruleText: { fontSize: FontSize.sm, color: colors.textSecondary, flex: 1 },
   lockInBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: Colors.primary, borderRadius: Radius.md,
+    backgroundColor: colors.primary, borderRadius: Radius.md,
     paddingVertical: 18, gap: 10,
   },
   lockInBtnDisabled: { opacity: 0.6 },
-  lockInText: { color: Colors.background, fontSize: FontSize.lg, fontWeight: FontWeight.extraBold, letterSpacing: 2 },
+  lockInText: { color: colors.background, fontSize: FontSize.lg, fontWeight: FontWeight.extraBold, letterSpacing: 2 },
 });

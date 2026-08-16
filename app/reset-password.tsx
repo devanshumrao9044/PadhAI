@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors } from '@/constants/theme';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -17,6 +19,8 @@ import { supabase } from '@/services/supabase';
 import { useAuthSession } from '@/auth/AuthSessionProvider';
 
 export default function ResetPasswordScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { signOut } = useAuthSession();
   const [checking, setChecking] = useState(true);
@@ -174,21 +178,21 @@ export default function ResetPasswordScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0A0A0F', justifyContent: 'center' },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background, justifyContent: 'center' },
   flex: { flex: 1 },
   content: { flexGrow: 1, justifyContent: 'center', padding: 24 },
   logo: { color: '#FFFFFF', fontSize: 52, fontWeight: '900', textAlign: 'center' },
-  logoAccent: { color: '#7C5CFC' },
-  title: { color: '#F1F1F6', fontSize: 26, fontWeight: '800', textAlign: 'center', marginTop: 24 },
-  subtitle: { color: '#9CA3AF', fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 8, marginBottom: 24 },
+  logoAccent: { color: colors.primary },
+  title: { color: colors.textPrimary, fontSize: 26, fontWeight: '800', textAlign: 'center', marginTop: 24 },
+  subtitle: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 8, marginBottom: 24 },
   card: { backgroundColor: '#0F0F1A', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: 'rgba(124,92,252,0.15)' },
-  input: { backgroundColor: '#1A1A27', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', color: '#F1F1F6', paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12 },
-  button: { minHeight: 50, borderRadius: 12, backgroundColor: '#7C5CFC', alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  input: { backgroundColor: colors.surfaceVariant, borderRadius: 12, borderWidth: 1, borderColor: colors.border, color: colors.textPrimary, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12 },
+  button: { minHeight: 50, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
   error: { color: '#FF4757', textAlign: 'center', marginBottom: 16, lineHeight: 20 },
   backButton: { alignItems: 'center', paddingVertical: 18 },
-  backText: { color: '#9CA3AF', fontSize: 14, fontWeight: '600' },
+  backText: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
 });
 

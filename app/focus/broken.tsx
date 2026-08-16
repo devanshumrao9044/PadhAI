@@ -1,15 +1,18 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { SESSION_BREAK_MESSAGES } from '@/constants/messages';
 
 export default function FocusBrokenScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const params = useLocalSearchParams<{ penalty: string }>();
-  
+
   // Safe parsing
   const penalty = parseInt(params.penalty ?? '0', 10);
 
@@ -40,7 +43,7 @@ export default function FocusBrokenScreen() {
       <View style={styles.content}>
         <Animated.View style={[styles.iconContainer, { transform: [{ translateX: shakeAnim }, { scale: scaleAnim }] }]}>
           <View style={styles.iconBg}>
-            <MaterialIcons name="cancel" size={80} color={Colors.danger} />
+            <MaterialIcons name="cancel" size={80} color={colors.danger} />
           </View>
         </Animated.View>
 
@@ -50,15 +53,15 @@ export default function FocusBrokenScreen() {
 
           <View style={styles.consequences}>
             <View style={styles.consequenceRow}>
-              <MaterialIcons name="remove-circle" size={18} color={Colors.danger} />
+              <MaterialIcons name="remove-circle" size={18} color={colors.danger} />
               <Text style={styles.consequenceText}>{penalty > 0 ? `-${penalty} XP deducted` : 'XP penalized'}</Text>
             </View>
             <View style={styles.consequenceRow}>
-              <MaterialIcons name="remove-circle" size={18} color={Colors.danger} />
+              <MaterialIcons name="remove-circle" size={18} color={colors.danger} />
               <Text style={styles.consequenceText}>Streak reset to 0</Text>
             </View>
             <View style={styles.consequenceRow}>
-              <MaterialIcons name="remove-circle" size={18} color={Colors.danger} />
+              <MaterialIcons name="remove-circle" size={18} color={colors.danger} />
               <Text style={styles.consequenceText}>Consistency damaged</Text>
             </View>
           </View>
@@ -73,7 +76,7 @@ export default function FocusBrokenScreen() {
 
         <Animated.View style={[styles.actions, { opacity: fadeAnim }]}>
           <TouchableOpacity style={styles.tryAgainBtn} onPress={() => router.replace('/(tabs)/focus')} activeOpacity={0.85}>
-            <MaterialIcons name="replay" size={20} color={Colors.background} />
+            <MaterialIcons name="replay" size={20} color={colors.background} />
             <Text style={styles.tryAgainText}>Retry</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.homeBtn} onPress={() => router.replace('/(tabs)')} activeOpacity={0.85}>
@@ -85,23 +88,23 @@ export default function FocusBrokenScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0A0005' },
   content: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl },
   iconContainer: { marginBottom: Spacing.xl },
-  iconBg: { width: 140, height: 140, borderRadius: 70, backgroundColor: Colors.danger + '22', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: Colors.danger + '44' },
+  iconBg: { width: 140, height: 140, borderRadius: 70, backgroundColor: colors.danger + '22', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.danger + '44' },
   messageSection: { alignItems: 'center', width: '100%', marginBottom: Spacing.xl },
-  brokenTitle: { fontSize: FontSize.xxl, fontWeight: FontWeight.extraBold, color: Colors.danger, textAlign: 'center', includeFontPadding: false, marginBottom: Spacing.md },
-  rudeMessage: { fontSize: FontSize.lg, color: Colors.textPrimary, textAlign: 'center', lineHeight: 28, fontWeight: FontWeight.semiBold, marginBottom: Spacing.lg, fontStyle: 'italic' },
-  consequences: { width: '100%', gap: 10, backgroundColor: Colors.danger + '11', borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1, borderColor: Colors.danger + '22', marginBottom: Spacing.md },
+  brokenTitle: { fontSize: FontSize.xxl, fontWeight: FontWeight.extraBold, color: colors.danger, textAlign: 'center', includeFontPadding: false, marginBottom: Spacing.md },
+  rudeMessage: { fontSize: FontSize.lg, color: colors.textPrimary, textAlign: 'center', lineHeight: 28, fontWeight: FontWeight.semiBold, marginBottom: Spacing.lg, fontStyle: 'italic' },
+  consequences: { width: '100%', gap: 10, backgroundColor: colors.danger + '11', borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1, borderColor: colors.danger + '22', marginBottom: Spacing.md },
   consequenceRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  consequenceText: { fontSize: FontSize.base, color: Colors.textSecondary },
-  penaltyCard: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.dangerDim, borderRadius: Radius.md, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, borderWidth: 1, borderColor: Colors.danger + '55' },
-  penaltyText: { fontSize: 32, fontWeight: FontWeight.extraBold, color: Colors.danger, includeFontPadding: false },
-  penaltyLabel: { fontSize: FontSize.base, color: Colors.danger + 'AA' },
+  consequenceText: { fontSize: FontSize.base, color: colors.textSecondary },
+  penaltyCard: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.dangerDim, borderRadius: Radius.md, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, borderWidth: 1, borderColor: colors.danger + '55' },
+  penaltyText: { fontSize: 32, fontWeight: FontWeight.extraBold, color: colors.danger, includeFontPadding: false },
+  penaltyLabel: { fontSize: FontSize.base, color: colors.danger + 'AA' },
   actions: { width: '100%', gap: 10 },
-  tryAgainBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.danger, borderRadius: Radius.md, paddingVertical: 16 },
-  tryAgainText: { color: Colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
-  homeBtn: { backgroundColor: Colors.surface, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
-  homeBtnText: { color: Colors.textSecondary, fontSize: FontSize.md, fontWeight: FontWeight.semiBold },
+  tryAgainBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.danger, borderRadius: Radius.md, paddingVertical: 16 },
+  tryAgainText: { color: colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
+  homeBtn: { backgroundColor: colors.surface, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  homeBtnText: { color: colors.textSecondary, fontSize: FontSize.md, fontWeight: FontWeight.semiBold },
 });

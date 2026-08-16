@@ -11,10 +11,13 @@ import StatsRow from '../../components/dashboard/StatsRow';
 import QuickShortcuts from '../../components/dashboard/QuickShortcuts';
 import QuoteCard from '../../components/dashboard/QuoteCard';
 import { useApp } from '@/hooks/useApp';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors } from '@/constants/theme';
 
 export default function Dashboard() {
   const router = useRouter();
-  
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, chapters, sessions, dailySummaries, reload } = useApp();
   const [refreshing, setRefreshing] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -82,9 +85,9 @@ export default function Dashboard() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#A855F7"
-            colors={['#A855F7']}
-            progressBackgroundColor="#1C1C1E"
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+            progressBackgroundColor={colors.surfaceVariant}
           />
         }
       >
@@ -92,7 +95,7 @@ export default function Dashboard() {
           <Text style={styles.appName}>
             पढ़<Text style={styles.ai}>AI</Text>
           </Text>
-          
+
           {/* Header Right Actions */}
           <View style={styles.headerRight}>
             <Text style={styles.date}>
@@ -100,13 +103,13 @@ export default function Dashboard() {
                 weekday: 'short', day: 'numeric', month: 'short'
               })}
             </Text>
-            
-            <TouchableOpacity 
-              style={styles.referralBtn} 
+
+            <TouchableOpacity
+              style={styles.referralBtn}
               onPress={() => router.push('/referral')}
               activeOpacity={0.8}
             >
-              <MaterialIcons name="card-giftcard" size={22} color="#A855F7" />
+              <MaterialIcons name="card-giftcard" size={22} color={colors.primary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -125,10 +128,10 @@ export default function Dashboard() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#0F0F0F',
+    backgroundColor: colors.background,
     minHeight: '100vh' as any,
   },
   scroll: { flex: 1 },
@@ -147,20 +150,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
-  appName: { fontSize: 28, fontWeight: '900', color: '#FFFFFF' },
+  appName: { fontSize: 28, fontWeight: '900', color: colors.textPrimary },
   ai: { color: '#A855F7' },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  date: { color: '#6B7280', fontSize: 14, fontWeight: '500' },
+  date: { color: colors.textTertiary, fontSize: 14, fontWeight: '500' },
   referralBtn: {
-    backgroundColor: 'rgba(168, 85, 247, 0.12)',
+    backgroundColor: colors.primary + '1F',
     padding: 8,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(168, 85, 247, 0.3)',
+    borderColor: colors.primary + '4D',
   },
 });
 

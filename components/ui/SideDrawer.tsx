@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   Animated, Pressable, View, Text, StyleSheet,
   TouchableOpacity, Dimensions, ScrollView
@@ -6,7 +6,8 @@ import {
 import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { getLevelForUser } from '@/constants/levels';
 
@@ -27,6 +28,8 @@ const MENU_ITEMS = [
 ];
 
 export default function SideDrawer({ visible, onClose }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useApp();
@@ -108,17 +111,17 @@ export default function SideDrawer({ visible, onClose }: Props) {
             ) : null}
           </View>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <MaterialIcons name="close" size={22} color={Colors.textSecondary} />
+            <MaterialIcons name="close" size={22} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
 
         {/* XP strip */}
         {user ? (
           <View style={styles.xpStrip}>
-            <MaterialIcons name="bolt" size={14} color={Colors.warning} />
+            <MaterialIcons name="bolt" size={14} color={colors.warning} />
             <Text style={styles.xpText}>{user.xpTotal} Weekly XP</Text>
             <View style={styles.xpDivider} />
-            <MaterialIcons name="local-fire-department" size={14} color={Colors.danger} />
+            <MaterialIcons name="local-fire-department" size={14} color={colors.danger} />
             <Text style={styles.xpText}>{user.streakCurrent} day streak</Text>
           </View>
         ) : null}
@@ -135,10 +138,10 @@ export default function SideDrawer({ visible, onClose }: Props) {
               activeOpacity={0.7}
             >
               <View style={styles.menuIconWrap}>
-                <MaterialIcons name={item.icon} size={20} color={Colors.textSecondary} />
+                <MaterialIcons name={item.icon} size={20} color={colors.textSecondary} />
               </View>
               <Text style={styles.menuLabel}>{item.label}</Text>
-              <MaterialIcons name="chevron-right" size={18} color={Colors.textTertiary} />
+              <MaterialIcons name="chevron-right" size={18} color={colors.textTertiary} />
             </TouchableOpacity>
           ))}
 
@@ -151,7 +154,7 @@ export default function SideDrawer({ visible, onClose }: Props) {
             activeOpacity={0.8}
           >
             <View style={styles.referIconWrap}>
-              <MaterialIcons name="card-giftcard" size={20} color={Colors.primary} />
+              <MaterialIcons name="card-giftcard" size={20} color={colors.primary} />
             </View>
             <View style={styles.referTextBlock}>
               <Text style={styles.referLabel}>Refer and earn</Text>
@@ -172,7 +175,7 @@ export default function SideDrawer({ visible, onClose }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.65)',
@@ -184,9 +187,9 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: DRAWER_WIDTH,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRightWidth: 1,
-    borderRightColor: Colors.border,
+    borderRightColor: colors.border,
     zIndex: 101,
     elevation: 24,
     shadowColor: '#000',
@@ -205,23 +208,23 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.primary + '22',
+    backgroundColor: colors.primary + '22',
     borderWidth: 2,
-    borderColor: Colors.primary + '66',
+    borderColor: colors.primary + '66',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
-    color: Colors.primary,
+    color: colors.primary,
     includeFontPadding: false,
   },
   userInfo: { flex: 1 },
   userName: {
     fontSize: FontSize.md,
     fontWeight: FontWeight.semiBold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     includeFontPadding: false,
   },
   levelBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
@@ -231,16 +234,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: Colors.surfaceVariant,
+    backgroundColor: colors.surfaceVariant,
     marginHorizontal: Spacing.md,
     borderRadius: Radius.sm,
     paddingHorizontal: 10,
     paddingVertical: 7,
     marginBottom: Spacing.sm,
   },
-  xpText: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: FontWeight.medium },
-  xpDivider: { width: 1, height: 12, backgroundColor: Colors.border, marginHorizontal: 2 },
-  divider: { height: 1, backgroundColor: Colors.border, marginVertical: Spacing.sm, marginHorizontal: Spacing.md },
+  xpText: { fontSize: FontSize.xs, color: colors.textSecondary, fontWeight: FontWeight.medium },
+  xpDivider: { width: 1, height: 12, backgroundColor: colors.border, marginHorizontal: 2 },
+  divider: { height: 1, backgroundColor: colors.border, marginVertical: Spacing.sm, marginHorizontal: Spacing.md },
   menuScroll: { flex: 1 },
   menuItem: {
     flexDirection: 'row',
@@ -253,7 +256,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: Radius.sm,
-    backgroundColor: Colors.surfaceVariant,
+    backgroundColor: colors.surfaceVariant,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -261,7 +264,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: FontSize.base,
     fontWeight: FontWeight.medium,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   // Refer & Earn highlighted row
   referItem: {
@@ -270,16 +273,16 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingHorizontal: Spacing.md,
     paddingVertical: 13,
-    backgroundColor: Colors.primary + '0F',
+    backgroundColor: colors.primary + '0F',
     borderTopWidth: 0,
   },
   referIconWrap: {
     width: 36,
     height: 36,
     borderRadius: Radius.sm,
-    backgroundColor: Colors.primary + '22',
+    backgroundColor: colors.primary + '22',
     borderWidth: 1,
-    borderColor: Colors.primary + '44',
+    borderColor: colors.primary + '44',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -287,15 +290,15 @@ const styles = StyleSheet.create({
   referLabel: {
     fontSize: FontSize.base,
     fontWeight: FontWeight.semiBold,
-    color: Colors.primary,
+    color: colors.primary,
   },
   referSub: {
     fontSize: FontSize.xs,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 1,
   },
   referBadge: {
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: Radius.full,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -307,6 +310,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   footer: { paddingHorizontal: Spacing.md, paddingTop: Spacing.sm },
-  footerText: { fontSize: FontSize.xs, color: Colors.textTertiary, textAlign: 'center' },
+  footerText: { fontSize: FontSize.xs, color: colors.textTertiary, textAlign: 'center' },
 });
 

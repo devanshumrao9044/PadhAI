@@ -1,4 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors } from '@/constants/theme';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   Share, ScrollView, ActivityIndicator,
@@ -15,6 +17,8 @@ const INSTAGRAM_URL = 'https://www.instagram.com/materialhubx';
 const EMAIL_ADDRESS = 'materialhubx@gmail.com';
 
 export default function ReferralScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [loading, setLoading] = useState(true);
   const [myCode, setMyCode] = useState<string | null>(null);
   const [completed, setCompleted] = useState(0);
@@ -32,12 +36,12 @@ export default function ReferralScreen() {
       return;
     }
     const stats = await fetchReferralStats(user.id);
-    setMyCode(stats.myCode);
+    setMyCode(stats.myCode?.toUpperCase() ?? null);
     setCompleted(stats.completed);
     setPending(stats.pending);
     setHasUnlockedReward(stats.hasUnlockedReward);
     setLoading(false);
-    
+
     if (stats.hasUnlockedReward) {
       const { data: userData } = await supabase
         .from('users')
@@ -254,7 +258,7 @@ export default function ReferralScreen() {
               onPress={() => { setShowReward(false); claimViaEmail(); }}
               activeOpacity={0.8}
             >
-              <Text style={[styles.modalBtnText, { color: '#9CA3AF' }]}>
+              <Text style={[styles.modalBtnText, { color: colors.textSecondary }]}>
                 ✉️ Claim via Email
               </Text>
             </TouchableOpacity>
@@ -268,24 +272,24 @@ export default function ReferralScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0A0A0F' },
-  loader: { flex: 1, backgroundColor: '#0A0A0F', justifyContent: 'center', alignItems: 'center' },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.background },
+  loader: { flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingVertical: 14,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
   },
   backBtn: { width: 40, alignItems: 'flex-start' },
-  backArrow: { color: '#7C5CFC', fontSize: 22, fontWeight: '700' },
-  headerTitle: { color: '#F1F1F6', fontSize: 17, fontWeight: '700' },
+  backArrow: { color: colors.primary, fontSize: 22, fontWeight: '700' },
+  headerTitle: { color: colors.textPrimary, fontSize: 17, fontWeight: '700' },
   scroll: { flex: 1 },
   content: { padding: 20, paddingBottom: 60, gap: 16 },
 
   hero: { alignItems: 'center', paddingVertical: 12 },
   heroEmoji: { fontSize: 48, marginBottom: 12 },
-  heroTitle: { color: '#F1F1F6', fontSize: 22, fontWeight: '800', marginBottom: 8, textAlign: 'center' },
-  heroSubtitle: { color: '#6B7280', fontSize: 14, textAlign: 'center', lineHeight: 20, maxWidth: 300 },
+  heroTitle: { color: colors.textPrimary, fontSize: 22, fontWeight: '800', marginBottom: 8, textAlign: 'center' },
+  heroSubtitle: { color: colors.textTertiary, fontSize: 14, textAlign: 'center', lineHeight: 20, maxWidth: 300 },
 
   card: {
     backgroundColor: '#0F0F1A', borderRadius: 16,
@@ -293,46 +297,46 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(124, 92, 252, 0.12)',
   },
   cardLabel: {
-    color: '#6B7280', fontSize: 11, fontWeight: '700',
+    color: colors.textTertiary, fontSize: 11, fontWeight: '700',
     letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 14,
   },
   codeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  codeText: { color: '#F1F1F6', fontSize: 26, fontWeight: '900', letterSpacing: 3 },
+  codeText: { color: colors.textPrimary, fontSize: 26, fontWeight: '900', letterSpacing: 3 },
   copyBtn: {
     backgroundColor: 'rgba(124, 92, 252, 0.15)', borderRadius: 8,
     paddingHorizontal: 14, paddingVertical: 8,
     borderWidth: 1, borderColor: 'rgba(124, 92, 252, 0.3)',
   },
   copyBtnDone: { backgroundColor: 'rgba(46, 213, 115, 0.15)', borderColor: 'rgba(46, 213, 115, 0.3)' },
-  copyBtnText: { color: '#7C5CFC', fontSize: 13, fontWeight: '700' },
+  copyBtnText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
   shareBtn: {
-    backgroundColor: '#7C5CFC', borderRadius: 12,
+    backgroundColor: colors.primary, borderRadius: 12,
     paddingVertical: 13, alignItems: 'center',
   },
   shareBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
 
   progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   progressCount: { fontSize: 16 },
-  progressDone: { color: '#7C5CFC', fontWeight: '900', fontSize: 20 },
-  progressTotal: { color: '#6B7280', fontWeight: '600' },
+  progressDone: { color: colors.primary, fontWeight: '900', fontSize: 20 },
+  progressTotal: { color: colors.textTertiary, fontWeight: '600' },
   progressTrack: {
     height: 8, backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 4, overflow: 'hidden', marginVertical: 12,
   },
-  progressFill: { height: '100%', backgroundColor: '#7C5CFC', borderRadius: 4 },
-  progressHint: { color: '#9CA3AF', fontSize: 13, lineHeight: 18 },
+  progressFill: { height: '100%', backgroundColor: colors.primary, borderRadius: 4 },
+  progressHint: { color: colors.textSecondary, fontSize: 13, lineHeight: 18 },
   pendingText: { color: '#F59E0B', fontSize: 12, marginTop: 8 },
 
   rewardCard: { borderColor: 'rgba(253, 224, 71, 0.25)', backgroundColor: 'rgba(253, 224, 71, 0.04)' },
   rewardTitle: { color: '#FDE047', fontSize: 20, fontWeight: '800', marginBottom: 6 },
-  rewardSubtitle: { color: '#9CA3AF', fontSize: 13, marginBottom: 16 },
+  rewardSubtitle: { color: colors.textSecondary, fontSize: 13, marginBottom: 16 },
   claimBtn: {
-    backgroundColor: '#7C5CFC', borderRadius: 12,
+    backgroundColor: colors.primary, borderRadius: 12,
     paddingVertical: 13, alignItems: 'center', marginBottom: 10,
   },
   claimBtnEmail: { backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
   claimBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
-  claimBtnEmailText: { color: '#9CA3AF' },
+  claimBtnEmailText: { color: colors.textSecondary },
 
   stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
   stepBadge: {
@@ -340,8 +344,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(124, 92, 252, 0.2)',
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  stepNumber: { color: '#7C5CFC', fontSize: 12, fontWeight: '800' },
-  stepText: { color: '#9CA3AF', fontSize: 13, lineHeight: 20, flex: 1 },
+  stepNumber: { color: colors.primary, fontSize: 12, fontWeight: '800' },
+  stepText: { color: colors.textSecondary, fontSize: 13, lineHeight: 20, flex: 1 },
 
   modalOverlay: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.75)',
@@ -354,9 +358,9 @@ const styles = StyleSheet.create({
   },
   modalEmoji: { fontSize: 56, marginBottom: 16 },
   modalTitle: { color: '#FDE047', fontSize: 24, fontWeight: '900', marginBottom: 8 },
-  modalSubtitle: { color: '#9CA3AF', fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+  modalSubtitle: { color: colors.textSecondary, fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
   modalInstagramBtn: {
-    backgroundColor: '#7C5CFC', borderRadius: 12,
+    backgroundColor: colors.primary, borderRadius: 12,
     paddingVertical: 14, width: '100%', alignItems: 'center', marginBottom: 10,
   },
   modalEmailBtn: {

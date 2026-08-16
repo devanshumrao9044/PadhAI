@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Colors, Radius, FontSize, FontWeight, Spacing } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors, Radius, FontSize, FontWeight } from '@/constants/theme';
 
 interface StreakBadgeProps {
   streak: number;
@@ -9,10 +10,12 @@ interface StreakBadgeProps {
 }
 
 export default function StreakBadge({ streak, size = 'md' }: StreakBadgeProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const isAlive = streak > 0;
-  const color = isAlive ? Colors.danger : Colors.textTertiary;
-  const bg = isAlive ? Colors.danger + '22' : Colors.surfaceVariant;
-  const borderColor = isAlive ? Colors.danger + '44' : Colors.border;
+  const color = isAlive ? colors.danger : colors.textTertiary;
+  const bg = isAlive ? colors.danger + '22' : colors.surfaceVariant;
+  const borderColor = isAlive ? colors.danger + '44' : colors.border;
 
   const fontSize = size === 'sm' ? FontSize.sm : size === 'lg' ? FontSize.xl : FontSize.base;
   const iconSize = size === 'sm' ? 14 : size === 'lg' ? 22 : 18;
@@ -26,7 +29,7 @@ export default function StreakBadge({ streak, size = 'md' }: StreakBadgeProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   badge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     borderRadius: Radius.full, borderWidth: 1,

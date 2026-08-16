@@ -1,4 +1,7 @@
 import { View, Text, TextInput, StyleSheet } from 'react-native';
+import { useMemo } from 'react';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors } from '@/constants/theme';
 
 interface Props {
   value: string;
@@ -6,17 +9,19 @@ interface Props {
 }
 
 export default function StepName({ value, onChange }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.container}>
       <Text style={styles.emoji}>👋</Text>
       <Text style={styles.heading}>Name</Text>
       <Text style={styles.subtext}>
-        only be asked once 
+        only be asked once
       </Text>
       <TextInput
         style={styles.input}
         placeholder="Eg- Devansh "
-        placeholderTextColor="#4B5563"
+        placeholderTextColor={colors.textTertiary}
         value={value}
         onChangeText={onChange}
         autoFocus
@@ -26,7 +31,7 @@ export default function StepName({ value, onChange }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
@@ -38,26 +43,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   heading: {
-    color: '#FFFFFF',
+    color: colors.textPrimary,
     fontSize: 28,
     fontWeight: '800',
     textAlign: 'center',
     marginBottom: 8,
   },
   subtext: {
-    color: '#6B7280',
+    color: colors.textTertiary,
     fontSize: 15,
     textAlign: 'center',
     marginBottom: 32,
   },
   input: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 18,
-    color: '#FFFFFF',
+    color: colors.textPrimary,
     fontSize: 18,
     borderWidth: 1,
-    borderColor: '#2D2D2D',
+    borderColor: colors.border,
     textAlign: 'center',
   },
 });

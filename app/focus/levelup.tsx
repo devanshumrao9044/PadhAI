@@ -1,9 +1,10 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { LEVELS } from '@/constants/levels';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -62,6 +63,8 @@ const PARTICLES = Array.from({ length: 24 }, (_, i) => ({
 }));
 
 export default function LevelUpScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const params = useLocalSearchParams<{
     newLevel: string;
@@ -133,7 +136,7 @@ export default function LevelUpScreen() {
   const spin = beamRotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   const bgColor = bgFlash.interpolate({
     inputRange: [0, 1],
-    outputRange: [Colors.background, levelDef.color + '22'],
+    outputRange: [colors.background, levelDef.color + '22'],
   });
 
   return (
@@ -172,7 +175,7 @@ export default function LevelUpScreen() {
               <View style={[styles.prevLevelDot, { backgroundColor: prevLevel.color + '55' }]}>
                 <Text style={[styles.prevLevelText, { color: prevLevel.color }]}>{prevLevel.realisticTitle}</Text>
               </View>
-              <MaterialIcons name="arrow-forward" size={16} color={Colors.textTertiary} />
+              <MaterialIcons name="arrow-forward" size={16} color={colors.textTertiary} />
               <View style={[styles.newLevelDot, { backgroundColor: levelDef.color + '33', borderColor: levelDef.color }]}>
                 <Text style={[styles.newLevelText, { color: levelDef.color }]}>{levelDef.realisticTitle}</Text>
               </View>
@@ -229,7 +232,7 @@ export default function LevelUpScreen() {
             {/* XP earned this session */}
             <View style={styles.xpRow}>
               <View style={styles.xpChip}>
-                <MaterialIcons name="bolt" size={18} color={Colors.warning} />
+                <MaterialIcons name="bolt" size={18} color={colors.warning} />
                 <Text style={styles.xpChipText}>+{xpEarned} XP earned</Text>
               </View>
               <View style={[styles.xpChip, { backgroundColor: levelDef.color + '22', borderColor: levelDef.color + '55' }]}>
@@ -256,7 +259,7 @@ export default function LevelUpScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: { flex: 1 },
   safe: { flex: 1 },
   particleOrigin: {
@@ -348,7 +351,7 @@ const styles = StyleSheet.create({
   badgeLevelNum: {
     fontSize: 56,
     fontWeight: FontWeight.extraBold,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     includeFontPadding: false,
     lineHeight: 60,
   },
@@ -376,7 +379,7 @@ const styles = StyleSheet.create({
   levelUpLabel: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.extraBold,
-    color: Colors.warning,
+    color: colors.warning,
     letterSpacing: 3,
     marginBottom: 4,
   },
@@ -388,12 +391,12 @@ const styles = StyleSheet.create({
   },
   examTitle: {
     fontSize: FontSize.base,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: Spacing.md,
   },
   subtitle: {
     fontSize: FontSize.md,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: Spacing.lg,
@@ -408,17 +411,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: Colors.warning + '22',
+    backgroundColor: colors.warning + '22',
     borderRadius: Radius.full,
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderWidth: 1,
-    borderColor: Colors.warning + '44',
+    borderColor: colors.warning + '44',
   },
   xpChipText: {
     fontSize: FontSize.sm,
     fontWeight: FontWeight.semiBold,
-    color: Colors.warning,
+    color: colors.warning,
   },
 
   btnBlock: { width: '100%' },

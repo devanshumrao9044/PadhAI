@@ -2,9 +2,10 @@ import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function TabLayout() {
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
   const tabBarHeight = Platform.select({
@@ -18,8 +19,8 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: Colors.surface,
-          borderTopColor: Colors.border,
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
           borderTopWidth: 1,
           height: tabBarHeight,
           paddingTop: 8,
@@ -31,8 +32,8 @@ export default function TabLayout() {
           paddingHorizontal: 4,
           elevation: 0,
         },
-        tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.textTertiary,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textTertiary,
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '600',

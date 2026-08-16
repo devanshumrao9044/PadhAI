@@ -1,4 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useMemo } from 'react';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors } from '@/constants/theme';
 
 const EXAMS = [
   { id: 'JEE', label: 'JEE', emoji: '⚛️', sub: 'IIT/NIT Engineering' },
@@ -14,12 +17,14 @@ interface Props {
 }
 
 export default function StepExam({ value, onChange }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.container}>
       <Text style={styles.emoji}>🎯</Text>
       <Text style={styles.heading}>Target</Text>
       <Text style={styles.subtext}>
-        The app will be customized accordingly. 
+        The app will be customized accordingly.
       </Text>
       <View style={styles.list}>
         {EXAMS.map((exam) => (
@@ -52,7 +57,7 @@ export default function StepExam({ value, onChange }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 8,
@@ -63,14 +68,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   heading: {
-    color: '#FFFFFF',
+    color: colors.textPrimary,
     fontSize: 28,
     fontWeight: '800',
     textAlign: 'center',
     marginBottom: 8,
   },
   subtext: {
-    color: '#6B7280',
+    color: colors.textTertiary,
     fontSize: 15,
     textAlign: 'center',
     marginBottom: 28,
@@ -81,16 +86,16 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1C1C1E',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#2D2D2D',
+    borderColor: colors.border,
     gap: 14,
   },
   cardSelected: {
-    borderColor: '#6B21A8',
-    backgroundColor: '#1E1033',
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + '26',
   },
   cardEmoji: {
     fontSize: 26,
@@ -99,20 +104,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cardLabel: {
-    color: '#FFFFFF',
+    color: colors.textPrimary,
     fontSize: 16,
     fontWeight: '700',
   },
   cardLabelSelected: {
-    color: '#A78BFA',
+    color: colors.primaryGlow,
   },
   cardSub: {
-    color: '#6B7280',
+    color: colors.textTertiary,
     fontSize: 13,
     marginTop: 2,
   },
   check: {
-    color: '#6B21A8',
+    color: colors.primary,
     fontSize: 20,
     fontWeight: '900',
   },

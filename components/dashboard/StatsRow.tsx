@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useApp } from '@/hooks/useApp';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors } from '@/constants/theme';
 
 interface Props {
   todayMins?: number;
@@ -10,6 +12,8 @@ interface Props {
 }
 
 export default function StatsRow({ todayMins = 0, xp = 0, chaptersTotal = 0, chaptersDone = 0 }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, getDailySummary } = useApp();
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -28,59 +32,41 @@ export default function StatsRow({ todayMins = 0, xp = 0, chaptersTotal = 0, cha
           <Text style={styles.value}>{hours}h {minutes}m</Text>
           <Text style={styles.label}>Today Focus</Text>
         </View>
-
         <View style={styles.card}>
           <Text style={styles.emoji}>⚡</Text>
-          <Text style={[styles.value, { color: '#FACC15' }]}>{xp || user?.xpTotal || 0}</Text>
+          <Text style={[styles.value, { color: colors.warning }]}>{xp || user?.xpTotal || 0}</Text>
           <Text style={styles.label}>Weekly XP</Text>
         </View>
-
         <View style={styles.card}>
           <Text style={styles.emoji}>📚</Text>
           <Text style={styles.value}>{chaptersDone}/{chaptersTotal}</Text>
           <Text style={styles.label}>Chapters</Text>
         </View>
       </View>
-
       <View style={styles.progressContainer}>
         <View style={styles.progressHeader}>
           <Text style={styles.progressTitle}>Daily Goal Progress</Text>
           <Text style={styles.progressText}>{todayMinutes} / {goalMinutes} mins</Text>
         </View>
         <View style={styles.progressTrack}>
-          <View
-            style={[
-              styles.progressFill,
-              { width: `${percent}%` as any, backgroundColor: percent >= 100 ? '#4ADE80' : '#8B5CF6' }
-            ]}
-          />
+          <View style={[styles.progressFill, { width: `${percent}%` as any, backgroundColor: percent >= 100 ? colors.success : colors.primary }]} />
         </View>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: { marginBottom: 16 },
   row: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  card: {
-    flex: 1, backgroundColor: '#1C1C1E', borderRadius: 16,
-    padding: 14, alignItems: 'center',
-    borderWidth: 1, borderColor: '#2D2D2D',
-  },
+  card: { flex: 1, backgroundColor: colors.surface, borderRadius: 16, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
   emoji: { fontSize: 22, marginBottom: 6 },
-  value: { color: '#FFFFFF', fontSize: 16, fontWeight: '800', marginBottom: 2 },
-  label: { color: '#6B7280', fontSize: 11, textAlign: 'center' },
-  progressContainer: {
-    backgroundColor: '#1C1C1E', borderRadius: 16, padding: 16,
-    borderWidth: 1, borderColor: '#2D2D2D',
-  },
-  progressHeader: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 10,
-  },
-  progressTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
-  progressText: { color: '#9CA3AF', fontSize: 12, fontWeight: '500' },
-  progressTrack: { height: 8, backgroundColor: '#2D2D2D', borderRadius: 4, overflow: 'hidden' },
+  value: { color: colors.textPrimary, fontSize: 16, fontWeight: '800', marginBottom: 2 },
+  label: { color: colors.textSecondary, fontSize: 11, textAlign: 'center' },
+  progressContainer: { backgroundColor: colors.surface, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.border },
+  progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  progressTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: '600' },
+  progressText: { color: colors.textSecondary, fontSize: 12, fontWeight: '500' },
+  progressTrack: { height: 8, backgroundColor: colors.surfaceVariant, borderRadius: 4, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 4 },
 });

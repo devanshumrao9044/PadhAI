@@ -1,14 +1,15 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, TextInput, Alert, Platform, Image, ActivityIndicator
+  Modal, TextInput, Alert, Platform, Image, ActivityIndicator, Switch
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/services/supabase';
-import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { useAuthSession } from '@/auth/AuthSessionProvider';
 import { getLevelForUser, getXPProgressForUser, LEVELS } from '@/constants/levels';
@@ -16,6 +17,8 @@ import XPBar from '@/components/ui/XPBar';
 import { WEEKLY_MARKER_PREFIX } from '@/services/weeklyXp';
 
 export default function ProfileScreen() {
+  const { colors, mode, toggleTheme } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, setUser, sessions, chapters, xpLog } = useApp();
   const router = useRouter();
   const { signOut, signingOut } = useAuthSession();
@@ -53,9 +56,9 @@ export default function ProfileScreen() {
           const safetyPct = (safetyCount / safeTotal) * 100;
           const rankPct = ((safeTotal - rank) / safeTotal) * 100;
           let zone = 'Demotion';
-          let color = Colors.danger;
-          if (rankPct >= demotionPct + safetyPct) { zone = 'Promotion'; color = Colors.success; }
-          else if (rankPct >= demotionPct) { zone = 'Safety'; color = Colors.warning; }
+          let color = colors.danger;
+          if (rankPct >= demotionPct + safetyPct) { zone = 'Promotion'; color = colors.success; }
+          else if (rankPct >= demotionPct) { zone = 'Safety'; color = colors.warning; }
           setRankInfo({ rank, total, zone, color });
         }
       } catch (e) {
@@ -63,7 +66,7 @@ export default function ProfileScreen() {
       }
     }
     fetchRankInfo();
-  }, [userId]);
+  }, [userId, colors]);
 
   const level = useMemo(() => getLevelForUser({ xpTotal: user?.xpTotal ?? 0, levelRank: user?.levelRank }), [user?.xpTotal, user?.levelRank]);
   const progress = useMemo(() => getXPProgressForUser({ xpTotal: user?.xpTotal ?? 0, levelRank: user?.levelRank }), [user?.xpTotal, user?.levelRank]);
@@ -90,7 +93,7 @@ export default function ProfileScreen() {
   if (!user) return null;
 
   const showAlert = (title: string, message: string, isSignOut = false) => {
-    if (Platform.OS === 'web') {
+    if (isSignOut || Platform.OS === 'web') {
       setAlertConfig({ visible: true, title, message, isSignOut });
     } else if (isSignOut) {
       Alert.alert(title, message, [
@@ -133,7 +136,7 @@ export default function ProfileScreen() {
       quality: 0.5,
       base64: false,
     });
-    
+
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
       setEditAvatarUrl(asset.uri);
@@ -264,7 +267,7 @@ export default function ProfileScreen() {
           </View>
 
           <TouchableOpacity style={styles.editProfileBtn} onPress={openEditModal}>
-            <MaterialIcons name="edit" size={16} color={Colors.background} />
+            <MaterialIcons name="edit" size={16} color={colors.background} />
             <Text style={styles.editProfileBtnText}>Edit Profile</Text>
           </TouchableOpacity>
         </View>
@@ -279,7 +282,7 @@ export default function ProfileScreen() {
               <Text style={styles.levelExam}>{level.examTitle}</Text>
             </View>
             <View style={styles.xpBadge}>
-              <MaterialIcons name="bolt" size={16} color={Colors.warning} />
+              <MaterialIcons name="bolt" size={16} color={colors.warning} />
               <Text style={styles.xpBadgeText}>{user.xpTotal} Weekly XP</Text>
             </View>
           </View>
@@ -292,10 +295,10 @@ export default function ProfileScreen() {
         {/* Stats */}
         <View style={styles.statsGrid}>
           {[
-            { icon: 'local-fire-department', color: Colors.danger, val: user.streakCurrent, label: 'Current Streak' },
-            { icon: 'emoji-events', color: Colors.warning, val: user.streakLongest, label: 'Best Streak' },
-            { icon: 'schedule', color: Colors.accent, val: `${totalHours}h`, label: 'Total Study' },
-            { icon: 'check-circle', color: Colors.success, val: doneChapters, label: 'Chapters Done' },
+            { icon: 'local-fire-department', color: colors.danger, val: user.streakCurrent, label: 'Current Streak' },
+            { icon: 'emoji-events', color: colors.warning, val: user.streakLongest, label: 'Best Streak' },
+            { icon: 'schedule', color: colors.accent, val: `${totalHours}h`, label: 'Total Study' },
+            { icon: 'check-circle', color: colors.success, val: doneChapters, label: 'Chapters Done' },
           ].map(item => (
             <View key={item.label} style={styles.statItem}>
               <MaterialIcons name={item.icon as any} size={22} color={item.color} />
@@ -314,11 +317,11 @@ export default function ProfileScreen() {
               style={[styles.levelRow, level.rank >= l.rank ? styles.levelRowUnlocked : null]}
             >
               <View style={[styles.levelDot, {
-                backgroundColor: level.rank >= l.rank ? l.color : Colors.textTertiary,
+                backgroundColor: level.rank >= l.rank ? l.color : colors.textTertiary,
               }]} />
               <View style={styles.levelRowInfo}>
                 <Text style={[styles.levelRowTitle, {
-                  color: level.rank >= l.rank ? l.color : Colors.textTertiary,
+                  color: level.rank >= l.rank ? l.color : colors.textTertiary,
                 }]}>
                   {l.realisticTitle}
                 </Text>
@@ -336,7 +339,7 @@ export default function ProfileScreen() {
           <Text style={styles.cardTitle}>ACCOUNT INFO</Text>
 
           <View style={styles.settingRow}>
-            <MaterialIcons name="flag" size={20} color={Colors.primary} />
+            <MaterialIcons name="flag" size={20} color={colors.primary} />
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>Daily Goal</Text>
               <Text style={styles.settingValue}>{user.dailyGoalMinutes} minutes</Text>
@@ -344,7 +347,7 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.settingRow}>
-            <MaterialIcons name="calendar-today" size={20} color={Colors.textSecondary} />
+            <MaterialIcons name="calendar-today" size={20} color={colors.textSecondary} />
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>Member Since</Text>
               <Text style={styles.settingValue}>{joinDate}</Text>
@@ -356,20 +359,34 @@ export default function ProfileScreen() {
             onPress={() => router.push('/privacy-policy' as Parameters<typeof router.push>[0])}
             activeOpacity={0.7}
           >
-            <MaterialIcons name="privacy-tip" size={20} color={Colors.primary} />
+            <MaterialIcons name="privacy-tip" size={20} color={colors.primary} />
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>Privacy Policy</Text>
               <Text style={styles.settingValue}>How PadhAI uses and protects your data</Text>
             </View>
-            <MaterialIcons name="chevron-right" size={20} color={Colors.textSecondary} />
+            <MaterialIcons name="chevron-right" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
+
+          <View style={styles.settingRow}>
+            <MaterialIcons name="dark-mode" size={20} color={colors.primary} />
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Theme</Text>
+              <Text style={styles.settingValue}>{mode === 'dark' ? 'Dark mode' : 'Light mode'}</Text>
+            </View>
+            <Switch
+              value={mode === 'light'}
+              onValueChange={() => { void toggleTheme(); }}
+              trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }}
+              thumbColor={mode === 'light' ? colors.primary : colors.textTertiary}
+            />
+          </View>
 
           {(user as any).myReferralCode ? (
             <View style={styles.settingRow}>
-              <MaterialIcons name="card-giftcard" size={20} color={Colors.primary} />
+              <MaterialIcons name="card-giftcard" size={20} color={colors.primary} />
               <View style={styles.settingInfo}>
                 <Text style={styles.settingLabel}>Your Referral Code</Text>
-                <Text style={styles.settingValue}>{(user as any).myReferralCode}</Text>
+                <Text style={styles.settingValue}>{String((user as any).myReferralCode).toUpperCase()}</Text>
               </View>
             </View>
           ) : null}
@@ -380,13 +397,29 @@ export default function ProfileScreen() {
             disabled={signingOut}
             activeOpacity={0.7}
           >
-            <MaterialIcons name="logout" size={20} color={Colors.danger} />
+            <MaterialIcons name="logout" size={20} color={colors.danger} />
             <View style={styles.settingInfo}>
               <Text style={styles.signOutLabel}>{signingOut ? 'Signing out…' : 'Sign Out'}</Text>
             </View>
-            <MaterialIcons name="chevron-right" size={20} color={Colors.danger} />
+            <MaterialIcons name="chevron-right" size={20} color={colors.danger} />
           </TouchableOpacity>
         </View>
+
+        {sessions.length > 0 ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>RECENT SESSIONS</Text>
+            {sessions.slice(0, 3).map(session => (
+              <View key={session.id} style={styles.sessionRow}>
+                <MaterialIcons name={session.completed ? 'check-circle' : 'cancel'} size={17} color={session.completed ? colors.success : colors.danger} />
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingLabel}>{session.sessionDate}</Text>
+                  <Text style={styles.settingValue}>{session.durationActualMins} minutes {session.completed ? 'completed' : 'broken'}</Text>
+                </View>
+                <Text style={[styles.xpAmount, { color: session.completed ? colors.success : colors.danger }]}>{session.completed ? `+${session.xpEarned}` : `-${session.xpDeducted}`} XP</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         {/* Recent XP */}
         {recentXP.length > 0 ? (
@@ -397,11 +430,11 @@ export default function ProfileScreen() {
                 <MaterialIcons
                   name={tx.amount > 0 ? 'add-circle' : 'remove-circle'}
                   size={16}
-                  color={tx.amount > 0 ? Colors.success : Colors.danger}
+                  color={tx.amount > 0 ? colors.success : colors.danger}
                 />
                 <Text style={styles.xpReason}>{tx.reason.replace(/_/g, ' ')}</Text>
                 <Text style={[styles.xpAmount, {
-                  color: tx.amount > 0 ? Colors.success : Colors.danger,
+                  color: tx.amount > 0 ? colors.success : colors.danger,
                 }]}>
                   {tx.amount > 0 ? '+' : ''}{tx.amount} XP
                 </Text>
@@ -424,9 +457,9 @@ export default function ProfileScreen() {
                 ) : (
                   <View style={[styles.avatarInitials, {
                     width: 64, height: 64, borderRadius: 32,
-                    backgroundColor: Colors.surfaceVariant,
+                    backgroundColor: colors.surfaceVariant,
                   }]}>
-                    <MaterialIcons name="person" size={30} color={Colors.textSecondary} />
+                    <MaterialIcons name="person" size={30} color={colors.textSecondary} />
                   </View>
                 )}
                 <View style={styles.cameraIconBadge}>
@@ -440,7 +473,7 @@ export default function ProfileScreen() {
                 value={editName}
                 onChangeText={setEditName}
                 placeholder="Enter your name"
-                placeholderTextColor={Colors.textTertiary}
+                placeholderTextColor={colors.textTertiary}
               />
 
               <Text style={styles.inputLabel}>TARGET EXAM</Text>
@@ -480,7 +513,7 @@ export default function ProfileScreen() {
                 onChangeText={setEditGoal}
                 keyboardType="number-pad"
                 placeholder="e.g. 120"
-                placeholderTextColor={Colors.textTertiary}
+                placeholderTextColor={colors.textTertiary}
               />
 
               <View style={styles.modalBtns}>
@@ -496,7 +529,7 @@ export default function ProfileScreen() {
                   disabled={loading}
                 >
                   {loading
-                    ? <ActivityIndicator color={Colors.background} />
+                    ? <ActivityIndicator color={colors.background} />
                     : <Text style={styles.saveBtnText}>Save</Text>}
                 </TouchableOpacity>
               </View>
@@ -508,29 +541,31 @@ export default function ProfileScreen() {
       {/* Sign-out loading overlay */}
       <Modal visible={signingOut} transparent animationType="fade">
         <View style={styles.signOutOverlay}>
-          <ActivityIndicator size="large" color={Colors.primary} />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.signOutOverlayText}>Signing out...</Text>
         </View>
       </Modal>
 
       {/* Web Alert */}
-      {Platform.OS === 'web' && (
+      {(
         <Modal visible={alertConfig.visible} transparent animationType="fade">
           <View style={styles.alertOverlay}>
-            <View style={styles.alertBox}>
-              <Text style={styles.alertTitle}>{alertConfig.title}</Text>
+                      <View style={styles.alertBox}>
+            <View style={styles.alertIcon}><MaterialIcons name={alertConfig.isSignOut ? 'logout' : 'info-outline'} size={22} color={alertConfig.isSignOut ? colors.danger : colors.primary} /></View>
+            <Text style={styles.alertTitle}>{alertConfig.title}</Text>
+
               <Text style={styles.alertMsg}>{alertConfig.message}</Text>
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 {alertConfig.isSignOut ? (
                   <>
                     <TouchableOpacity
-                      style={[styles.alertBtn, { backgroundColor: Colors.surfaceVariant, flex: 1 }]}
+                      style={[styles.alertBtn, { backgroundColor: colors.surfaceVariant, flex: 1 }]}
                       onPress={() => setAlertConfig(p => ({ ...p, visible: false }))}
                     >
-                      <Text style={{ color: Colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
+                      <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.alertBtn, { backgroundColor: Colors.danger, flex: 1 }]}
+                      style={[styles.alertBtn, { backgroundColor: colors.danger, flex: 1 }]}
                       onPress={handleSignOut}
                     >
                       <Text style={styles.saveBtnText}>Sign Out</Text>
@@ -553,76 +588,78 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   scrollView: { flex: 1 },
   scroll: { padding: Spacing.md, paddingBottom: 100 },
   profileHeader: { alignItems: 'center', marginBottom: Spacing.xl, paddingTop: Spacing.md },
   avatarContainer: { position: 'relative', marginBottom: Spacing.sm },
-  avatarImage: { width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderColor: Colors.primary },
-  avatarInitials: { width: 90, height: 90, borderRadius: 45, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: Colors.border },
+  avatarImage: { width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderColor: colors.primary },
+  avatarInitials: { width: 90, height: 90, borderRadius: 45, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.border },
   avatarText: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, includeFontPadding: false },
   profileInfo: { alignItems: 'center', marginBottom: Spacing.md },
-  profileName: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: Colors.textPrimary },
-  profileSub: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
+  profileName: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: colors.textPrimary },
+  profileSub: { fontSize: FontSize.sm, color: colors.textSecondary, marginTop: 2 },
   badgesRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' },
-  examBadge: { backgroundColor: Colors.primary + '22', borderRadius: Radius.full, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: Colors.primary + '55' },
-  examBadgeText: { fontSize: FontSize.xs, color: Colors.primary, fontWeight: FontWeight.semiBold },
+  examBadge: { backgroundColor: colors.primary + '22', borderRadius: Radius.full, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary + '55' },
+  examBadgeText: { fontSize: FontSize.xs, color: colors.primary, fontWeight: FontWeight.semiBold },
   rankBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1 },
   rankBadgeText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold },
-  editProfileBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.full },
-  editProfileBtnText: { color: Colors.background, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
-  levelCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, padding: Spacing.md, marginBottom: Spacing.md },
+  editProfileBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.full },
+  editProfileBtnText: { color: colors.background, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
+  levelCard: { backgroundColor: colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.md, marginBottom: Spacing.md },
   levelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.sm },
   levelTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, includeFontPadding: false },
-  levelExam: { fontSize: FontSize.sm, color: Colors.textSecondary },
-  xpBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.warning + '22', borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 4 },
-  xpBadgeText: { fontSize: FontSize.base, color: Colors.warning, fontWeight: FontWeight.semiBold },
-  xpNeeded: { fontSize: FontSize.xs, color: Colors.textTertiary, marginTop: 6 },
-  statsGrid: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, padding: Spacing.md, marginBottom: Spacing.md },
+  levelExam: { fontSize: FontSize.sm, color: colors.textSecondary },
+  xpBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.warning + '22', borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 4 },
+  xpBadgeText: { fontSize: FontSize.base, color: colors.warning, fontWeight: FontWeight.semiBold },
+  xpNeeded: { fontSize: FontSize.xs, color: colors.textTertiary, marginTop: 6 },
+  statsGrid: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.md, marginBottom: Spacing.md },
   statItem: { alignItems: 'center', flex: 1, gap: 4 },
-  statVal: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.textPrimary, includeFontPadding: false },
-  statLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, textAlign: 'center' },
-  card: { backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, padding: Spacing.md, marginBottom: Spacing.md },
-  cardTitle: { fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, color: Colors.textTertiary, letterSpacing: 1.2, marginBottom: Spacing.sm, textTransform: 'uppercase' },
+  statVal: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: colors.textPrimary, includeFontPadding: false },
+  statLabel: { fontSize: FontSize.xs, color: colors.textSecondary, textAlign: 'center' },
+  card: { backgroundColor: colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.md, marginBottom: Spacing.md },
+  cardTitle: { fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, color: colors.textTertiary, letterSpacing: 1.2, marginBottom: Spacing.sm, textTransform: 'uppercase' },
   levelRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, opacity: 0.4 },
   levelRowUnlocked: { opacity: 1 },
   levelDot: { width: 10, height: 10, borderRadius: 5 },
   levelRowInfo: { flex: 1 },
   levelRowTitle: { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
-  levelRowSub: { fontSize: FontSize.xs, color: Colors.textTertiary },
-  settingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  levelRowSub: { fontSize: FontSize.xs, color: colors.textTertiary },
+  settingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
   settingInfo: { flex: 1 },
-  settingLabel: { fontSize: FontSize.base, color: Colors.textPrimary },
-  settingValue: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
+  settingLabel: { fontSize: FontSize.base, color: colors.textPrimary },
+  settingValue: { fontSize: FontSize.sm, color: colors.textSecondary, marginTop: 2 },
   signOutRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: Spacing.sm, marginTop: 4 },
-  signOutLabel: { fontSize: FontSize.base, color: Colors.danger, fontWeight: FontWeight.semiBold },
+  signOutLabel: { fontSize: FontSize.base, color: colors.danger, fontWeight: FontWeight.semiBold },
   xpRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
-  xpReason: { flex: 1, fontSize: FontSize.sm, color: Colors.textSecondary, textTransform: 'capitalize' },
+  sessionRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.border },
+  xpReason: { flex: 1, fontSize: FontSize.sm, color: colors.textSecondary, textTransform: 'capitalize' },
   xpAmount: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
-  modalOverlay: { flex: 1, backgroundColor: Colors.overlay },
-  modalSheet: { backgroundColor: Colors.surface, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.lg, paddingBottom: Spacing.xxl, marginTop: 'auto', borderWidth: 1, borderColor: Colors.border },
-  modalTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.textPrimary, marginBottom: Spacing.lg, textAlign: 'center' },
+  modalOverlay: { flex: 1, backgroundColor: colors.overlay },
+  modalSheet: { backgroundColor: colors.surface, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.lg, paddingBottom: Spacing.xxl, marginTop: 'auto', borderWidth: 1, borderColor: colors.border },
+  modalTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: colors.textPrimary, marginBottom: Spacing.lg, textAlign: 'center' },
   modalAvatarEdit: { alignSelf: 'center', marginBottom: Spacing.lg, position: 'relative' },
   avatarImageSmall: { width: 64, height: 64, borderRadius: 32 },
-  cameraIconBadge: { position: 'absolute', bottom: 0, right: -4, backgroundColor: Colors.primary, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: Colors.surface },
-  inputLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: Colors.textTertiary, marginBottom: 6, marginTop: 10 },
-  input: { backgroundColor: Colors.surfaceVariant, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: Spacing.md, paddingVertical: 12, color: Colors.textPrimary, fontSize: FontSize.md, marginBottom: 8 },
+  cameraIconBadge: { position: 'absolute', bottom: 0, right: -4, backgroundColor: colors.primary, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface },
+  inputLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: colors.textTertiary, marginBottom: 6, marginTop: 10 },
+  input: { backgroundColor: colors.surfaceVariant, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: Spacing.md, paddingVertical: 12, color: colors.textPrimary, fontSize: FontSize.md, marginBottom: 8 },
   chipRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  chip: { flex: 1, backgroundColor: Colors.surfaceVariant, paddingVertical: 10, borderRadius: Radius.md, alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
-  chipActive: { backgroundColor: Colors.primary + '22', borderColor: Colors.primary },
-  chipText: { color: Colors.textSecondary, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
-  chipTextActive: { color: Colors.primary, fontWeight: FontWeight.bold },
+  chip: { flex: 1, backgroundColor: colors.surfaceVariant, paddingVertical: 10, borderRadius: Radius.md, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  chipActive: { backgroundColor: colors.primary + '22', borderColor: colors.primary },
+  chipText: { color: colors.textSecondary, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
+  chipTextActive: { color: colors.primary, fontWeight: FontWeight.bold },
   modalBtns: { flexDirection: 'row', gap: 10, marginTop: Spacing.xl },
-  cancelBtn: { flex: 1, backgroundColor: Colors.surfaceVariant, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center' },
-  cancelBtnText: { color: Colors.textSecondary, fontSize: FontSize.md, fontWeight: FontWeight.semiBold },
-  saveBtn: { flex: 1, backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center' },
-  saveBtnText: { color: Colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
-  alertOverlay: { flex: 1, backgroundColor: Colors.overlay, justifyContent: 'center' },
-  alertBox: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, margin: Spacing.xl },
-  alertTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.textPrimary, marginBottom: 8 },
-  alertMsg: { fontSize: FontSize.base, color: Colors.textSecondary, marginBottom: Spacing.md },
-  alertBtn: { backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center' },
+  cancelBtn: { flex: 1, backgroundColor: colors.surfaceVariant, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center' },
+  cancelBtnText: { color: colors.textSecondary, fontSize: FontSize.md, fontWeight: FontWeight.semiBold },
+  saveBtn: { flex: 1, backgroundColor: colors.primary, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center' },
+  saveBtnText: { color: colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
+  alertOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'center' },
+  alertBox: { backgroundColor: colors.surface, borderRadius: Radius.xl, padding: Spacing.lg, margin: Spacing.xl, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
+  alertIcon: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.surfaceVariant, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  alertTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: colors.textPrimary, marginBottom: 8 },
+  alertMsg: { fontSize: FontSize.base, color: colors.textSecondary, marginBottom: Spacing.md },
+  alertBtn: { backgroundColor: colors.primary, borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center' },
   signOutOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.75)',
@@ -631,7 +668,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   signOutOverlayText: {
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     fontSize: FontSize.base,
     fontWeight: FontWeight.medium,
   },

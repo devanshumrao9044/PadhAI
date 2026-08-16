@@ -11,8 +11,12 @@ import QuickShortcuts from '../../components/dashboard/QuickShortcuts';
 import QuoteCard from '../../components/dashboard/QuoteCard';
 import SideDrawer from '../../components/ui/SideDrawer';
 import { useApp } from '@/hooks/useApp';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors } from '@/constants/theme';
 
 export default function Dashboard() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, chapters, sessions, dailySummaries, reload } = useApp();
   const [refreshing, setRefreshing] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -90,9 +94,9 @@ export default function Dashboard() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#7C5CFC"
-            colors={['#7C5CFC']}
-            progressBackgroundColor="#1C1C1E"
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+            progressBackgroundColor={colors.surfaceVariant}
           />
         }
       >
@@ -139,8 +143,8 @@ export default function Dashboard() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F0F0F' },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   scroll: { flex: 1 },
   content: { flexGrow: 1, padding: 20, paddingTop: 16, paddingBottom: 120 },
   header: {
@@ -152,7 +156,7 @@ const styles = StyleSheet.create({
     width: 22, height: 2,
     backgroundColor: '#9CA3AF', borderRadius: 2,
   },
-  appName: { fontSize: 26, fontWeight: '900', color: '#FFFFFF' },
-  ai: { color: '#7C5CFC' },
-  date: { color: '#6B7280', fontSize: 13, fontWeight: '500' },
+  appName: { fontSize: 26, fontWeight: '900', color: colors.textPrimary },
+  ai: { color: colors.primary },
+  date: { color: colors.textTertiary, fontSize: 13, fontWeight: '500' },
 });

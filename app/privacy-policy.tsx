@@ -1,3 +1,6 @@
+import { useMemo } from 'react';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors } from '@/constants/theme';
 import { useRouter } from 'expo-router';
 import {
   Pressable,
@@ -10,6 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { PRIVACY_POLICY, PRIVACY_POLICY_SECTIONS } from '@/constants/privacyPolicy';
 
 export default function PrivacyPolicyScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
 
   return (
@@ -48,8 +53,8 @@ export default function PrivacyPolicyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0A0A0F' },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     minHeight: 56,
     flexDirection: 'row',
@@ -57,20 +62,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 18,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    borderBottomColor: colors.border,
   },
   backButton: { minWidth: 70, paddingVertical: 10 },
   backText: { color: '#B5A6FF', fontSize: 16, fontWeight: '700' },
-  headerTitle: { color: '#F1F1F6', fontSize: 17, fontWeight: '800' },
+  headerTitle: { color: colors.textPrimary, fontSize: 17, fontWeight: '800' },
   headerSpacer: { minWidth: 70 },
   content: { padding: 24, paddingBottom: 48 },
   logo: { color: '#FFFFFF', fontSize: 38, fontWeight: '900', textAlign: 'center' },
-  logoAccent: { color: '#7C5CFC' },
-  title: { color: '#F1F1F6', fontSize: 28, fontWeight: '800', textAlign: 'center', marginTop: 14 },
-  meta: { color: '#9CA3AF', fontSize: 13, textAlign: 'center', marginTop: 8 },
+  logoAccent: { color: colors.primary },
+  title: { color: colors.textPrimary, fontSize: 28, fontWeight: '800', textAlign: 'center', marginTop: 14 },
+  meta: { color: colors.textSecondary, fontSize: 13, textAlign: 'center', marginTop: 8 },
   intro: { color: '#C7C7D4', fontSize: 15, lineHeight: 23, marginTop: 24 },
   section: { marginTop: 26 },
-  sectionTitle: { color: '#F1F1F6', fontSize: 17, fontWeight: '800', marginBottom: 9 },
+  sectionTitle: { color: colors.textPrimary, fontSize: 17, fontWeight: '800', marginBottom: 9 },
   paragraph: { color: '#C7C7D4', fontSize: 15, lineHeight: 23, marginBottom: 10 },
   contactCard: {
     marginTop: 24,

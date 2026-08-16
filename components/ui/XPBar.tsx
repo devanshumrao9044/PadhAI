@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Colors, Radius, FontSize, FontWeight } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors, Radius, FontSize } from '@/constants/theme';
 import { getLevelForUser, getXPProgressForUser } from '@/constants/levels';
 
 interface XPBarProps {
@@ -10,6 +11,8 @@ interface XPBarProps {
 }
 
 export default function XPBar({ xp, compact = false, levelRank }: XPBarProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const level = getLevelForUser({ xpTotal: xp, levelRank });
   const { current, needed, progress } = getXPProgressForUser({ xpTotal: xp, levelRank });
 
@@ -33,10 +36,10 @@ export default function XPBar({ xp, compact = false, levelRank }: XPBarProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: { width: '100%' },
   track: {
-    height: 8, backgroundColor: Colors.surfaceVariant,
+    height: 8, backgroundColor: colors.surfaceVariant,
     borderRadius: Radius.full, overflow: 'hidden',
   },
   trackCompact: { height: 4 },
@@ -46,7 +49,7 @@ const styles = StyleSheet.create({
   },
   fillCompact: {},
   label: {
-    fontSize: FontSize.xs, color: Colors.textTertiary,
+    fontSize: FontSize.xs, color: colors.textTertiary,
     marginTop: 4, textAlign: 'right',
   },
 });

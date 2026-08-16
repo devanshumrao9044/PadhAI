@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -13,11 +13,17 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthSession } from './AuthSessionProvider';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors } from '@/constants/theme';
 
 type Mode = 'login' | 'signup' | 'forgot';
+type FieldName = 'name' | 'email' | 'referralCode' | 'password';
+type FieldErrors = Partial<Record<FieldName, string>>;
 
 export default function AuthScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { signIn, signUp, sendPasswordReset } = useAuthSession();
   const [mode, setMode] = useState<Mode>('login');
   const [name, setName] = useState('');
@@ -25,27 +31,33 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [message, setMessage] = useState<string | null>(null);
 
   const clearFeedback = () => {
-    setError(null);
+    setFieldErrors({});
     setMessage(null);
+  };
+
+  const updateField = (field: FieldName, value: string) => {
+    if (fieldErrors[field]) {
+      setFieldErrors(previous => ({ ...previous, [field]: undefined }));
+    }
+    if (field === 'name') setName(value);
+    if (field === 'email') setEmail(value);
+    if (field === 'password') setPassword(value);
+    if (field === 'referralCode') setReferralCode(value.toUpperCase().replace(/\s/g, ''));
   };
 
   const submit = async () => {
     clearFeedback();
     const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail || !normalizedEmail.includes('@')) {
-      setError('Please enter a valid email address.');
-      return;
-    }
-    if (mode !== 'forgot' && password.length < 6) {
-      setError('Password must be at least 6 characters.');
-      return;
-    }
-    if (mode === 'signup' && name.trim().length < 2) {
-      setError('Please enter your name.');
+    const nextErrors: FieldErrors = {};
+    if (!normalizedEmail || !normalizedEmail.includes('@')) nextErrors.email = 'Please enter a valid email address.';
+    if (mode !== 'forgot' && password.length < 6) nextErrors.password = 'Password must be at least 6 characters.';
+    if (mode === 'signup' && name.trim().length < 2) nextErrors.name = 'Please enter your name.';
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors);
       return;
     }
 
@@ -65,7 +77,14 @@ export default function AuthScreen() {
         setMessage('Reset link sent. Please check your email.');
       }
     } catch (submitError: any) {
-      setError(submitError?.message ?? 'Something went wrong. Please try again.');
+      const errorMessage = submitError?.message ?? 'Something went wrong. Please try again.';
+      if (errorMessage.toLowerCase().includes('referral code')) {
+        setFieldErrors({ referralCode: errorMessage });
+      } else if (mode === 'login' && errorMessage.toLowerCase().includes('invalid login')) {
+        setFieldErrors({ password: 'Email or password is incorrect.' });
+      } else {
+        setMessage(errorMessage);
+      }
     } finally {
       setBusy(false);
     }
@@ -78,77 +97,86 @@ export default function AuthScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text style={styles.logo}>पढ़<Text style={styles.logoAccent}>AI</Text></Text>
+          <View style={styles.brandMark}><Text style={styles.logo}>पढ़<Text style={styles.logoAccent}>AI</Text></Text></View>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.subtitle}>Focus your mind. Build your future.</Text>
 
-          {mode === 'signup' ? (
-            <TextInput style={styles.input} placeholder="Full name" placeholderTextColor="#737384" value={name} onChangeText={setName} />
-          ) : null}
-          <TextInput style={styles.input} placeholder="Email address" placeholderTextColor="#737384" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoCorrect={false} />
-          {mode === 'signup' ? (
-            <TextInput style={styles.input} placeholder="Referral code (optional)" placeholderTextColor="#737384" value={referralCode} onChangeText={setReferralCode} autoCapitalize="characters" />
-          ) : null}
-          {mode !== 'forgot' ? (
-            <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#737384" value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} />
-          ) : null}
+          <View style={styles.formCard}>
+            {mode === 'signup' ? (
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>FULL NAME</Text>
+                <TextInput style={[styles.input, fieldErrors.name && styles.inputError]} placeholder="Your full name" placeholderTextColor={colors.textTertiary} value={name} onChangeText={value => updateField('name', value)} autoCapitalize="words" />
+                {fieldErrors.name ? <Text style={styles.fieldError}>{fieldErrors.name}</Text> : null}
+              </View>
+            ) : null}
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          {message ? <Text style={styles.message}>{message}</Text> : null}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>EMAIL ADDRESS</Text>
+              <TextInput style={[styles.input, fieldErrors.email && styles.inputError]} placeholder="you@example.com" placeholderTextColor={colors.textTertiary} value={email} onChangeText={value => updateField('email', value)} autoCapitalize="none" keyboardType="email-address" autoCorrect={false} />
+              {fieldErrors.email ? <Text style={styles.fieldError}>{fieldErrors.email}</Text> : null}
+            </View>
 
-          <Pressable style={[styles.primaryButton, busy && styles.disabled]} onPress={submit} disabled={busy}>
-            {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>{buttonLabel}</Text>}
-          </Pressable>
+            {mode === 'signup' ? (
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>REFERRAL CODE <Text style={styles.optionalLabel}>(OPTIONAL)</Text></Text>
+                <TextInput style={[styles.input, fieldErrors.referralCode && styles.inputError]} placeholder="ENTER CODE" placeholderTextColor={colors.textTertiary} value={referralCode} onChangeText={value => updateField('referralCode', value)} autoCapitalize="characters" autoCorrect={false} keyboardType="default" />
+                {fieldErrors.referralCode ? <Text style={styles.fieldError}>{fieldErrors.referralCode}</Text> : <Text style={styles.helperText}>Use uppercase letters only.</Text>}
+              </View>
+            ) : null}
+
+            {mode !== 'forgot' ? (
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>PASSWORD</Text>
+                <TextInput style={[styles.input, fieldErrors.password && styles.inputError]} placeholder="At least 6 characters" placeholderTextColor={colors.textTertiary} value={password} onChangeText={value => updateField('password', value)} secureTextEntry autoCapitalize="none" autoCorrect={false} />
+                {fieldErrors.password ? <Text style={styles.fieldError}>{fieldErrors.password}</Text> : null}
+              </View>
+            ) : null}
+
+            {message ? <Text style={styles.message}>{message}</Text> : null}
+
+            <Pressable style={({ pressed }) => [styles.primaryButton, busy && styles.disabled, pressed && !busy && styles.pressed]} onPress={submit} disabled={busy}>
+              {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>{buttonLabel}</Text>}
+            </Pressable>
+          </View>
 
           {mode !== 'forgot' ? <Text style={styles.comingSoonText}>Google signup — Coming Soon</Text> : null}
-
-          {mode === 'login' ? (
-            <Pressable onPress={() => { clearFeedback(); setMode('forgot'); }} style={styles.secondaryAction}>
-              <Text style={styles.secondaryText}>Forgot password?</Text>
-            </Pressable>
-          ) : null}
-          <Pressable
-            onPress={() => {
-              clearFeedback();
-              setMode(mode === 'login' ? 'signup' : 'login');
-            }}
-            style={styles.secondaryAction}
-          >
+          {mode === 'login' ? <Pressable onPress={() => { clearFeedback(); setMode('forgot'); }} style={styles.secondaryAction}><Text style={styles.secondaryText}>Forgot password?</Text></Pressable> : null}
+          <Pressable onPress={() => { clearFeedback(); setMode(mode === 'login' ? 'signup' : 'login'); }} style={styles.secondaryAction}>
             <Text style={styles.secondaryText}>{mode === 'login' ? 'Create a new account' : 'Back to sign in'}</Text>
           </Pressable>
-
-          {mode === 'forgot' ? (
-            <Pressable onPress={() => { clearFeedback(); setMode('login'); }} style={styles.secondaryAction}>
-              <Text style={styles.secondaryText}>Cancel</Text>
-            </Pressable>
-          ) : null}
-
-          <Pressable onPress={() => router.push('/privacy-policy' as Parameters<typeof router.push>[0])} style={styles.policyAction}>
-            <Text style={styles.policyText}>Privacy Policy</Text>
-          </Pressable>
+          {mode === 'forgot' ? <Pressable onPress={() => { clearFeedback(); setMode('login'); }} style={styles.secondaryAction}><Text style={styles.secondaryText}>Cancel</Text></Pressable> : null}
+          <Pressable onPress={() => router.push('/privacy-policy' as Parameters<typeof router.push>[0])} style={styles.policyAction}><Text style={styles.policyText}>Privacy Policy</Text></Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0A0A0F' },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
-  content: { flexGrow: 1, justifyContent: 'center', padding: 24 },
-  logo: { color: '#FFFFFF', fontSize: 56, fontWeight: '900', textAlign: 'center' },
-  logoAccent: { color: '#7C5CFC' },
-  title: { color: '#F1F1F6', fontSize: 28, fontWeight: '800', textAlign: 'center', marginTop: 24 },
-  subtitle: { color: '#9CA3AF', fontSize: 15, textAlign: 'center', marginTop: 8, marginBottom: 28 },
-  input: { backgroundColor: '#151521', borderColor: 'rgba(255,255,255,0.1)', borderRadius: 14, borderWidth: 1, color: '#FFFFFF', paddingHorizontal: 16, paddingVertical: 15, marginBottom: 12 },
-  primaryButton: { minHeight: 52, borderRadius: 14, backgroundColor: '#7C5CFC', alignItems: 'center', justifyContent: 'center', marginTop: 6 },
+  content: { flexGrow: 1, justifyContent: 'center', padding: 24, maxWidth: 520, width: '100%', alignSelf: 'center' },
+  brandMark: { alignItems: 'center', marginBottom: 4 },
+  logo: { color: colors.textPrimary, fontSize: 56, fontWeight: '900', textAlign: 'center', letterSpacing: -2 },
+  logoAccent: { color: colors.primary },
+  title: { color: colors.textPrimary, fontSize: 28, fontWeight: '800', textAlign: 'center', marginTop: 14 },
+  subtitle: { color: colors.textSecondary, fontSize: 15, textAlign: 'center', marginTop: 8, marginBottom: 24 },
+  formCard: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 22, padding: 18, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 4 },
+  fieldGroup: { marginBottom: 14 },
+  fieldLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: '800', letterSpacing: 1, marginBottom: 7 },
+  optionalLabel: { color: colors.textTertiary, fontWeight: '600', letterSpacing: 0 },
+  input: { backgroundColor: colors.surfaceVariant, borderColor: colors.borderStrong, borderRadius: 13, borderWidth: 1, color: colors.textPrimary, paddingHorizontal: 15, paddingVertical: 14, fontSize: 15 },
+  inputError: { borderColor: colors.danger, backgroundColor: colors.dangerDim + '35' },
+  fieldError: { color: colors.danger, fontSize: 12, lineHeight: 17, marginTop: 5 },
+  helperText: { color: colors.textTertiary, fontSize: 11, marginTop: 5 },
+  primaryButton: { minHeight: 52, borderRadius: 14, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  pressed: { transform: [{ scale: 0.98 }], opacity: 0.9 },
   disabled: { opacity: 0.6 },
   primaryText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
-  secondaryAction: { alignItems: 'center', paddingVertical: 14 },
-  secondaryText: { color: '#B5A6FF', fontSize: 14, fontWeight: '600' },
-  comingSoonText: { color: '#737384', fontSize: 12, textAlign: 'center', marginTop: 16 },
+  comingSoonText: { color: colors.textTertiary, fontSize: 12, textAlign: 'center', marginTop: 16 },
+  secondaryAction: { alignItems: 'center', paddingVertical: 11 },
+  secondaryText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
   policyAction: { alignItems: 'center', paddingVertical: 12, marginTop: 4 },
-  policyText: { color: '#8F8FA3', fontSize: 13, textDecorationLine: 'underline' },
-  error: { color: '#FF6675', lineHeight: 20, textAlign: 'center', marginVertical: 12 },
-  message: { color: '#44D39A', lineHeight: 20, textAlign: 'center', marginVertical: 12 },
+  policyText: { color: colors.textSecondary, fontSize: 13, textDecorationLine: 'underline' },
+  message: { color: colors.success, lineHeight: 20, textAlign: 'center', marginBottom: 12 },
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Modal, TextInput, ActivityIndicator, FlatList, Alert
@@ -6,13 +6,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Colors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 
 const COLOR_OPTIONS = ['#6B21A8', '#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#EC4899'];
 const ICON_OPTIONS = ['book', 'functions', 'biotech', 'shutter-speed', 'psychology', 'computer'];
 
 export default function TrackerScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { subjects, addSubject } = useApp();
 
@@ -25,13 +28,13 @@ export default function TrackerScreen() {
   // 🚀 Cleaned & Fixed handleCreateSubject
   const handleCreateSubject = async () => {
     if (!subjectName.trim()) return;
-    
+
     setSaving(true);
     try {
       if (typeof addSubject === 'function') {
         await addSubject(subjectName.trim(), selectedColor, selectedIcon);
       }
-      
+
       // ✅ Success hone par reset aur close
       setModalVisible(false);
       setSubjectName('');
@@ -40,7 +43,7 @@ export default function TrackerScreen() {
     } catch (error: any) {
       console.error("Error creating subject:", error);
       Alert.alert(
-        "Error", 
+        "Error",
         "Subject save nahi ho paya. Please try again."
       );
     } finally {
@@ -53,19 +56,19 @@ export default function TrackerScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>📚 Study Tracker</Text>
-        <TouchableOpacity 
-          style={styles.addBtn} 
+        <TouchableOpacity
+          style={styles.addBtn}
           onPress={() => setModalVisible(true)}
           activeOpacity={0.8}
         >
-          <MaterialIcons name="add" size={20} color={Colors.background} />
+          <MaterialIcons name="add" size={20} color={colors.background} />
         </TouchableOpacity>
       </View>
 
       {/* Subjects List */}
       {!subjects || subjects.length === 0 ? (
         <View style={styles.empty}>
-          <MaterialIcons name="library-books" size={48} color={Colors.textTertiary} />
+          <MaterialIcons name="library-books" size={48} color={colors.textTertiary} />
           <Text style={styles.emptyTitle}>No subjects found</Text>
           <Text style={styles.emptyText}>Tap + to add your first subject</Text>
         </View>
@@ -75,18 +78,18 @@ export default function TrackerScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.subjectCard}
               onPress={() => router.push(`/tracker/${item.id}`)}
               activeOpacity={0.7}
             >
               <View style={styles.cardInfo}>
-                <View style={[styles.subjectDot, { backgroundColor: item.colorHex || Colors.primary }]}>
-                  <MaterialIcons name={(item.iconName as any) || 'book'} size={14} color={Colors.background} />
+                <View style={[styles.subjectDot, { backgroundColor: item.colorHex || colors.primary }]}>
+                  <MaterialIcons name={(item.iconName as any) || 'book'} size={14} color={colors.background} />
                 </View>
                 <Text style={styles.subjectName}>{item.name}</Text>
               </View>
-              <MaterialIcons name="chevron-right" size={20} color={Colors.textTertiary} />
+              <MaterialIcons name="chevron-right" size={20} color={colors.textTertiary} />
             </TouchableOpacity>
           )}
         />
@@ -99,14 +102,14 @@ export default function TrackerScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Naya Subject</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <MaterialIcons name="close" size={24} color={Colors.textSecondary} />
+                <MaterialIcons name="close" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
             <TextInput
               style={styles.input}
               placeholder="Subject name (e.g. Physics)"
-              placeholderTextColor={Colors.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               value={subjectName}
               onChangeText={setSubjectName}
               autoFocus
@@ -117,9 +120,9 @@ export default function TrackerScreen() {
             <Text style={styles.sectionLabel}>Select Color</Text>
             <View style={styles.optionsRow}>
               {COLOR_OPTIONS.map(c => (
-                <TouchableOpacity 
-                  key={c} 
-                  style={[styles.colorCircle, { backgroundColor: c }, selectedColor === c && styles.circleSelected]} 
+                <TouchableOpacity
+                  key={c}
+                  style={[styles.colorCircle, { backgroundColor: c }, selectedColor === c && styles.circleSelected]}
                   onPress={() => setSelectedColor(c)}
                 />
               ))}
@@ -137,10 +140,10 @@ export default function TrackerScreen() {
                   ]}
                   onPress={() => setSelectedIcon(icon)}
                 >
-                  <MaterialIcons 
-                    name={icon as any} 
-                    size={24} 
-                    color={selectedIcon === icon ? Colors.background : Colors.textSecondary} 
+                  <MaterialIcons
+                    name={icon as any}
+                    size={24}
+                    color={selectedIcon === icon ? colors.background : colors.textSecondary}
                   />
                 </TouchableOpacity>
               ))}
@@ -153,7 +156,7 @@ export default function TrackerScreen() {
               activeOpacity={0.8}
             >
               {saving ? (
-                <ActivityIndicator color={Colors.background} />
+                <ActivityIndicator color={colors.background} />
               ) : (
                 <Text style={styles.saveBtnText}>Subject Add Karo</Text>
               )}
@@ -165,34 +168,34 @@ export default function TrackerScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
-  headerTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: Colors.textPrimary },
-  addBtn: { backgroundColor: Colors.primary, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: colors.textPrimary },
+  addBtn: { backgroundColor: colors.primary, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   list: { padding: Spacing.md, gap: Spacing.sm },
-  subjectCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, padding: Spacing.md },
+  subjectCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, padding: Spacing.md },
   cardInfo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   subjectDot: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  subjectName: { fontSize: FontSize.base, fontWeight: FontWeight.semiBold, color: Colors.textPrimary },
+  subjectName: { fontSize: FontSize.base, fontWeight: FontWeight.semiBold, color: colors.textPrimary },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
-  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.textPrimary },
-  emptyText: { fontSize: FontSize.base, color: Colors.textSecondary },
-  modalOverlay: { flex: 1, backgroundColor: Colors.overlay, justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: Colors.surface, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.lg, paddingBottom: Spacing.xxl },
+  emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: colors.textPrimary },
+  emptyText: { fontSize: FontSize.base, color: colors.textSecondary },
+  modalOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
+  modalSheet: { backgroundColor: colors.surface, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.lg, paddingBottom: Spacing.xxl },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
-  modalTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: Colors.textPrimary },
-  input: { backgroundColor: Colors.surfaceVariant, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: Spacing.md, paddingVertical: 14, color: Colors.textPrimary, fontSize: FontSize.md, marginBottom: Spacing.md },
-  sectionLabel: { fontSize: FontSize.sm, color: Colors.textSecondary, marginBottom: Spacing.sm, fontWeight: FontWeight.medium },
+  modalTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: colors.textPrimary },
+  input: { backgroundColor: colors.surfaceVariant, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: Spacing.md, paddingVertical: 14, color: colors.textPrimary, fontSize: FontSize.md, marginBottom: Spacing.md },
+  sectionLabel: { fontSize: FontSize.sm, color: colors.textSecondary, marginBottom: Spacing.sm, fontWeight: FontWeight.medium },
   optionsRow: { flexDirection: 'row', gap: 12, marginBottom: Spacing.lg, flexWrap: 'wrap' },
   colorCircle: { width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: 'transparent' },
-  circleSelected: { borderColor: Colors.textPrimary },
-  
+  circleSelected: { borderColor: colors.textPrimary },
+
   // 🚀 Styles for Icon Picker
   iconScrollRow: { gap: 12, marginBottom: Spacing.xl },
-  iconBox: { width: 48, height: 48, borderRadius: Radius.md, backgroundColor: Colors.surfaceVariant, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.border },
-  
+  iconBox: { width: 48, height: 48, borderRadius: Radius.md, backgroundColor: colors.surfaceVariant, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
+
   saveBtn: { borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center', marginTop: Spacing.sm },
   saveBtnDisabled: { opacity: 0.4 },
-  saveBtnText: { color: Colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
+  saveBtnText: { color: colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
 });

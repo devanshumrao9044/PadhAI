@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
   SafeAreaView
 } from 'react-native';
+import { useTheme } from '@/contexts/ThemeContext';
+import { ThemeColors } from '@/constants/theme';
 import { router } from 'expo-router';
 import { supabase } from '../services/supabase';
 import StepName from '../components/onboarding/StepName';
@@ -13,23 +15,25 @@ import StepGoal from '../components/onboarding/StepGoal';
 const TOTAL_STEPS = 4;
 
 export default function OnboardingScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [step, setStep] = useState(1);
   const [name, setName] = useState('');
   const [exam, setExam] = useState('JEE');
-  const [studentClass, setStudentClass] = useState('12th'); 
+  const [studentClass, setStudentClass] = useState('12th');
   const [goalMinutes, setGoalMinutes] = useState(120);
   const [loading, setLoading] = useState(false);
 
-  
+
   function canProceed() {
     if (step === 1) return name.trim().length >= 2;
-    if (step === 2) return true; 
-    if (step === 3) return !!studentClass; 
+    if (step === 2) return true;
+    if (step === 3) return !!studentClass;
     if (step === 4) return goalMinutes > 0;
     return false;
   }
 
-  
+
   async function handleFinish() {
     setLoading(true);
     try {
@@ -53,7 +57,7 @@ export default function OnboardingScreen() {
         .eq('id', user.id);
 
       if (error) {
-        
+
         setLoading(false);
         Alert.alert(
           'Could Not Save Profile',
@@ -108,17 +112,17 @@ export default function OnboardingScreen() {
         {step === 1 && (
           <StepName value={name} onChange={setName} />
         )}
-        
+
         {step === 2 && (
           <StepExam value={exam} onChange={setExam} />
         )}
 
-      
+
         {step === 3 && (
           <View style={styles.classContainer}>
             <Text style={styles.classTitle}>Which is your class? </Text>
             <Text style={styles.classSubtitle}>This will help to understand your syllabus better. </Text>
-            
+
             <View style={styles.classOptionsGrid}>
               {['11th', '12th', 'Dropper'].map(c => (
                 <TouchableOpacity
@@ -181,10 +185,10 @@ export default function OnboardingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F0F0F',
+    backgroundColor: colors.background,
     paddingHorizontal: 24,
     paddingTop: 24,
   },
@@ -196,16 +200,16 @@ const styles = StyleSheet.create({
   },
   progressDot: {
     height: 6,
-    flex: 1, 
+    flex: 1,
     maxWidth: 60,
     borderRadius: 3,
-    backgroundColor: '#2D2D2D',
+    backgroundColor: colors.surfaceVariant,
   },
   progressDotActive: {
-    backgroundColor: '#6B21A8',
+    backgroundColor: colors.primary,
   },
   stepCounter: {
-    color: '#6B7280',
+    color: colors.textTertiary,
     fontSize: 13,
     textAlign: 'center',
     marginBottom: 32,
@@ -222,21 +226,21 @@ const styles = StyleSheet.create({
   },
   backButton: {
     flex: 1,
-    backgroundColor: '#1C1C1E',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 18,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2D2D2D',
+    borderColor: colors.border,
   },
   backButtonText: {
-    color: '#9CA3AF',
+    color: colors.textSecondary,
     fontSize: 16,
     fontWeight: '600',
   },
   nextButton: {
     flex: 2,
-    backgroundColor: '#6B21A8',
+    backgroundColor: colors.primary,
     borderRadius: 14,
     padding: 18,
     alignItems: 'center',
@@ -252,7 +256,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  
+
   classContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -260,13 +264,13 @@ const styles = StyleSheet.create({
   classTitle: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#F1F1F6',
+    color: colors.textPrimary,
     marginBottom: 12,
     textAlign: 'center',
   },
   classSubtitle: {
     fontSize: 15,
-    color: '#9CA3AF',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 40,
     lineHeight: 22,
@@ -275,24 +279,24 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   classOption: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: colors.surface,
     borderWidth: 2,
-    borderColor: '#2D2D2D',
+    borderColor: colors.border,
     borderRadius: 16,
     paddingVertical: 20,
     alignItems: 'center',
   },
   classOptionActive: {
-    backgroundColor: 'rgba(107, 33, 168, 0.15)',
-    borderColor: '#6B21A8',
+    backgroundColor: colors.primary + '26',
+    borderColor: colors.primary,
   },
   classOptionText: {
     fontSize: 18,
-    color: '#9CA3AF',
+    color: colors.textSecondary,
     fontWeight: '600',
   },
   classOptionTextActive: {
-    color: '#7C5CFC',
+    color: colors.primary,
     fontWeight: '700',
   },
 });
