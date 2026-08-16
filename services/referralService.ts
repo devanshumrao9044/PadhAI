@@ -9,94 +9,15 @@ export async function processReferralOnFirstSession(
   userId: string
 ): Promise<void> {
   try {
-    const { data: referral } = await supabase
-      .from('referrals')
-      .select('id, referrer_id, status')
-      .eq('referee_id', userId)
-      .eq('status', 'pending')
-      .maybeSingle();
-
-    if (!referral) return;
-
-    const { data: sessions } = await supabase
-      .from('focus_sessions')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('broken', false)
-      .limit(2);
-
-    // The handler may run immediately after the insert or during offline sync.
-    // Any completed session proves the user has reached the referral milestone;
-    // the pending referral filter below keeps the operation idempotent.
-    if (!sessions || sessions.length === 0) return;
-
-    const { data: completedReferral, error: completionError } = await supabase
-      .from('referrals')
-      .update({ status: 'completed' })
-      .eq('id', referral.id)
-      .eq('status', 'pending')
-      .select('id')
-      .maybeSingle();
-
-    if (completionError) throw completionError;
-    // Only the caller that successfully transitions pending -> completed may
-    // award XP; concurrent retries exit here without duplicating the reward.
-    if (!completedReferral) return;
-
-    const { data: referee } = await supabase
-      .from('users')
-      .select('xp')
-      .eq('id', userId)
-      .single();
-
-    if (referee) {
-      await supabase
-        .from('users')
-        .update({ xp: (referee.xp || 0) + XP_REFEREE })
-        .eq('id', userId);
-
-      await supabase.from('xp_transactions').insert({
-        user_id: userId,
-        amount: XP_REFEREE,
-        reason: 'referral_bonus_referee',
-      });
+    const { data, error } = await supabase.rpc('process_referral_bonus', {
+      p_referee_id: userId,
+    });
+    if (error) throw error;
+    if (data?.success) {
+      console.log(`[Referral] Success: +${data.referee_xp_added} XP to referee, +${data.referrer_xp_added} XP to referrer`);
     }
-
-    const { data: referrer } = await supabase
-      .from('users')
-      .select('xp')
-      .eq('id', referral.referrer_id)
-      .single();
-
-    if (referrer) {
-      await supabase
-        .from('users')
-        .update({ xp: (referrer.xp || 0) + XP_REFERRER })
-        .eq('id', referral.referrer_id);
-
-      await supabase.from('xp_transactions').insert({
-        user_id: referral.referrer_id,
-        amount: XP_REFERRER,
-        reason: 'referral_bonus_referrer',
-      });
-    }
-
-    const { count } = await supabase
-      .from('referrals')
-      .select('id', { count: 'exact', head: true })
-      .eq('referrer_id', referral.referrer_id)
-      .eq('status', 'completed');
-
-    if ((count ?? 0) >= REWARD_THRESHOLD) {
-      await supabase
-        .from('users')
-        .update({ has_unlocked_reward: true })
-        .eq('id', referral.referrer_id);
-    }
-
-    console.log(`Referral done: +${XP_REFEREE} to referee, +${XP_REFERRER} to referrer`);
   } catch (err) {
-    console.log('processReferralOnFirstSession error:', err);
+    console.log('[Referral] processReferralOnFirstSession error:', err);
   }
 }
 
