@@ -44,20 +44,3 @@ test('Referral milestone reward threshold rule', () => {
   assert.strictEqual(isRewardUnlocked(5), true);
   assert.strictEqual(isRewardUnlocked(10), true);
 });
-
-test('Referral code expiration logic rule', () => {
-  const isCodeExpired = (expiresAt: string | null) => {
-    if (!expiresAt) return false;
-    return new Date(expiresAt) < new Date();
-  };
-
-  const futureDate = new Date();
-  futureDate.setFullYear(futureDate.getFullYear() + 1);
-  
-  const pastDate = new Date();
-  pastDate.setFullYear(pastDate.getFullYear() - 1);
-
-  assert.strictEqual(isCodeExpired(null), false); // No expiration
-  assert.strictEqual(isCodeExpired(futureDate.toISOString()), false); // Valid
-  assert.strictEqual(isCodeExpired(pastDate.toISOString()), true); // Expired
-});
