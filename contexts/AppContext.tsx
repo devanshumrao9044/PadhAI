@@ -137,23 +137,50 @@ const mapChapter = (c: any): Chapter => ({
   isDeleted: c.is_deleted === true || c.is_deleted === 'true' || c.is_deleted === 1,
 });
 
-const mapSession = (s: any): FocusSession => ({
-  // ✅ Accept either casing — in-memory objects use camelCase,
-  // DB-loaded rows would use snake_case if the column existed
-  comebackBonus: s.comebackBonus ?? s.comeback_bonus ?? 0,
-  id: s.id,
-  userId: s.user_id,
-  subjectId: s.subject_id,
-  chapterId: s.chapter_id ?? null,
-  durationPlannedMins: s.planned_minutes,
-  durationActualMins: s.actual_minutes,
-  completed: !s.broken,
-  xpEarned: s.xp_earned,
-  xpDeducted: s.xp_deducted,
-  brokenAtPercent: s.broken_at_percent ?? (s.broken ? 0 : 100),
-  sessionDate: s.started_at ? dateStr(new Date(s.started_at)) : todayStr(),
-  createdAt: s.created_at,
-});
+const mapSession = (s: any): FocusSession => {
+  // Production focus_sessions has no chapter_id, broken_at_percent, or created_at.
+  // Local session objects may still provide those fields for UI-only context.
+  const startedAt = s.started_at ?? s.startedAt ?? new Date().toISOString();
+  const endedAt = s.ended_at ?? s.endedAt ?? startedAt;
+  return {
+    comebackBonus: s.comebackBonus ?? s.comeback_bonus ?? 0,
+    id: s.id,
+    userId: s.user_id ?? s.userId,
+    subjectId: s.subject_id ?? s.subjectId ?? null,
+    chapterId: s.chapter_id ?? s.chapterId ?? null,
+    durationPlannedMins: s.planned_minutes ?? s.durationPlannedMins ?? 0,
+    durationActualMins: s.actual_minutes ?? s.durationActualMins ?? 0,
+    completed: typeof s.completed === 'boolean' ? s.completed : !s.broken,
+    xpEarned: s.xp_earned ?? s.xpEarned ?? 0,
+    xpDeducted: s.xp_deducted ?? s.xpDeducted ?? 0,
+    brokenAtPercent: s.broken_at_percent ?? s.brokenAtPercent ?? (
+      s.broken
+        ? Math.min(100, Math.max(0, Math.floor(((s.actual_minutes ?? s.durationActualMins ?? 0) / Math.max(1, s.planned_minutes ?? s.durationPlannedMins ?? 1)) * 100)))
+        : 100
+    ),
+    sessionDate: dateStr(new Date(startedAt)),
+    createdAt: s.created_at ?? s.createdAt ?? endedAt,
+  };
+};
+
+const toFocusSessionDbPayload = (s: any) => {
+  const broken = typeof s.broken === 'boolean' ? s.broken : s.completed === false;
+  return {
+    id: s.id,
+    user_id: s.user_id ?? s.userId,
+    subject_id: s.subject_id ?? s.subjectId ?? null,
+    planned_minutes: s.planned_minutes ?? s.durationPlannedMins ?? 0,
+    actual_minutes: s.actual_minutes ?? s.durationActualMins ?? 0,
+    completed: typeof s.completed === 'boolean' ? s.completed : !broken,
+    broken,
+    xp_earned: s.xp_earned ?? s.xpEarned ?? 0,
+    xp_deducted: s.xp_deducted ?? s.xpDeducted ?? 0,
+    break_reason: s.break_reason ?? null,
+    started_at: s.started_at ?? s.startedAt ?? new Date().toISOString(),
+    ended_at: s.ended_at ?? s.endedAt ?? null,
+    comeback_bonus: s.comeback_bonus ?? s.comebackBonus ?? 0,
+  };
+};
 
 const mapSummary = (s: any): DailySummary => ({
   id: s.id,
@@ -237,7 +264,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       for (const task of queue) {
         try {
           if (task.action === 'insert') {
-            const { error } = await supabase.from(task.table).insert(task.payload);
+            const payload = task.table === 'focus_sessions'
+              ? toFocusSessionDbPayload(task.payload)
+              : task.payload;
+            const { error } = await supabase.from(task.table).insert(payload);
             if (error) throw error;
             if (
               task.table === 'focus_sessions' &&
@@ -431,7 +461,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const [subRes, chapRes, sessRes, sumRes, xpRes] = await Promise.all([
           supabase.from('subjects').select('id,user_id,name,color_hex,icon_name,display_order,created_at,is_deleted').eq('user_id', userId).eq('is_deleted', false).order('display_order', { ascending: true }),
           supabase.from('chapters').select('id,subject_id,user_id,name,status,planned_date,completed_date,display_order,created_at,is_deleted').eq('user_id', userId).eq('is_deleted', false).order('display_order', { ascending: true }),
-          supabase.from('focus_sessions').select('id,user_id,subject_id,chapter_id,planned_minutes,actual_minutes,broken,xp_earned,xp_deducted,broken_at_percent,started_at,created_at').eq('user_id', userId).order('started_at', { ascending: false }).limit(200),
+          supabase.from('focus_sessions').select('id,user_id,subject_id,planned_minutes,actual_minutes,completed,broken,xp_earned,xp_deducted,break_reason,started_at,ended_at,comeback_bonus').eq('user_id', userId).order('started_at', { ascending: false }).limit(200),
           supabase.from('daily_summary').select('id,user_id,date,total_focus_minutes,sessions_completed,sessions_broken,goal_minutes,goal_met,xp_earned').eq('user_id', userId).order('date', { ascending: false }).limit(100),
           supabase.from('xp_transactions').select('id,user_id,amount,reason,created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
         ]);
@@ -715,19 +745,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
         id: sessionId,
         user_id: activeUser?.id ?? '',
         subject_id: activeSession?.subjectId ?? null,
-        chapter_id: activeSession?.chapterId ?? null,
         planned_minutes: activeSession?.plannedMins ?? actualMins,
         actual_minutes: actualMins,
+        completed: true,
         broken: false,
         xp_earned: xp,
         xp_deducted: 0,
         comeback_bonus: bonusFromComeback,
         started_at: activeSession?.startedAt ?? new Date().toISOString(),
         ended_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
       };
-      
-      const sessionObj = mapSession({ ...sessionPayload, comebackBonus: bonusFromComeback });
+
+      const sessionObj = mapSession({
+        ...sessionPayload,
+        chapter_id: activeSession?.chapterId ?? null,
+        broken_at_percent: 100,
+      });
       
       const newSessions = [sessionObj, ...sessions];
       setSessions(newSessions);
@@ -774,19 +807,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
         id: sessionId,
         user_id: activeUser?.id ?? '',
         subject_id: activeSession?.subjectId ?? null,
-        chapter_id: activeSession?.chapterId ?? null,
         planned_minutes: planned,
         actual_minutes: actualMins,
+        completed: false,
         broken: true,
         xp_earned: 0,
         xp_deducted: penalty,
-        broken_at_percent: brokenAt,
+        break_reason: 'user_abandoned',
         started_at: activeSession?.startedAt ?? new Date().toISOString(),
         ended_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
       };
-      
-      const sessionObj = mapSession(sessionPayload);
+
+      const sessionObj = mapSession({
+        ...sessionPayload,
+        chapter_id: activeSession?.chapterId ?? null,
+        broken_at_percent: brokenAt,
+      });
       
       const newSessions = [sessionObj, ...sessions];
       setSessions(newSessions);
