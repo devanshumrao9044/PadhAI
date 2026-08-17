@@ -172,9 +172,11 @@ export default function LeaderboardScreen() {
     ? { ...entry, xp: user.xpTotal, level: currentLevel.rank }
     : entry);
 
-  const fetchLeaderboard = async () => {
+  const fetchLeaderboard = useCallback(async () => {
     try {
-      const { data, error } = await supabase.rpc('get_leaderboard');
+      const { data, error } = await supabase.rpc('get_level_leaderboard', {
+        p_level: currentLevel.rank,
+      });
       if (!error && data) {
         setEntries(data as LeaderboardEntry[]);
       }
@@ -183,17 +185,19 @@ export default function LeaderboardScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentLevel.rank]);
 
   useEffect(() => {
-    fetchLeaderboard();
-  }, []);
+    void fetchLeaderboard();
+    const liveRefresh = setInterval(() => { void fetchLeaderboard(); }, 30_000);
+    return () => clearInterval(liveRefresh);
+  }, [fetchLeaderboard]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchLeaderboard();
     setRefreshing(false);
-  }, []);
+  }, [fetchLeaderboard]);
 
   // Build carousel: show currentLevel ±2 levels
   const carouselLevels = LEVELS.filter(
@@ -279,7 +283,11 @@ export default function LeaderboardScreen() {
 
         {/* ── Section 3: Leaderboard List ───────────────────────────────── */}
         <View style={styles.listSection}>
-          <Text style={styles.sectionTitle}>LEADERBOARD</Text>
+            <View style={styles.sectionHeadingRow}>
+              <Text style={styles.sectionTitle}>LEVEL {currentLevel.rank} LEADERBOARD</Text>
+              <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>LIVE</Text></View>
+            </View>
+            <Text style={styles.sectionSubtitle}>All users in your current level · updates every 30 seconds</Text>
 
           {loading ? (
             <View style={styles.loadingBox}>
@@ -293,25 +301,9 @@ export default function LeaderboardScreen() {
             </View>
           ) : (
             <View style={styles.listContainer}>
-              {/* Show top 3 always, then entries around user */}
-              {displayEntries.map((entry, idx) => {
-                const isMe = entry.id === user?.id;
-                const isTop3 = idx < 3;
-                const isNearMe = myRank > 3 && Math.abs(entry.rank - myRank) <= 3;
-                // Show: top 3 always + entries near me
-                if (!isTop3 && !isNearMe && !isMe) {
-                  // Show separator if this is the gap
-                  if (idx === 3 && myRank > 6) {
-                    return (
-                      <View key="sep" style={styles.separator}>
-                        <Text style={styles.separatorText}>• • •</Text>
-                      </View>
-                    );
-                  }
-                  return null;
-                }
-                return <BoardRow key={entry.id} entry={entry} isMe={isMe} />;
-              })}
+              {displayEntries.map(entry => (
+                <BoardRow key={entry.id} entry={entry} isMe={entry.id === user?.id} />
+              ))}
             </View>
           )}
         </View>
@@ -529,6 +521,10 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   listSection: {
     paddingHorizontal: Spacing.md,
   },
+  sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 },
+  livePill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.success + '18', borderRadius: Radius.full, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: colors.success + '55' },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success },
+  liveText: { color: colors.success, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8 },
   sectionTitle: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.extraBold,
@@ -537,7 +533,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     marginBottom: Spacing.sm,
     textTransform: 'uppercase',
   },
-  listContainer: { gap: 6 },
+  sectionSubtitle: { color: colors.textTertiary, fontSize: FontSize.xs, marginBottom: Spacing.sm },
+  listContainer: { gap: 6, paddingBottom: Spacing.xl },
   boardRow: {
     flexDirection: 'row',
     alignItems: 'center',

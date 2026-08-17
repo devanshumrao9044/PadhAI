@@ -66,7 +66,7 @@ export type AppContextType = {
   last90Days: DailySummary[];
   activeSession: ActiveSession | null;
   startSession: (plannedMins: number, subjectId: string | null, chapterId: string | null) => Promise<string>;
-  completeSession: (sessionId: string, actualMins: number) => Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number }) | null>;
+  completeSession: (sessionId: string, actualMins: number) => Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number; referralXpAwarded?: number }) | null>;
   breakSession: (sessionId: string, actualMins: number) => Promise<FocusSession | null>;
   getDailySummary: (date: string) => DailySummary | null;
   getLast7Days: () => DailySummary[];
@@ -884,7 +884,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const COMEBACK_BONUS_XP = 50;
 
-  const completeSession = async (sessionId: string, actualMins: number): Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number }) | null> => {
+  const completeSession = async (sessionId: string, actualMins: number): Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number; referralXpAwarded?: number }) | null> => {
     try {
       const activeUser = user ?? await getItem<UserProfile>(StorageKeys.USER);
       const bonusFromComeback = comebackPending ? COMEBACK_BONUS_XP : 0;
@@ -892,6 +892,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (comebackPending) setComebackPendingState(false);
 
       let newXPTotal = activeUser?.xpTotal ?? 0;
+      let referralXpAwarded = 0;
 
       const sessionPayload = {
         id: sessionId,
@@ -933,7 +934,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         if (sessionSaved) {
           try {
-            await processReferralOnFirstSession(activeUser.id);
+            const referralResult = await processReferralOnFirstSession(activeUser.id);
+            referralXpAwarded = referralResult?.refereeXpAdded ?? 0;
+            newXPTotal += referralXpAwarded;
           } catch (referralError) {
             console.warn('[Referral] Processing failed:', referralError);
           }
@@ -943,7 +946,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const newLevelRank = activeUser ? getLevelForUser({ ...activeUser, xpTotal: newXPTotal }).rank : 1;
       const leveledUp = newLevelRank > oldLevelRank;
       processSyncQueue();
-      return { ...sessionObj, leveledUp, newLevelRank, totalXP: newXPTotal };
+      return { ...sessionObj, leveledUp, newLevelRank, totalXP: newXPTotal, referralXpAwarded };
     } catch {
       return null;
     }

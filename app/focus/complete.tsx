@@ -8,8 +8,6 @@ import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/
 import { useApp } from '@/hooks/useApp';
 import { getLevelForUser } from '@/constants/levels';
 import { COMPLETION_MESSAGES } from '@/constants/messages';
-import { supabase } from '@/services/supabase';
-import { processReferralOnFirstSession } from '@/services/referralService';
 
 function ConfettiDot({
   color, delay, startX,
@@ -66,11 +64,12 @@ export default function FocusCompleteScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const params = useLocalSearchParams<{
-    xp: string; comeback: string; recovery: string; lostStreak: string;
+    xp: string; referralXp: string; comeback: string; recovery: string; lostStreak: string;
   }>();
   const { user, setUser } = useApp();
 
   const xp = parseInt(params.xp ?? '0', 10);
+  const referralXpAwarded = parseInt(params.referralXp ?? '0', 10);
   const isComeback = params.comeback === '1';
   const isRecovery = params.recovery === '1';
   const lostStreak = parseInt(params.lostStreak ?? '0', 10);
@@ -94,6 +93,7 @@ export default function FocusCompleteScreen() {
   );
   const level = user ? getLevelForUser(user) : null;
   const recoveryAppliedRef = useRef(false);
+  const referralAppliedRef = useRef(false);
 
   // ✅ Restore half-streak when this is a recovery session
   useEffect(() => {
@@ -102,18 +102,13 @@ export default function FocusCompleteScreen() {
     void setUser({ ...user, streakCurrent: recoveredStreak });
   }, [isRecovery, lostStreak, recoveredStreak, setUser, user]);
 
-  // Referral check
+  // AppContext awards the referral bonus once, during the completed-session write.
+  // This effect only hydrates the returned amount into the local user state.
   useEffect(() => {
-    async function triggerReferralCheck() {
-      try {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (authUser) await processReferralOnFirstSession(authUser.id);
-      } catch (err) {
-        console.log('Referral hook error:', err);
-      }
-    }
-    triggerReferralCheck();
-  }, []);
+    if (referralAppliedRef.current || referralXpAwarded <= 0 || !user) return;
+    referralAppliedRef.current = true;
+    void setUser({ ...user, xpTotal: user.xpTotal + referralXpAwarded });
+  }, [referralXpAwarded, setUser, user]);
 
   // Animation refs are stable and route params are immutable for this mounted screen.
   useEffect(() => {
@@ -227,6 +222,20 @@ export default function FocusCompleteScreen() {
             <Text style={styles.xpAmount}>+{xp} XP</Text>
             <Text style={styles.xpLabel}>earned</Text>
           </View>
+
+          {referralXpAwarded > 0 ? (
+            <View style={styles.referralBonusBanner}>
+              <View style={styles.referralBonusIcon}><MaterialIcons name="people" size={22} color={colors.success} /></View>
+              <View style={styles.referralBonusText}>
+                <Text style={styles.referralBonusTitle}>REFERRAL BONUS</Text>
+                <Text style={styles.referralBonusSub}>Your first completed session unlocked extra XP.</Text>
+              </View>
+              <View style={styles.referralBonusBadge}>
+                <Text style={styles.referralBonusAmount}>+{referralXpAwarded}</Text>
+                <Text style={styles.referralBonusLabel}>XP</Text>
+              </View>
+            </View>
+          ) : null}
 
           {/* ── Streak Recovery Badge ── */}
           {isRecovery ? (
@@ -365,6 +374,14 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.warning, includeFontPadding: false,
   },
   xpLabel: { fontSize: FontSize.base, color: colors.warning + 'AA' },
+  referralBonusBanner: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderRadius: Radius.lg, borderWidth: 1.5, borderColor: colors.success + '66', backgroundColor: colors.success + '18', padding: Spacing.md, marginBottom: Spacing.md },
+  referralBonusIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.success + '22' },
+  referralBonusText: { flex: 1 },
+  referralBonusTitle: { fontSize: FontSize.xs, fontWeight: FontWeight.extraBold, color: colors.success, letterSpacing: 1.2, marginBottom: 2 },
+  referralBonusSub: { fontSize: FontSize.xs, color: colors.textSecondary, lineHeight: 17 },
+  referralBonusBadge: { minWidth: 54, alignItems: 'center', borderRadius: Radius.md, backgroundColor: colors.success, paddingHorizontal: 8, paddingVertical: 6 },
+  referralBonusAmount: { color: '#FFFFFF', fontSize: FontSize.md, fontWeight: FontWeight.extraBold },
+  referralBonusLabel: { color: '#FFFFFFCC', fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8 },
 
   // ── Streak Recovery Banner ──
   recoveryBanner: {

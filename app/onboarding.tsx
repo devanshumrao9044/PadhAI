@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
-  SafeAreaView
+  SafeAreaView, KeyboardAvoidingView, Platform, ScrollView
 } from 'react-native';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeColors } from '@/constants/theme';
@@ -79,7 +79,7 @@ export default function OnboardingScreen() {
       }
       await setOnboarded(true);
       setLoading(false);
-      router.replace('/(tabs)/focus');
+      router.replace('/first-time-help');
 
     } catch (error: any) {
       setLoading(false);
@@ -100,6 +100,13 @@ export default function OnboardingScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
 
       {/* Progress Bar */}
       <View style={styles.progressContainer}>
@@ -192,7 +199,8 @@ export default function OnboardingScreen() {
           )}
         </TouchableOpacity>
       </View>
-
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -204,6 +212,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 24,
   },
+  flex: { flex: 1 },
+  scroll: { flex: 1 },
+  scrollContent: { flexGrow: 1, paddingBottom: 8 },
   progressContainer: {
     flexDirection: 'row',
     gap: 6,
@@ -224,17 +235,20 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.textTertiary,
     fontSize: 13,
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 16,
     fontWeight: '600',
     letterSpacing: 0.5,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingVertical: 8,
   },
   footer: {
     flexDirection: 'row',
     gap: 12,
-    paddingVertical: 24,
+    paddingTop: 16,
+    paddingBottom: 8,
   },
   backButton: {
     flex: 1,

@@ -22,7 +22,6 @@ import {
   getImageByteSize,
   MAX_AVATAR_OUTPUT_BYTES,
   MAX_AVATAR_SOURCE_BYTES,
-  AVATAR_SUPPORTED_INPUT_FORMATS,
   prepareAvatarImage,
 } from '@/services/avatarImage';
 
@@ -151,9 +150,8 @@ export default function ProfileScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
+      allowsEditing: false,
+      quality: 1,
       base64: false,
     });
 
@@ -503,9 +501,6 @@ export default function ProfileScreen() {
                   <MaterialIcons name="photo-camera" size={14} color="#FFF" />
                 </View>
               </TouchableOpacity>
-              <Text style={styles.avatarHint}>
-                {AVATAR_SUPPORTED_INPUT_FORMATS} accepted • max {formatFileSize(MAX_AVATAR_SOURCE_BYTES)} • auto-compressed below {formatFileSize(MAX_AVATAR_OUTPUT_BYTES)}
-              </Text>
               {avatarError ? <Text style={styles.avatarError}>{avatarError}</Text> : null}
 
               <Text style={styles.inputLabel}>FULL NAME</Text>
@@ -698,7 +693,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   modalSheet: { backgroundColor: colors.surface, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.lg, paddingBottom: Spacing.xxl, marginTop: 'auto', borderWidth: 1, borderColor: colors.border },
   modalTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: colors.textPrimary, marginBottom: Spacing.lg, textAlign: 'center' },
   modalAvatarEdit: { alignSelf: 'center', marginBottom: 6, position: 'relative' },
-  avatarHint: { fontSize: FontSize.xs, color: colors.textSecondary, textAlign: 'center', marginBottom: 4 },
   avatarError: { fontSize: FontSize.xs, color: colors.danger, textAlign: 'center', marginBottom: Spacing.sm },
   avatarImageSmall: { width: 64, height: 64, borderRadius: 32 },
   cameraIconBadge: { position: 'absolute', bottom: 0, right: -4, backgroundColor: colors.primary, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface },

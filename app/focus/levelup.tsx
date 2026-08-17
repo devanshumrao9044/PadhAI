@@ -74,11 +74,13 @@ export default function LevelUpScreen() {
     color: string;
     totalXP: string;
     xpEarned: string;
+    referralXp: string;
   }>();
 
   const newLevelRank = parseInt(params.newLevel ?? '1', 10);
   const totalXP = parseInt(params.totalXP ?? '0', 10);
   const xpEarned = parseInt(params.xpEarned ?? '0', 10);
+  const referralXpAwarded = parseInt(params.referralXp ?? '0', 10);
   const levelDef = LEVELS.find(l => l.rank === newLevelRank) ?? LEVELS[0];
   const prevLevel = LEVELS.find(l => l.rank === newLevelRank - 1);
 
@@ -242,6 +244,12 @@ export default function LevelUpScreen() {
                 <Text style={[styles.xpChipText, { color: levelDef.color }]}>{totalXP} XP total</Text>
               </View>
             </View>
+            {referralXpAwarded > 0 ? (
+              <View style={styles.referralBonusRow}>
+                <MaterialIcons name="people" size={18} color={colors.success} />
+                <Text style={styles.referralBonusText}>Referral bonus: +{referralXpAwarded} XP</Text>
+              </View>
+            ) : null}
           </Animated.View>
 
           {/* CTA */}
@@ -403,6 +411,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     lineHeight: 24,
     marginBottom: Spacing.lg,
   },
+  referralBonusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'center', marginTop: 10, borderRadius: Radius.full, borderWidth: 1, borderColor: colors.success + '55', backgroundColor: colors.success + '18', paddingHorizontal: 12, paddingVertical: 7 },
+  referralBonusText: { color: colors.success, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   xpRow: {
     flexDirection: 'row',
     gap: 10,

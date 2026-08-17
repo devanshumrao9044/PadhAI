@@ -103,19 +103,21 @@ export default function FocusActiveScreen() {
       const session = await complete(sessionToComplete.sessionId, actualMins);
 
       const comebackParam = (session as any)?.comebackBonus > 0 ? '1' : '0';
-      const xpEarned = session?.xpEarned ?? 0;
+        const xpEarned = session?.xpEarned ?? 0;
+        const referralXpAwarded = session?.referralXpAwarded ?? 0;
 
-      if (isRecovery) setRecovery(false, 0);
+        if (isRecovery) setRecovery(false, 0);
 
       if (session?.leveledUp && session?.newLevelRank) {
         const { LEVELS } = await import('@/constants/levels');
         const levelDef = LEVELS.find(l => l.rank === session.newLevelRank);
         const totalXPAfter = session?.totalXP ?? xpEarned;
-        currentRouter.replace(
-          `/focus/levelup?newLevel=${session.newLevelRank}&title=${encodeURIComponent(levelDef?.realisticTitle ?? '')}&examTitle=${encodeURIComponent(levelDef?.examTitle ?? '')}&color=${encodeURIComponent(levelDef?.color ?? '#A855F7')}&totalXP=${totalXPAfter}&xpEarned=${xpEarned}&recovery=${isRecovery ? '1' : '0'}&lostStreak=${recoveredStreak}`
+                  currentRouter.replace(
+          `/focus/levelup?newLevel=${session.newLevelRank}&title=${encodeURIComponent(levelDef?.realisticTitle ?? '')}&examTitle=${encodeURIComponent(levelDef?.examTitle ?? '')}&color=${encodeURIComponent(levelDef?.color ?? '#A855F7')}&totalXP=${totalXPAfter}&xpEarned=${xpEarned}&referralXp=${referralXpAwarded}&recovery=${isRecovery ? '1' : '0'}&lostStreak=${recoveredStreak}`
         );
+
       } else {
-        currentRouter.replace(`/focus/complete?xp=${xpEarned}&comeback=${comebackParam}&recovery=${isRecovery ? '1' : '0'}&lostStreak=${recoveredStreak}`);
+        currentRouter.replace(`/focus/complete?xp=${xpEarned}&referralXp=${referralXpAwarded}&comeback=${comebackParam}&recovery=${isRecovery ? '1' : '0'}&lostStreak=${recoveredStreak}`);
       }
     } catch (error) {
       console.error('Silent Complete Error:', error);

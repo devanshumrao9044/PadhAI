@@ -5,20 +5,35 @@ const XP_REFERRER = 25;
 const REWARD_THRESHOLD = 5;
 
 // ── processReferralOnFirstSession: Awards XP on first successful focus session ──
+export type ReferralBonusResult = {
+  success: boolean;
+  refereeXpAdded: number;
+  referrerXpAdded: number;
+  referrerTotalCompleted: number;
+};
+
 export async function processReferralOnFirstSession(
   userId: string
-): Promise<void> {
+): Promise<ReferralBonusResult | null> {
   try {
     const { data, error } = await supabase.rpc('process_referral_bonus', {
       p_referee_id: userId,
     });
     if (error) throw error;
     if (data?.success) {
-      console.log(`[Referral] Success: +${data.referee_xp_added} XP to referee, +${data.referrer_xp_added} XP to referrer`);
+      const result: ReferralBonusResult = {
+        success: true,
+        refereeXpAdded: Number(data.referee_xp_added ?? 0),
+        referrerXpAdded: Number(data.referrer_xp_added ?? 0),
+        referrerTotalCompleted: Number(data.referrer_total_completed ?? 0),
+      };
+      console.log(`[Referral] Success: +${result.refereeXpAdded} XP to referee, +${result.referrerXpAdded} XP to referrer`);
+      return result;
     }
   } catch (err) {
     console.log('[Referral] processReferralOnFirstSession error:', err);
   }
+  return null;
 }
 
 // ── fetchReferralStats: Retrieves referral counts and code for the user ────────

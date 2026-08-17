@@ -30,6 +30,7 @@ export default function AuthScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordTouched, setPasswordTouched] = useState(false);
   const [referralCode, setReferralCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -48,7 +49,10 @@ export default function AuthScreen() {
     }
     if (field === 'name') setName(value);
     if (field === 'email') setEmail(value);
-    if (field === 'password') setPassword(value);
+    if (field === 'password') {
+      setPasswordTouched(true);
+      setPassword(value);
+    }
     if (field === 'referralCode') setReferralCode(value.toUpperCase().replace(/\s/g, ''));
   };
 
@@ -135,8 +139,8 @@ export default function AuthScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <View style={styles.brandMark}><Text style={styles.logo}>पढ़<Text style={styles.logoAccent}>AI</Text></Text></View>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.subtitle}>Focus your mind. Build your future.</Text>
@@ -168,7 +172,11 @@ export default function AuthScreen() {
               <View style={styles.fieldGroup}>
                 <Text style={styles.fieldLabel}>PASSWORD</Text>
                 <TextInput style={[styles.input, fieldErrors.password && styles.inputError]} placeholder="At least 6 characters" placeholderTextColor={colors.textTertiary} value={password} onChangeText={value => updateField('password', value)} secureTextEntry autoCapitalize="none" autoCorrect={false} />
-                {fieldErrors.password ? <Text style={styles.fieldError}>{fieldErrors.password}</Text> : null}
+                {fieldErrors.password ? <Text style={styles.fieldError}>{fieldErrors.password}</Text> : passwordTouched && password.length > 0 && !validatePassword(password).valid ? (
+                  <Text style={styles.fieldError}>{validatePassword(password).error}</Text>
+                ) : (
+                  <Text style={styles.helperText}>Minimum 6 characters with uppercase, lowercase, number, and symbol.</Text>
+                )}
               </View>
             ) : null}
 
@@ -200,17 +208,17 @@ export default function AuthScreen() {
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
-  content: { flexGrow: 1, justifyContent: 'center', padding: 24, maxWidth: 520, width: '100%', alignSelf: 'center' },
+  content: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingTop: 24, paddingBottom: 36, maxWidth: 520, width: '100%', alignSelf: 'center' },
   brandMark: { alignItems: 'center', marginBottom: 4 },
   logo: { color: colors.textPrimary, fontSize: 56, fontWeight: '900', textAlign: 'center', letterSpacing: -2 },
   logoAccent: { color: colors.primary },
   title: { color: colors.textPrimary, fontSize: 28, fontWeight: '800', textAlign: 'center', marginTop: 14 },
   subtitle: { color: colors.textSecondary, fontSize: 15, textAlign: 'center', marginTop: 8, marginBottom: 24 },
-  formCard: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 22, padding: 18, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 4 },
+  formCard: { width: '100%', alignSelf: 'stretch', overflow: 'hidden', backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 22, padding: 18, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 4 },
   fieldGroup: { marginBottom: 14 },
   fieldLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: '800', letterSpacing: 1, marginBottom: 7 },
   optionalLabel: { color: colors.textTertiary, fontWeight: '600', letterSpacing: 0 },
-  input: { backgroundColor: colors.surfaceVariant, borderColor: colors.borderStrong, borderRadius: 13, borderWidth: 1, color: colors.textPrimary, paddingHorizontal: 15, paddingVertical: 14, fontSize: 15 },
+  input: { width: '100%', alignSelf: 'stretch', minWidth: 0, backgroundColor: colors.surfaceVariant, borderColor: colors.borderStrong, borderRadius: 13, borderWidth: 1, color: colors.textPrimary, paddingHorizontal: 15, paddingVertical: 14, fontSize: 15 },
   inputError: { borderColor: colors.danger, backgroundColor: colors.dangerDim + '35' },
   fieldError: { color: colors.danger, fontSize: 12, lineHeight: 17, marginTop: 5 },
   helperText: { color: colors.textTertiary, fontSize: 11, marginTop: 5 },
