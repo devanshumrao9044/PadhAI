@@ -43,7 +43,7 @@ export default function Dashboard() {
     if (reloadTimerRef.current) return;
     reloadTimerRef.current = setTimeout(() => {
       reloadTimerRef.current = null;
-      void reload();
+      void reload({ force: true });
     }, 250);
   }, [reload]);
 
@@ -86,7 +86,7 @@ export default function Dashboard() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    try { await reload(); } finally { setRefreshing(false); }
+    try { await reload({ force: true }); } finally { setRefreshing(false); }
   }, [reload]);
 
   if (isLoading || !user) {

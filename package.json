@@ -21,6 +21,7 @@
     "expo-router": "~5.0.7",
     "expo-splash-screen": "~0.30.8",
     "expo-status-bar": "~2.2.3",
+    "lz-string": "^1.5.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-native": "0.79.3",

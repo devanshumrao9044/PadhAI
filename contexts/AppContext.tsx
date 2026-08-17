@@ -12,6 +12,7 @@ function uuidv4(): string {
   });
 }
 import { getItem, setItem, removeItem, StorageKeys } from '@/services/storage';
+import { readUserCache, removeUserCache, writeUserCache } from '@/services/cache';
 import { supabase } from '@/services/supabase';
 import {
   UserProfile, Subject, Chapter, Topic,
@@ -74,7 +75,7 @@ export type AppContextType = {
   awardXP: (amount: number, reason: string) => Promise<void>;
   deductXP: (amount: number, reason: string) => Promise<void>;
   isLoading: boolean;
-  reload: () => Promise<void>;
+  reload: (options?: { force?: boolean }) => Promise<void>;
 };
 
 export const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -251,6 +252,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const syncInFlightRef = useRef(false);
   const weeklySettlementInFlightRef = useRef(false);
   const deletedChapterIdsRef = useRef(new Set<string>());
+  const loadInFlightRef = useRef<Promise<void> | null>(null);
+  const lastLoadAtRef = useRef<{ userId: string | null; at: number } | null>(null);
+  const currentUserIdRef = useRef<string | null>(null);
 
   const addToSyncQueue = async (task: Omit<SyncTask, 'id'>) => {
     const existingQueue = (await getItem<SyncTask[]>(OFFLINE_QUEUE_KEY)) || [];
@@ -380,8 +384,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const clearLocalAccountData = async () => {
+  const clearLocalAccountData = async (userId?: string) => {
     await Promise.all([
+      userId ? removeUserCache(userId) : Promise.resolve(),
       removeItem(StorageKeys.USER),
       removeItem(StorageKeys.SUBJECTS),
       removeItem(StorageKeys.CHAPTERS),
@@ -409,27 +414,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
         getItem<XPTransaction[]>(StorageKeys.XP_LOG),
       ]);
 
-      const { data: authData } = await supabase.auth.getUser();
+      const { data: authData } = await supabase.auth.getSession();
       if (loadGeneration !== authGenerationRef.current) return;
-      if (authData?.user) {
-        const userId = authData.user.id;
+      const authUser = authData.session?.user;
+      if (authUser) {
+        const userId = authUser.id;
+        currentUserIdRef.current = userId;
         const sameAccount = savedUser?.id === userId;
+        const [cachedUser, cachedSubjects, cachedChapters, cachedSessions, cachedSummaries, cachedXP, cachedAnalytics, cachedReferral] = await Promise.all([
+          readUserCache<UserProfile>(userId, 'user'),
+          readUserCache<Subject[]>(userId, 'subjects'),
+          readUserCache<Chapter[]>(userId, 'chapters'),
+          readUserCache<FocusSession[]>(userId, 'sessions'),
+          readUserCache<DailySummary[]>(userId, 'dailySummaries'),
+          readUserCache<XPTransaction[]>(userId, 'xpLog'),
+          readUserCache<ChapterAnalytics[]>(userId, 'chapterAnalytics'),
+          readUserCache<{ referralCount: number; hasUnlockedReward: boolean }>(userId, 'referralMeta'),
+        ]);
+        if (cachedUser) {
+          setUserState(cachedUser.data);
+          setIsOnboardedState(cachedUser.data.fullName !== 'Student');
+        }
+        if (cachedSubjects) setSubjects(cachedSubjects.data);
+        if (cachedChapters) setChapters(cachedChapters.data.filter(chapter => !chapter.isDeleted));
+        if (cachedAnalytics) setChapterAnalytics(cachedAnalytics.data);
+        if (cachedReferral) {
+          setReferralCount(cachedReferral.data.referralCount);
+          setHasUnlockedRewardState(cachedReferral.data.hasUnlockedReward);
+        }
 
         if (sameAccount) {
           setTopics(savedTopics ?? []);
           setActiveSession(savedActive ?? null);
-          setSessions(savedSessions ?? []);
-          setDailySummaries(savedSummaries ?? []);
-          setXpLog(savedXP ?? []);
+          setSessions(cachedSessions?.data ?? savedSessions ?? []);
+          setDailySummaries(cachedSummaries?.data ?? savedSummaries ?? []);
+          setXpLog(cachedXP?.data ?? savedXP ?? []);
           await processSyncQueue();
         } else {
-          await clearLocalAccountData();
+          await clearLocalAccountData(savedUser?.id);
+          setSubjects(cachedSubjects?.data ?? []);
+          setChapters(cachedChapters?.data.filter(chapter => !chapter.isDeleted) ?? []);
           setTopics([]);
           setActiveSession(null);
-          setSessions([]);
-          setChapterAnalytics([]);
-          setDailySummaries([]);
-          setXpLog([]);
+          setSessions(cachedSessions?.data ?? []);
+          setChapterAnalytics(cachedAnalytics?.data ?? []);
+          setDailySummaries(cachedSummaries?.data ?? []);
+          setXpLog(cachedXP?.data ?? []);
         }
 
         // Load user profile from DB
@@ -442,10 +472,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (loadGeneration !== authGenerationRef.current) return;
         if (profileData) {
-          loadedProfile = mapUser({ ...profileData, email: authData.user.email });
+          loadedProfile = mapUser({ ...profileData, email: authUser.email });
           setUserState(loadedProfile);
           setIsOnboardedState(!!(profileData.name && profileData.name !== 'Student'));
           await setItem(StorageKeys.USER, loadedProfile);
+          void writeUserCache(userId, 'user', loadedProfile);
         }
 
         // Load referral count and check jackpot
@@ -458,6 +489,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const rCount = count ?? 0;
           setReferralCount(rCount);
           setHasUnlockedRewardState(rCount >= 5);
+          void writeUserCache(userId, 'referralMeta', { referralCount: rCount, hasUnlockedReward: rCount >= 5 });
         } catch {
           // ignore
         }
@@ -473,35 +505,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ]);
 
         if (loadGeneration !== authGenerationRef.current) return;
-        if (subRes.data) setSubjects(subRes.data.map(mapSubject));
+        if (subRes.data) {
+          const cloudSubjects = subRes.data.map(mapSubject);
+          setSubjects(cloudSubjects);
+          void writeUserCache(userId, 'subjects', cloudSubjects);
+        }
         if (chapRes.data) {
           const activeChapters = chapRes.data
             .map(mapChapter)
             .filter(chapter => !deletedChapterIdsRef.current.has(chapter.id) && chapter.isDeleted === false);
           setChapters(activeChapters);
           await setItem(StorageKeys.CHAPTERS, activeChapters);
+          void writeUserCache(userId, 'chapters', activeChapters);
         }
         if (sessRes.data) {
           const cloudSess = sessRes.data.map(mapSession);
           setSessions(cloudSess);
           setItem(StorageKeys.SESSIONS, cloudSess);
+          void writeUserCache(userId, 'sessions', cloudSess);
         }
         if (sumRes.data) {
           const cloudSum = sumRes.data.map(mapSummary);
           setDailySummaries(cloudSum);
           setItem(StorageKeys.DAILY_SUMMARY, cloudSum);
+          void writeUserCache(userId, 'dailySummaries', cloudSum);
         }
         if (!chapterAnalyticsRes.error && chapterAnalyticsRes.data) {
-          setChapterAnalytics(normalizeChapterAnalyticsRows(chapterAnalyticsRes.data));
+          const normalizedAnalytics = normalizeChapterAnalyticsRows(chapterAnalyticsRes.data);
+          setChapterAnalytics(normalizedAnalytics);
+          void writeUserCache(userId, 'chapterAnalytics', normalizedAnalytics);
         } else if (chapterAnalyticsRes.error) {
           console.warn('[Analytics] Chapter analytics load failed:', chapterAnalyticsRes.error.message);
-          setChapterAnalytics([]);
+          if (!cachedAnalytics) setChapterAnalytics([]);
         }
-        let loadedXP = savedXP ?? [];
+        let loadedXP = cachedXP?.data ?? savedXP ?? [];
         if (xpRes.data) {
           loadedXP = xpRes.data.map(mapXP);
           setXpLog(loadedXP);
           setItem(StorageKeys.XP_LOG, loadedXP);
+          void writeUserCache(userId, 'xpLog', loadedXP);
         }
         if (loadedProfile) {
           const settlementResult = await settleWeeklyXPIfNeeded(loadedProfile, loadedXP);
@@ -512,9 +554,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
           else setUserState(settlementResult.user);
           setXpLog(settlementResult.xpLog);
           await setItem(StorageKeys.XP_LOG, settlementResult.xpLog);
+          void writeUserCache(userId, 'xpLog', settlementResult.xpLog);
         }
       } else {
         if (loadGeneration !== authGenerationRef.current) return;
+        currentUserIdRef.current = null;
         setUserState(null);
         setIsOnboardedState(false);
         setSubjects([]);
@@ -534,16 +578,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const reload = useCallback(async (options?: { force?: boolean }) => {
+    if (loadInFlightRef.current) return loadInFlightRef.current;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user?.id ?? null;
+    const lastLoad = lastLoadAtRef.current;
+    if (!options?.force && lastLoad?.userId === userId && Date.now() - lastLoad.at < 60_000) return;
+    const pending = load();
+    loadInFlightRef.current = pending;
+    try {
+      await pending;
+      lastLoadAtRef.current = { userId, at: Date.now() };
+    } finally {
+      if (loadInFlightRef.current === pending) loadInFlightRef.current = null;
+    }
+  }, [load]);
+
   useEffect(() => {
-    load();
+    void reload();
 
     const appStateSub = AppState.addEventListener('change', nextState => {
-      if (nextState === 'active') processSyncQueue();
+      if (nextState === 'active') {
+        void processSyncQueue();
+        void reload();
+      }
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event) => {
       if (event === 'SIGNED_IN') {
-        load();
+        void reload({ force: true });
       } else if (event === 'SIGNED_OUT') {
         authGenerationRef.current += 1;
         setUserState(null);
@@ -562,7 +625,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setComebackPendingState(false);
         setStreakRecoveryPendingState(false);
         setLostStreakCount(0);
-        await clearLocalAccountData();
+        lastLoadAtRef.current = null;
+        const activeUserId = currentUserIdRef.current;
+        currentUserIdRef.current = null;
+        const savedAccount = await getItem<UserProfile>(StorageKeys.USER);
+        await clearLocalAccountData(activeUserId ?? savedAccount?.id);
       }
     });
 
@@ -570,12 +637,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       authListener.subscription.unsubscribe();
       appStateSub.remove();
     };
-  }, [load]);
+  }, [load, reload]);
 
   // ── setUser: sync XP/streak fields to Supabase (profile fields saved separately in profile.tsx) ─────────────────────────────────────────────
   const setUser = async (u: UserProfile) => {
     setUserState(u);
     await setItem(StorageKeys.USER, u);
+    void writeUserCache(u.id, 'user', u);
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) return;
@@ -616,7 +684,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }]).select().single();
     if (error) throw error;
     const newSubject = mapSubject(data);
-    setSubjects(prev => [...prev, newSubject]);
+    const updatedSubjects = [...subjects, newSubject];
+    setSubjects(updatedSubjects);
+    void writeUserCache(authUser.id, 'subjects', updatedSubjects);
     return newSubject;
   };
 
@@ -627,13 +697,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (data.iconName) payload.icon_name = data.iconName;
     const { error } = await supabase.from('subjects').update(payload).eq('id', id);
     if (error) throw error;
-    setSubjects(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
+    const updatedSubjects = subjects.map(s => s.id === id ? { ...s, ...data } : s);
+    setSubjects(updatedSubjects);
+    const { data: authData } = await supabase.auth.getSession();
+    if (authData.session?.user?.id) void writeUserCache(authData.session.user.id, 'subjects', updatedSubjects);
   };
 
   const deleteSubject = async (id: string) => {
     const { error } = await supabase.from('subjects').update({ is_deleted: true }).eq('id', id);
     if (error) throw error;
-    setSubjects(prev => prev.filter(s => s.id !== id));
+    const updatedSubjects = subjects.filter(s => s.id !== id);
+    setSubjects(updatedSubjects);
+    const { data: authData } = await supabase.auth.getSession();
+    if (authData.session?.user?.id) void writeUserCache(authData.session.user.id, 'subjects', updatedSubjects);
   };
 
   // ── Chapters ──────────────────────────────────────────────────────────────
@@ -650,7 +726,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }]).select().single();
     if (error) throw error;
     const newChapter = mapChapter(data);
-    setChapters(prev => [...prev, newChapter]);
+    const updatedChapters = [...chapters, newChapter];
+    setChapters(updatedChapters);
+    void writeUserCache(authUser.id, 'chapters', updatedChapters);
     return newChapter;
   };
 
@@ -661,14 +739,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (data.status !== undefined) payload.status = data.status;
     const { error } = await supabase.from('chapters').update(payload).eq('id', id);
     if (error) throw error;
-    setChapters(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
+    const updatedChapters = chapters.map(c => c.id === id ? { ...c, ...data } : c);
+    setChapters(updatedChapters);
+    const { data: authData } = await supabase.auth.getSession();
+    if (authData.session?.user?.id) void writeUserCache(authData.session.user.id, 'chapters', updatedChapters);
   };
 
   const deleteChapter = async (id: string) => {
     const { error } = await supabase.from('chapters').update({ is_deleted: true }).eq('id', id);
     if (error) throw error;
     deletedChapterIdsRef.current.add(id);
-    setChapters(prev => prev.filter(c => c.id !== id));
+    const updatedChapters = chapters.filter(c => c.id !== id);
+    setChapters(updatedChapters);
+    const { data: authData } = await supabase.auth.getSession();
+    if (authData.session?.user?.id) void writeUserCache(authData.session.user.id, 'chapters', updatedChapters);
   };
 
   const bulkDeleteChapters = async (ids: string[]) => {
@@ -676,7 +760,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.from('chapters').update({ is_deleted: true }).in('id', ids);
     if (error) throw error;
     ids.forEach(id => deletedChapterIdsRef.current.add(id));
-    setChapters(prev => prev.filter(c => !ids.includes(c.id)));
+    const updatedChapters = chapters.filter(c => !ids.includes(c.id));
+    setChapters(updatedChapters);
+    const { data: authData } = await supabase.auth.getSession();
+    if (authData.session?.user?.id) void writeUserCache(authData.session.user.id, 'chapters', updatedChapters);
   };
 
   // ── Topics (local only) ───────────────────────────────────────────────────
@@ -711,6 +798,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const newXPLog = [mapXP(txPayload), ...xpLog];
     setXpLog(newXPLog);
     await setItem(StorageKeys.XP_LOG, newXPLog);
+    void writeUserCache(user.id, 'xpLog', newXPLog);
     await setUser({ ...user, xpTotal: user.xpTotal + amount });
     try {
       const { error } = await supabase.from('xp_transactions').insert([txPayload]);
@@ -726,6 +814,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const newXPLog = [mapXP(txPayload), ...xpLog];
     setXpLog(newXPLog);
     await setItem(StorageKeys.XP_LOG, newXPLog);
+    void writeUserCache(user.id, 'xpLog', newXPLog);
     await setUser({ ...user, xpTotal: Math.max(0, user.xpTotal - amount) });
     try {
       const { error } = await supabase.from('xp_transactions').insert([txPayload]);
@@ -779,6 +868,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const newSessions = [sessionObj, ...sessions];
       setSessions(newSessions);
       await setItem(StorageKeys.SESSIONS, newSessions);
+      if (activeUser?.id) void writeUserCache(activeUser.id, 'sessions', newSessions);
       setActiveSession(null);
       await setItem(StorageKeys.ACTIVE_SESSION, null);
       if (activeUser) {
@@ -841,6 +931,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const newSessions = [sessionObj, ...sessions];
       setSessions(newSessions);
       await setItem(StorageKeys.SESSIONS, newSessions);
+      if (activeUser?.id) void writeUserCache(activeUser.id, 'sessions', newSessions);
       setActiveSession(null);
       await setItem(StorageKeys.ACTIVE_SESSION, null);
       if (activeUser) {
@@ -892,6 +983,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const newDaily = [mapSummary(summaryPayload), ...dailySummaries.filter(s => s.date !== today)];
       setDailySummaries(newDaily);
       await setItem(StorageKeys.DAILY_SUMMARY, newDaily);
+      void writeUserCache(activeUser.id, 'dailySummaries', newDaily);
       try {
         const { error } = await supabase.from('daily_summary').upsert([summaryPayload], { onConflict: 'user_id,date' });
         if (error) throw error;
@@ -903,6 +995,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const newXPLog = [mapXP(txPayload), ...xpLog];
         setXpLog(newXPLog);
         await setItem(StorageKeys.XP_LOG, newXPLog);
+        void writeUserCache(activeUser.id, 'xpLog', newXPLog);
         try {
           const { error } = await supabase.from('xp_transactions').insert([txPayload]);
           if (error) throw error;
@@ -995,7 +1088,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     comebackPending, setComebackPending: stableSetComebackPending,
     hasUnlockedReward, setHasUnlockedReward: stableSetHasUnlockedReward, referralCount,
     streakRecoveryPending, lostStreakCount, setStreakRecoveryPending: stableSetStreakRecoveryPending,
-    isLoading, reload: load,
+    isLoading, reload,
   }), [
     user, isOnboarded, subjects, chapters, chapterAnalytics, topics, sessions, dailySummaries, last7Days, last90Days, activeSession, xpLog,
     comebackPending, hasUnlockedReward, referralCount, streakRecoveryPending, lostStreakCount, isLoading,
@@ -1003,7 +1096,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     stableGetChaptersForSubject, stableAddChapter, stableUpdateChapter, stableDeleteChapter, stableBulkDeleteChapters,
     stableGetTopicsForChapter, stableAddTopic, stableToggleTopic, stableDeleteTopic, stableStartSession,
     stableCompleteSession, stableBreakSession, stableGetDailySummary, stableGetLast7Days, stableGetLast90Days,
-    stableAwardXP, stableDeductXP, stableSetComebackPending, stableSetHasUnlockedReward, stableSetStreakRecoveryPending, load,
+    stableAwardXP, stableDeductXP, stableSetComebackPending, stableSetHasUnlockedReward, stableSetStreakRecoveryPending, reload,
   ]);
 
   return (

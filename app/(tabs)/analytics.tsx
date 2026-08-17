@@ -73,7 +73,7 @@ export default function AnalyticsScreen() {
     if (reloadTimerRef.current) return;
     reloadTimerRef.current = setTimeout(() => {
       reloadTimerRef.current = null;
-      void reload();
+      void reload({ force: true });
     }, 250);
   }, [reload]);
 
