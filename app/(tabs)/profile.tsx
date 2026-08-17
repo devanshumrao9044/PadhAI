@@ -17,6 +17,13 @@ import XPBar from '@/components/ui/XPBar';
 import { getRecentSessions } from '@/services/sessionHistory';
 import { fetchReferralStats } from '@/services/referralService';
 import { getWeeklyZone } from '@/services/weeklyXp';
+import {
+  formatFileSize,
+  getImageByteSize,
+  MAX_AVATAR_OUTPUT_BYTES,
+  MAX_AVATAR_SOURCE_BYTES,
+  prepareAvatarImage,
+} from '@/services/avatarImage';
 
 export default function ProfileScreen() {
   const { colors, mode, toggleTheme } = useTheme();
@@ -37,6 +44,7 @@ export default function ProfileScreen() {
   const [editClass, setEditClass] = useState('12th');
   const [editGoal, setEditGoal] = useState('');
   const [editAvatarUrl, setEditAvatarUrl] = useState('');
+  const [avatarError, setAvatarError] = useState<string | null>(null);
 
   const [alertConfig, setAlertConfig] = useState<{
     visible: boolean; title: string; message: string; isSignOut?: boolean;
@@ -130,6 +138,7 @@ export default function ProfileScreen() {
     setEditClass(user.classLevel || '12th');
     setEditGoal(String(user.dailyGoalMinutes || 120));
     setEditAvatarUrl((user as any).avatarUrl || '');
+    setAvatarError(null);
     setEditVisible(true);
   };
 
@@ -149,7 +158,17 @@ export default function ProfileScreen() {
 
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
-      setEditAvatarUrl(asset.uri);
+      try {
+        const sourceBytes = await getImageByteSize(asset);
+        if (sourceBytes > MAX_AVATAR_SOURCE_BYTES) {
+          setAvatarError(`Photo ${formatFileSize(sourceBytes)} की है। अधिकतम ${formatFileSize(MAX_AVATAR_SOURCE_BYTES)} की photo चुनें।`);
+          return;
+        }
+        setAvatarError(null);
+        setEditAvatarUrl(asset.uri);
+      } catch (error: any) {
+        setAvatarError(error?.message ?? 'Selected photo को पढ़ा नहीं जा सका।');
+      }
     }
   };
 
@@ -161,6 +180,7 @@ export default function ProfileScreen() {
       return;
     }
     setLoading(true);
+    setAvatarError(null);
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) throw new Error('Not authenticated.');
@@ -176,14 +196,15 @@ export default function ProfileScreen() {
         const ext = 'jpeg';
         const mimeType = 'image/jpeg';
         const filePath = `${authUser.id}/${authUser.id}-${Date.now()}.${ext}`;
-
-                const response = await fetch(editAvatarUrl);
-        if (!response.ok) throw new Error('Unable to read the selected image.');
-        const fileBody = await response.arrayBuffer();
+        const preparedAvatar = await prepareAvatarImage(editAvatarUrl);
 
         const { error: uploadError } = await supabase.storage
           .from('avatars')
-          .upload(filePath, fileBody, { contentType: mimeType, upsert: true });
+          .upload(filePath, preparedAvatar.body, {
+            contentType: mimeType,
+            upsert: true,
+            cacheControl: '3600',
+          });
 
         if (uploadError) throw new Error(`Photo upload failed: ${uploadError.message}`);
 
@@ -220,7 +241,11 @@ export default function ProfileScreen() {
 
       setEditVisible(false);
     } catch (error: any) {
-      showAlert('Save Failed', error.message || 'Unknown error occurred.');
+      const message = error?.message || 'Unknown error occurred.';
+      showAlert('Save Failed', message.includes('compressed photo')
+        ? `${message} Maximum final size is ${formatFileSize(MAX_AVATAR_OUTPUT_BYTES)}.`
+        : message);
+      setAvatarError(message);
     } finally {
       setLoading(false);
     }
@@ -477,6 +502,10 @@ export default function ProfileScreen() {
                   <MaterialIcons name="photo-camera" size={14} color="#FFF" />
                 </View>
               </TouchableOpacity>
+              <Text style={styles.avatarHint}>
+                Max {formatFileSize(MAX_AVATAR_SOURCE_BYTES)} source • auto-compressed below {formatFileSize(MAX_AVATAR_OUTPUT_BYTES)}
+              </Text>
+              {avatarError ? <Text style={styles.avatarError}>{avatarError}</Text> : null}
 
               <Text style={styles.inputLabel}>FULL NAME</Text>
               <TextInput
@@ -652,7 +681,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: colors.overlay },
   modalSheet: { backgroundColor: colors.surface, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.lg, paddingBottom: Spacing.xxl, marginTop: 'auto', borderWidth: 1, borderColor: colors.border },
   modalTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: colors.textPrimary, marginBottom: Spacing.lg, textAlign: 'center' },
-  modalAvatarEdit: { alignSelf: 'center', marginBottom: Spacing.lg, position: 'relative' },
+  modalAvatarEdit: { alignSelf: 'center', marginBottom: 6, position: 'relative' },
+  avatarHint: { fontSize: FontSize.xs, color: colors.textSecondary, textAlign: 'center', marginBottom: 4 },
+  avatarError: { fontSize: FontSize.xs, color: colors.danger, textAlign: 'center', marginBottom: Spacing.sm },
   avatarImageSmall: { width: 64, height: 64, borderRadius: 32 },
   cameraIconBadge: { position: 'absolute', bottom: 0, right: -4, backgroundColor: colors.primary, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface },
   inputLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: colors.textTertiary, marginBottom: 6, marginTop: 10 },
