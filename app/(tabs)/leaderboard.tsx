@@ -138,10 +138,28 @@ function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
   const levelDef = LEVELS.find(l => l.rank === entry.level) ?? LEVELS[0];
   const rankColors: Record<number, string> = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32' };
   const rankBg = rankColors[entry.rank] ?? levelDef.color;
+  const medalIcons: Record<number, 'emoji-events' | 'military-tech' | 'workspace-premium'> = {
+    1: 'emoji-events',
+    2: 'military-tech',
+    3: 'workspace-premium',
+  };
+  const isTopThree = entry.rank <= 3;
+  const medalIcon = medalIcons[entry.rank];
 
   return (
-    <View style={[styles.boardRow, isMe && styles.boardRowMe]}>
-      <View style={[styles.boardRankBadge, { backgroundColor: rankBg + '33', borderColor: rankBg }]}>
+    <View
+      accessibilityLabel={isTopThree ? `${entry.name}, ${entry.rank === 1 ? 'gold' : entry.rank === 2 ? 'silver' : 'bronze'} medal, rank ${entry.rank}, ${entry.xp} XP` : `${entry.name}, rank ${entry.rank}, ${entry.xp} XP`}
+      style={[
+        styles.boardRow,
+        isMe && styles.boardRowMe,
+        isTopThree && styles.topThreeRow,
+        entry.rank === 1 && styles.firstPlaceRow,
+        entry.rank === 2 && styles.secondPlaceRow,
+        entry.rank === 3 && styles.thirdPlaceRow,
+      ]}
+    >
+      <View style={[styles.boardRankBadge, isTopThree && styles.medalBadge, { backgroundColor: rankBg + '33', borderColor: rankBg }]}>
+        {medalIcon ? <MaterialIcons name={medalIcon} size={16} color={rankBg} /> : null}
         <Text style={[styles.boardRankText, { color: rankBg }]}>{entry.rank}</Text>
       </View>
       <Text style={[styles.boardName, isMe && styles.boardNameMe]} numberOfLines={1}>
@@ -545,6 +563,10 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  topThreeRow: { paddingVertical: Spacing.md + 2 },
+  firstPlaceRow: { borderColor: '#FFD700', backgroundColor: '#FFD70012', shadowColor: '#FFD700', shadowOpacity: 0.18, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
+  secondPlaceRow: { borderColor: '#C0C0C0', backgroundColor: '#C0C0C012' },
+  thirdPlaceRow: { borderColor: '#CD7F32', backgroundColor: '#CD7F3212' },
   boardRowMe: {
     borderColor: colors.primary,
     backgroundColor: colors.primary + '12',
@@ -557,6 +579,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  medalBadge: { width: 48, height: 42, borderRadius: 14, gap: 1 },
   boardRankText: {
     fontSize: FontSize.base,
     fontWeight: FontWeight.extraBold,
