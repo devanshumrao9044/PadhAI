@@ -156,7 +156,7 @@ export default function AuthScreen() {
 
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>EMAIL ADDRESS</Text>
-              <TextInput style={[styles.input, fieldErrors.email && styles.inputError]} placeholder="you@example.com" placeholderTextColor={colors.textTertiary} value={email} onChangeText={value => updateField('email', value)} autoCapitalize="none" keyboardType="email-address" autoCorrect={false} />
+              <TextInput testID="auth-email" style={[styles.input, fieldErrors.email && styles.inputError]} placeholder="you@example.com" placeholderTextColor={colors.textTertiary} value={email} onChangeText={value => updateField('email', value)} autoCapitalize="none" keyboardType="email-address" autoCorrect={false} />
               {fieldErrors.email ? <Text style={styles.fieldError}>{fieldErrors.email}</Text> : null}
             </View>
 
@@ -171,7 +171,7 @@ export default function AuthScreen() {
             {mode !== 'forgot' ? (
               <View style={styles.fieldGroup}>
                 <Text style={styles.fieldLabel}>PASSWORD</Text>
-                <TextInput style={[styles.input, fieldErrors.password && styles.inputError]} placeholder="At least 6 characters" placeholderTextColor={colors.textTertiary} value={password} onChangeText={value => updateField('password', value)} secureTextEntry autoCapitalize="none" autoCorrect={false} />
+                <TextInput testID="auth-password" style={[styles.input, fieldErrors.password && styles.inputError]} placeholder="At least 6 characters" placeholderTextColor={colors.textTertiary} value={password} onChangeText={value => updateField('password', value)} secureTextEntry autoCapitalize="none" autoCorrect={false} />
                 {fieldErrors.password ? <Text style={styles.fieldError}>{fieldErrors.password}</Text> : passwordTouched && password.length > 0 && !validatePassword(password).valid ? (
                   <Text style={styles.fieldError}>{validatePassword(password).error}</Text>
                 ) : (
@@ -187,7 +187,7 @@ export default function AuthScreen() {
               </Pressable>
             ) : null}
 
-            <Pressable style={({ pressed }) => [styles.primaryButton, busy && styles.disabled, pressed && !busy && styles.pressed]} onPress={submit} disabled={busy}>
+            <Pressable testID="auth-submit" style={({ pressed }) => [styles.primaryButton, busy && styles.disabled, pressed && !busy && styles.pressed]} onPress={submit} disabled={busy}>
               {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>{buttonLabel}</Text>}
             </Pressable>
           </View>

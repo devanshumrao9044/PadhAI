@@ -1,0 +1,63 @@
+appId: com.padhai.app
+name: Leaderboard rank transition and celebration
+
+---
+# PADHAI_E2E_EMAIL and PADHAI_E2E_PASSWORD must be supplied through the
+# Maestro environment; credentials are intentionally not stored in this file.
+- launchApp:
+    clearState: true
+
+- tapOn:
+    id: auth-email
+- inputText: ${PADHAI_E2E_EMAIL}
+- tapOn:
+    id: auth-password
+- inputText: ${PADHAI_E2E_PASSWORD}
+- tapOn:
+    id: auth-submit
+
+# AuthRouteGuard hydrates the profile before exposing the tab navigator.
+- extendedWaitUntil:
+    visible:
+      id: tab-ranks
+    timeout: 15000
+
+- tapOn:
+    id: tab-ranks
+- extendedWaitUntil:
+    visible:
+      id: leaderboard-live
+    timeout: 15000
+
+- assertVisible:
+    id: leaderboard-screen
+- assertVisible:
+    id: leaderboard-live
+- assertVisible: LIVE
+
+# With clearState, the user has no stored rank observation. The live RPC must
+# place the fixture account in the top three and trigger the celebration.
+- extendedWaitUntil:
+    visible:
+      id: top-three-celebration
+    timeout: 10000
+- assertVisible: Top 3 achievement!
+- assertVisible: You reached rank ${PADHAI_E2E_EXPECTED_RANK}.
+
+# The optimized native-driven animation fades out and removes its overlay.
+- extendedWaitUntil:
+    notVisible:
+      id: top-three-celebration
+    timeout: 6000
+
+# Relaunch without clearing app state. The persisted user-and-level transition
+# state must prevent the celebration from replaying.
+- launchApp
+- tapOn:
+    id: tab-ranks
+- extendedWaitUntil:
+    visible:
+      id: leaderboard-live
+    timeout: 15000
+- assertNotVisible:
+    id: top-three-celebration

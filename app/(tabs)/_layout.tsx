@@ -84,6 +84,7 @@ export default function TabLayout() {
         name="leaderboard"
         options={{
           title: 'Ranks',
+          tabBarButtonTestID: 'tab-ranks',
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="leaderboard" size={size} color={color} />
           ),

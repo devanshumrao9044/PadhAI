@@ -314,7 +314,7 @@ export default function LeaderboardScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView testID="leaderboard-screen" style={styles.container} edges={['top']}>
       <ScrollView
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
@@ -394,7 +394,7 @@ export default function LeaderboardScreen() {
         <View style={styles.listSection}>
             <View style={styles.sectionHeadingRow}>
               <Text style={styles.sectionTitle}>LEVEL {currentLevel.rank} LEADERBOARD</Text>
-              <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>LIVE</Text></View>
+              <View testID="leaderboard-live" style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>LIVE</Text></View>
             </View>
             <Text style={styles.sectionSubtitle}>All users in your current level · updates every 30 seconds</Text>
 
@@ -420,6 +420,7 @@ export default function LeaderboardScreen() {
 
       {celebrationVisible && celebrationRank ? (
         <Animated.View
+          testID="top-three-celebration"
           pointerEvents="none"
           accessibilityRole="alert"
           accessibilityLiveRegion="polite"
