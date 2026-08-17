@@ -189,9 +189,12 @@ export default function LeaderboardScreen() {
   const [celebrationRank, setCelebrationRank] = useState<number | null>(null);
   const [celebrationVisible, setCelebrationVisible] = useState(false);
   const [celebrationStateReady, setCelebrationStateReady] = useState(false);
-  const celebrationOpacity = useRef(new Animated.Value(0)).current;
-  const celebrationScale = useRef(new Animated.Value(0.96)).current;
-  const celebrationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const celebrationProgress = useRef(new Animated.Value(0)).current;
+  const celebrationAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
+  const celebrationAnimatedStyle = useMemo(() => ({
+    opacity: celebrationProgress,
+    transform: [{ scale: celebrationProgress.interpolate({ inputRange: [0, 1], outputRange: [0.985, 1] }) }],
+  }), [celebrationProgress]);
   const previousTopThreeRankRef = useRef<number | null | undefined>(undefined);
 
   const currentLevel = user ? getLevelForUser(user) : LEVELS[0];
@@ -205,47 +208,36 @@ export default function LeaderboardScreen() {
     : entry);
 
   const triggerTopThreeCelebration = useCallback((rank: number) => {
-    if (celebrationTimerRef.current) {
-      clearTimeout(celebrationTimerRef.current);
-    }
+    celebrationAnimationRef.current?.stop();
 
     setCelebrationRank(rank);
     setCelebrationVisible(true);
-    celebrationOpacity.setValue(0);
-    celebrationScale.setValue(0.96);
+    celebrationProgress.setValue(0);
 
-    Animated.parallel([
-      Animated.timing(celebrationOpacity, {
+    const animation = Animated.sequence([
+      Animated.timing(celebrationProgress, {
         toValue: 1,
-        duration: 180,
+        duration: 160,
         useNativeDriver: true,
       }),
-      Animated.sequence([
-        Animated.timing(celebrationScale, {
-          toValue: 1.02,
-          duration: 220,
-          useNativeDriver: true,
-        }),
-        Animated.timing(celebrationScale, {
-          toValue: 1,
-          duration: 160,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start();
-
-    celebrationTimerRef.current = setTimeout(() => {
-      Animated.timing(celebrationOpacity, {
+      Animated.delay(1900),
+      Animated.timing(celebrationProgress, {
         toValue: 0,
-        duration: 250,
+        duration: 220,
         useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (finished) {
-          setCelebrationVisible(false);
-        }
-      });
-    }, 2400);
-  }, [celebrationOpacity, celebrationScale]);
+      }),
+    ]);
+
+    celebrationAnimationRef.current = animation;
+    animation.start(({ finished }) => {
+      if (celebrationAnimationRef.current === animation) {
+        celebrationAnimationRef.current = null;
+      }
+      if (finished) {
+        setCelebrationVisible(false);
+      }
+    });
+  }, [celebrationProgress]);
 
   useEffect(() => {
     previousTopThreeRankRef.current = undefined;
@@ -269,9 +261,8 @@ export default function LeaderboardScreen() {
   }, [celebrationStorageKey]);
 
   useEffect(() => () => {
-    if (celebrationTimerRef.current) {
-      clearTimeout(celebrationTimerRef.current);
-    }
+    celebrationAnimationRef.current?.stop();
+    celebrationAnimationRef.current = null;
   }, []);
 
   const fetchLeaderboard = useCallback(async () => {
@@ -433,7 +424,7 @@ export default function LeaderboardScreen() {
           accessibilityRole="alert"
           accessibilityLiveRegion="polite"
           accessibilityLabel={`Top three achievement. You reached rank ${celebrationRank}.`}
-          style={[styles.celebrationBanner, { opacity: celebrationOpacity, transform: [{ scale: celebrationScale }] }]}
+          style={[styles.celebrationBanner, celebrationAnimatedStyle]}
         >
           <MaterialIcons name="emoji-events" size={26} color="#FFD700" />
           <View style={styles.celebrationCopy}>
@@ -463,11 +454,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: '#FFD70088',
     backgroundColor: colors.surface,
-    shadowColor: '#FFD700',
-    shadowOpacity: 0.22,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
   },
   celebrationCopy: { flex: 1 },
   celebrationTitle: { color: '#FFD700', fontSize: FontSize.sm, fontWeight: FontWeight.extraBold },
