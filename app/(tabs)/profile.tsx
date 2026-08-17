@@ -22,6 +22,7 @@ import {
   getImageByteSize,
   MAX_AVATAR_OUTPUT_BYTES,
   MAX_AVATAR_SOURCE_BYTES,
+  AVATAR_SUPPORTED_INPUT_FORMATS,
   prepareAvatarImage,
 } from '@/services/avatarImage';
 
@@ -503,7 +504,7 @@ export default function ProfileScreen() {
                 </View>
               </TouchableOpacity>
               <Text style={styles.avatarHint}>
-                Max {formatFileSize(MAX_AVATAR_SOURCE_BYTES)} source • auto-compressed below {formatFileSize(MAX_AVATAR_OUTPUT_BYTES)}
+                {AVATAR_SUPPORTED_INPUT_FORMATS} accepted • max {formatFileSize(MAX_AVATAR_SOURCE_BYTES)} • auto-compressed below {formatFileSize(MAX_AVATAR_OUTPUT_BYTES)}
               </Text>
               {avatarError ? <Text style={styles.avatarError}>{avatarError}</Text> : null}
 

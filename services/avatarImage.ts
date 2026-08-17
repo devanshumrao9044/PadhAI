@@ -3,6 +3,7 @@ import {
   AVATAR_MAX_DIMENSION,
   MAX_AVATAR_OUTPUT_BYTES,
   MAX_AVATAR_SOURCE_BYTES,
+  AVATAR_SUPPORTED_INPUT_FORMATS,
   formatFileSize,
 } from './avatarPolicy.ts';
 
@@ -10,6 +11,7 @@ export {
   AVATAR_MAX_DIMENSION,
   MAX_AVATAR_OUTPUT_BYTES,
   MAX_AVATAR_SOURCE_BYTES,
+  AVATAR_SUPPORTED_INPUT_FORMATS,
   formatFileSize,
 } from './avatarPolicy.ts';
 
