@@ -11,6 +11,14 @@ import { LEVELS, getLevelForUser } from '@/constants/levels';
 import { useApp } from '@/hooks/useApp';
 import { supabase } from '@/services/supabase';
 import { getWeeklyZone } from '@/services/weeklyXp';
+import { getItem, setItem } from '@/services/storage';
+
+const TOP_THREE_CELEBRATION_KEY_PREFIX = 'padhai_top_three_celebration_v1_';
+
+type TopThreeCelebrationState = {
+  rank: number | null;
+  updatedAt: number;
+};
 
 interface LeaderboardEntry {
   id: string;
@@ -182,28 +190,132 @@ export default function LeaderboardScreen() {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [celebrationRank, setCelebrationRank] = useState<number | null>(null);
+  const [celebrationVisible, setCelebrationVisible] = useState(false);
+  const [celebrationStateReady, setCelebrationStateReady] = useState(false);
+  const celebrationOpacity = useRef(new Animated.Value(0)).current;
+  const celebrationScale = useRef(new Animated.Value(0.96)).current;
+  const celebrationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previousTopThreeRankRef = useRef<number | null | undefined>(undefined);
 
   const currentLevel = user ? getLevelForUser(user) : LEVELS[0];
+  const celebrationStorageKey = user?.id
+    ? `${TOP_THREE_CELEBRATION_KEY_PREFIX}${user.id}_level_${currentLevel.rank}`
+    : null;
   const myEntry = entries.find(e => e.id === user?.id);
   const myRank = myEntry?.rank ?? entries.length + 1;
   const displayEntries = entries.map(entry => entry.id === user?.id && user
     ? { ...entry, xp: user.xpTotal, level: currentLevel.rank }
     : entry);
 
+  const triggerTopThreeCelebration = useCallback((rank: number) => {
+    if (celebrationTimerRef.current) {
+      clearTimeout(celebrationTimerRef.current);
+    }
+
+    setCelebrationRank(rank);
+    setCelebrationVisible(true);
+    celebrationOpacity.setValue(0);
+    celebrationScale.setValue(0.96);
+
+    Animated.parallel([
+      Animated.timing(celebrationOpacity, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.sequence([
+        Animated.timing(celebrationScale, {
+          toValue: 1.02,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+        Animated.timing(celebrationScale, {
+          toValue: 1,
+          duration: 160,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+
+    celebrationTimerRef.current = setTimeout(() => {
+      Animated.timing(celebrationOpacity, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) {
+          setCelebrationVisible(false);
+        }
+      });
+    }, 2400);
+  }, [celebrationOpacity, celebrationScale]);
+
+  useEffect(() => {
+    previousTopThreeRankRef.current = undefined;
+    setCelebrationStateReady(false);
+
+    if (!celebrationStorageKey) {
+      setCelebrationStateReady(true);
+      return;
+    }
+
+    let active = true;
+    void getItem<TopThreeCelebrationState>(celebrationStorageKey).then(state => {
+      if (!active) return;
+      previousTopThreeRankRef.current = state?.rank ?? null;
+      setCelebrationStateReady(true);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [celebrationStorageKey]);
+
+  useEffect(() => () => {
+    if (celebrationTimerRef.current) {
+      clearTimeout(celebrationTimerRef.current);
+    }
+  }, []);
+
   const fetchLeaderboard = useCallback(async () => {
+    if (!celebrationStateReady) return;
+
     try {
       const { data, error } = await supabase.rpc('get_level_leaderboard', {
         p_level: currentLevel.rank,
       });
       if (!error && data) {
-        setEntries(data as LeaderboardEntry[]);
+        const nextEntries = data as LeaderboardEntry[];
+        setEntries(nextEntries);
+
+        if (celebrationStorageKey) {
+          const currentRank = nextEntries.find(entry => entry.id === user?.id)?.rank ?? null;
+          const previousRank = previousTopThreeRankRef.current;
+          const wasAlreadyInTopThree = previousRank != null && previousRank <= 3;
+          const newlyReachedTopThree = currentRank != null
+            && currentRank <= 3
+            && !wasAlreadyInTopThree;
+
+          previousTopThreeRankRef.current = currentRank;
+          if (previousRank !== currentRank) {
+            void setItem<TopThreeCelebrationState>(celebrationStorageKey, {
+              rank: currentRank,
+              updatedAt: Date.now(),
+            });
+          }
+
+          if (newlyReachedTopThree) {
+            triggerTopThreeCelebration(currentRank);
+          }
+        }
       }
     } catch (e) {
       console.log('Leaderboard fetch error:', e);
     } finally {
       setLoading(false);
     }
-  }, [currentLevel.rank]);
+  }, [celebrationStateReady, celebrationStorageKey, currentLevel.rank, triggerTopThreeCelebration, user?.id]);
 
   useEffect(() => {
     void fetchLeaderboard();
@@ -326,12 +438,52 @@ export default function LeaderboardScreen() {
           )}
         </View>
       </ScrollView>
+
+      {celebrationVisible && celebrationRank ? (
+        <Animated.View
+          pointerEvents="none"
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          accessibilityLabel={`Top three achievement. You reached rank ${celebrationRank}.`}
+          style={[styles.celebrationBanner, { opacity: celebrationOpacity, transform: [{ scale: celebrationScale }] }]}
+        >
+          <MaterialIcons name="emoji-events" size={26} color="#FFD700" />
+          <View style={styles.celebrationCopy}>
+            <Text style={styles.celebrationTitle}>Top 3 achievement!</Text>
+            <Text style={styles.celebrationSubtitle}>You reached rank {celebrationRank}. Keep it up.</Text>
+          </View>
+          <MaterialIcons name="star" size={20} color="#FFD700" />
+        </Animated.View>
+      ) : null}
     </SafeAreaView>
   );
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  celebrationBanner: {
+    position: 'absolute',
+    top: Spacing.md,
+    left: Spacing.md,
+    right: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: '#FFD70088',
+    backgroundColor: colors.surface,
+    shadowColor: '#FFD700',
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  celebrationCopy: { flex: 1 },
+  celebrationTitle: { color: '#FFD700', fontSize: FontSize.sm, fontWeight: FontWeight.extraBold },
+  celebrationSubtitle: { color: colors.textSecondary, fontSize: FontSize.xs, marginTop: 2 },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 100 },
 
