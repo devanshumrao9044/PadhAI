@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthSession } from './AuthSessionProvider';
+import { getPasswordProviderError, validatePassword } from './passwordPolicy';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeColors } from '@/constants/theme';
 
@@ -24,7 +25,7 @@ export default function AuthScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { signIn, signUp, sendPasswordReset } = useAuthSession();
+  const { signIn, signUp, resendSignupConfirmation, sendPasswordReset } = useAuthSession();
   const [mode, setMode] = useState<Mode>('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -33,10 +34,12 @@ export default function AuthScreen() {
   const [busy, setBusy] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [message, setMessage] = useState<string | null>(null);
+  const [verificationEmail, setVerificationEmail] = useState<string | null>(null);
 
   const clearFeedback = () => {
     setFieldErrors({});
     setMessage(null);
+    setVerificationEmail(null);
   };
 
   const updateField = (field: FieldName, value: string) => {
@@ -54,7 +57,10 @@ export default function AuthScreen() {
     const normalizedEmail = email.trim().toLowerCase();
     const nextErrors: FieldErrors = {};
     if (!normalizedEmail || !normalizedEmail.includes('@')) nextErrors.email = 'Please enter a valid email address.';
-    if (mode !== 'forgot' && password.length < 6) nextErrors.password = 'Password must be at least 6 characters.';
+    if (mode !== 'forgot') {
+      const passwordResult = validatePassword(password);
+      if (!passwordResult.valid) nextErrors.password = passwordResult.error;
+    }
     if (mode === 'signup' && name.trim().length < 2) nextErrors.name = 'Please enter your name.';
     if (Object.keys(nextErrors).length > 0) {
       setFieldErrors(nextErrors);
@@ -71,6 +77,7 @@ export default function AuthScreen() {
       } else if (mode === 'signup') {
         const result = await signUp(name, normalizedEmail, password, referralCode);
         if (result.requiresEmailConfirmation) {
+          setVerificationEmail(result.email);
           setMessage('Account created. Please verify your email, then sign in.');
           setMode('login');
         }
@@ -81,7 +88,12 @@ export default function AuthScreen() {
     } catch (submitError: any) {
       const errorMessage = submitError?.message ?? 'Something went wrong. Please try again.';
       const normalizedError = errorMessage.toLowerCase();
-      if (
+      const passwordProviderError = getPasswordProviderError(errorMessage);
+      if (passwordProviderError) {
+        setFieldErrors({ password: passwordProviderError });
+      } else if (normalizedError.includes('rate') || normalizedError.includes('too many') || normalizedError.includes('429')) {
+        setMessage('Too many requests. Please wait a moment and try again.');
+      } else if (
         normalizedError.includes('referral code') ||
         (mode === 'signup' && referralCode.trim().length > 0 && normalizedError.includes('database error saving new user'))
       ) {
@@ -90,11 +102,29 @@ export default function AuthScreen() {
         setFieldErrors({ password: 'Email or password is incorrect.' });
       } else if (mode === 'signup' && (normalizedError.includes('already registered') || normalizedError.includes('already been registered') || normalizedError.includes('user already exists'))) {
         setFieldErrors({ email: 'An account with this email already exists. Try signing in instead.' });
+      } else if (normalizedError.includes('verify your email')) {
+        setMessage('Please verify your email address before signing in.');
       } else if (mode === 'forgot' && normalizedError.includes('email address') && normalizedError.includes('invalid')) {
         setFieldErrors({ email: 'We could not send a reset link to this address. Please check the email and try again.' });
       } else {
         setMessage(errorMessage);
       }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resendVerification = async () => {
+    if (!verificationEmail || busy) return;
+    setBusy(true);
+    try {
+      await resendSignupConfirmation(verificationEmail);
+      setMessage('Verification email sent again. Please check your inbox.');
+    } catch (resendError: any) {
+      const resendMessage = resendError?.message?.toLowerCase() ?? '';
+      setMessage(resendMessage.includes('rate') || resendMessage.includes('too many')
+        ? 'Too many requests. Please wait before trying again.'
+        : 'We could not resend the verification email. Please try again later.');
     } finally {
       setBusy(false);
     }
@@ -143,6 +173,11 @@ export default function AuthScreen() {
             ) : null}
 
             {message ? <Text style={styles.message}>{message}</Text> : null}
+            {verificationEmail ? (
+              <Pressable onPress={resendVerification} style={styles.secondaryAction} disabled={busy}>
+                <Text style={styles.secondaryText}>Resend verification email</Text>
+              </Pressable>
+            ) : null}
 
             <Pressable style={({ pressed }) => [styles.primaryButton, busy && styles.disabled, pressed && !busy && styles.pressed]} onPress={submit} disabled={busy}>
               {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>{buttonLabel}</Text>}

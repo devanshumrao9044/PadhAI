@@ -6,6 +6,7 @@ import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
 import AuthInput from './AuthInput';
 import AuthButton from './AuthButton';
+import { getPasswordProviderError, validatePassword } from '@/auth/passwordPolicy';
 
 interface Props {
   onSwitchToLogin: () => void;
@@ -34,10 +35,11 @@ function getSignupErrors(name: string, email: string, password: string) {
 
   if (!password.trim()) {
     errors.password = 'Password is required.';
-  } else if (password.length < 6) {
-    errors.password = 'Password must be at least 6 characters.';
   } else if (password.length > 72) {
     errors.password = 'Password must be under 72 characters.';
+  } else {
+    const passwordResult = validatePassword(password);
+    if (!passwordResult.valid) errors.password = passwordResult.error;
   }
 
   return errors;
@@ -83,7 +85,10 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
 
       if (signupError) {
         const msg = signupError.message.toLowerCase();
-        if (msg.includes('referral code') || (normalizedReferralCode && msg.includes('database error saving new user'))) {
+        const passwordProviderError = getPasswordProviderError(signupError.message);
+        if (passwordProviderError) {
+          setApiError(passwordProviderError);
+        } else if (msg.includes('referral code') || (normalizedReferralCode && msg.includes('database error saving new user'))) {
           setApiError('Invalid referral code. Please check and try again.');
         } else if (
           msg.includes('already registered') ||
@@ -99,6 +104,12 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
 
       const signupUser = signupData?.user;
 
+      if (signupData?.session && signupUser && !signupUser.email_confirmed_at) {
+        await supabase.auth.signOut();
+        setApiSuccess('Account created. Please verify your email, then sign in.');
+        return;
+      }
+
       if (signupData?.session && signupUser) {
         const { data: profile } = await supabase
           .from('users')
@@ -111,6 +122,11 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
         } else {
           router.replace('/(tabs)');
         }
+        return;
+      }
+
+      if (signupUser && !signupUser.email_confirmed_at) {
+        setApiSuccess('Account created. Please verify your email, then sign in.');
         return;
       }
 

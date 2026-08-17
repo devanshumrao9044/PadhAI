@@ -34,6 +34,15 @@ export default function AuthRouteGuard() {
 
   useEffect(() => {
     if (!ready || !navigationReady || appLoading) return;
+    if (session && session.user.email && !session.user.email_confirmed_at) {
+      if (redirectingOut.current) return;
+      redirectingOut.current = true;
+      void supabase.auth.signOut().finally(() => {
+        redirectingOut.current = false;
+        router.replace('/login' as Parameters<typeof router.replace>[0]);
+      });
+      return;
+    }
     if (session) {
       redirectingOut.current = false;
       return;

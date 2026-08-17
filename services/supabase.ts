@@ -9,6 +9,11 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   throw new Error('Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY.');
 }
 
+// This project is a direct Expo client for native and static web builds. The
+// @supabase/ssr cookie model requires a server runtime that can set and refresh
+// HttpOnly cookies; adding it here would not create HttpOnly cookies and would
+// break the native client. Treat RLS and server-side RPC authorization as the
+// security boundary until a separate server-rendered web app is introduced.
 function makeStorage() {
   if (Platform.OS !== 'web') {
     return require('@react-native-async-storage/async-storage').default;
@@ -20,6 +25,9 @@ function makeStorage() {
       removeItem: (_key: string) => Promise.resolve(),
     };
   }
+  // Supabase's browser client needs this storage adapter to persist a SPA
+  // session. It is intentionally not described as HttpOnly protection: any
+  // true HttpOnly migration requires a server-side web architecture.
   return {
     getItem: (key: string) => Promise.resolve(localStorage.getItem(key)),
     setItem: (key: string, value: string) => {

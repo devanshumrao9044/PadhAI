@@ -102,6 +102,12 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
       }
 
       if (data?.session) {
+        if (!data.user?.email_confirmed_at) {
+          await supabase.auth.signOut();
+          setLoginApiError('Please verify your email address before signing in.');
+          return;
+        }
+
         const { data: profile } = await supabase
           .from('users')
           .select('name')
@@ -133,27 +139,16 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
     try {
       const trimmedEmail = forgotEmail.trim().toLowerCase();
 
-      // Check if account exists
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('email', trimmedEmail)
-        .maybeSingle();
-
-      if (!existingUser) {
-        setForgotApiError(
-          'No account found with this email. Please sign up first.'
-        );
-        return;
-      }
-
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         trimmedEmail,
         { redirectTo: 'padhai://reset-password' }
       );
 
       if (resetError) {
-        setForgotApiError(resetError.message ?? 'Failed to send reset email.');
+        const resetMessage = resetError.message.toLowerCase();
+        setForgotApiError(resetMessage.includes('rate') || resetMessage.includes('too many')
+          ? 'Too many requests. Please wait before trying again.'
+          : 'We could not send a reset link. Please check the address and try again.');
         return;
       }
 

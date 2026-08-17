@@ -7,7 +7,8 @@ type AuthContextValue = {
   ready: boolean;
   signingOut: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (name: string, email: string, password: string, referralCode?: string) => Promise<{ requiresEmailConfirmation: boolean }>;
+  signUp: (name: string, email: string, password: string, referralCode?: string) => Promise<{ requiresEmailConfirmation: boolean; email: string }>;
+  resendSignupConfirmation: (email: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -52,6 +53,13 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       password: password.trim(),
     });
     if (error) throw error;
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError) throw userError;
+    if (!userData.user?.email_confirmed_at) {
+      await supabase.auth.signOut();
+      throw new Error('Please verify your email address before signing in.');
+    }
   }, []);
 
   const signUp = useCallback(async (
@@ -75,7 +83,21 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     });
     if (error) throw error;
 
-    return { requiresEmailConfirmation: !data.session };
+    const normalizedEmail = email.trim().toLowerCase();
+    const requiresEmailConfirmation = !data.session || !data.user?.email_confirmed_at;
+    if (requiresEmailConfirmation && data.session) {
+      await supabase.auth.signOut();
+    }
+
+    return { requiresEmailConfirmation, email: normalizedEmail };
+  }, []);
+
+  const resendSignupConfirmation = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim().toLowerCase(),
+    });
+    if (error) throw error;
   }, []);
 
   const sendPasswordReset = useCallback(async (email: string) => {
@@ -105,6 +127,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       signingOut,
       signIn,
       signUp,
+      resendSignupConfirmation,
       sendPasswordReset,
       signOut,
     }}>
