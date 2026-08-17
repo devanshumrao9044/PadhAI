@@ -12,6 +12,7 @@ export default function AuthRouteGuard() {
   const { session, ready } = useAuthSession();
   const appContext = useContext(AppContext);
   const appUser = appContext?.user ?? null;
+  const appIsOnboarded = appContext?.isOnboarded ?? false;
   const appLoading = appContext?.isLoading ?? true;
   const redirectingOut = useRef(false);
   const checkedSessionId = useRef<string | null>(null);
@@ -66,9 +67,10 @@ export default function AuthRouteGuard() {
       checkedSessionId.current = null;
       return;
     }
-    if (isProtected || isSessionAllowedPublicRoute || checkedSessionId.current === session.user.id) return;
+    const sessionRouteKey = `${session.user.id}:${appIsOnboarded ? 'complete' : 'setup'}`;
+    if (isProtected || isSessionAllowedPublicRoute || checkedSessionId.current === sessionRouteKey) return;
 
-    checkedSessionId.current = session.user.id;
+    checkedSessionId.current = sessionRouteKey;
     let cancelled = false;
     const userId = session.user.id;
     const profile = appUser;
@@ -93,7 +95,7 @@ export default function AuthRouteGuard() {
         }
 
         if (cancelled) return;
-        const landingRoute = !profile?.fullName || profile.fullName === 'Student' ? '/onboarding' : '/(tabs)';
+        const landingRoute = appIsOnboarded ? '/(tabs)' : '/onboarding';
         router.replace(landingRoute);
         // On web and some native startup frames the first replace can be
         // ignored while the root navigator is committing its state. Retry a
@@ -111,7 +113,7 @@ export default function AuthRouteGuard() {
     return () => {
       cancelled = true;
     };
-  }, [appContext, appLoading, appUser, isProtected, isSessionAllowedPublicRoute, navigationReady, ready, router, session]);
+  }, [appContext, appIsOnboarded, appLoading, appUser, isProtected, isSessionAllowedPublicRoute, navigationReady, ready, router, session]);
 
   return null;
 }

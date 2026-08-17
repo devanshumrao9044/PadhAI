@@ -11,12 +11,15 @@ import { supabase } from '../services/supabase';
 import StepName from '../components/onboarding/StepName';
 import StepExam from '../components/onboarding/StepExam';
 import StepGoal from '../components/onboarding/StepGoal';
+import { useApp } from '../hooks/useApp';
+import type { UserProfile } from '../types/models';
 
 const TOTAL_STEPS = 4;
 
 export default function OnboardingScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { user: appUser, setUser, setOnboarded } = useApp();
   const [step, setStep] = useState(1);
   const [name, setName] = useState('');
   const [exam, setExam] = useState('JEE');
@@ -57,7 +60,6 @@ export default function OnboardingScreen() {
         .eq('id', user.id);
 
       if (error) {
-
         setLoading(false);
         Alert.alert(
           'Could Not Save Profile',
@@ -66,6 +68,16 @@ export default function OnboardingScreen() {
         return;
       }
 
+      if (appUser?.id === user.id) {
+        await setUser({
+          ...appUser,
+          fullName: name.trim(),
+          targetExam: exam as UserProfile['targetExam'],
+          classLevel: studentClass as UserProfile['classLevel'],
+          dailyGoalMinutes: goalMinutes,
+        });
+      }
+      await setOnboarded(true);
       setLoading(false);
       router.replace('/(tabs)/focus');
 

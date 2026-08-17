@@ -252,6 +252,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const syncInFlightRef = useRef(false);
   const weeklySettlementInFlightRef = useRef(false);
   const deletedChapterIdsRef = useRef(new Set<string>());
+  const deletedSubjectIdsRef = useRef(new Set<string>());
   const loadInFlightRef = useRef<Promise<void> | null>(null);
   const lastLoadAtRef = useRef<{ userId: string | null; at: number } | null>(null);
   const currentUserIdRef = useRef<string | null>(null);
@@ -435,7 +436,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setUserState(cachedUser.data);
           setIsOnboardedState(cachedUser.data.fullName !== 'Student');
         }
-        if (cachedSubjects) setSubjects(cachedSubjects.data);
+        if (cachedSubjects) {
+          setSubjects(cachedSubjects.data.filter(subject => !subject.isDeleted && !deletedSubjectIdsRef.current.has(subject.id)));
+        }
         if (cachedChapters) setChapters(cachedChapters.data.filter(chapter => !chapter.isDeleted));
         if (cachedAnalytics) setChapterAnalytics(cachedAnalytics.data);
         if (cachedReferral) {
@@ -451,8 +454,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setXpLog(cachedXP?.data ?? savedXP ?? []);
           await processSyncQueue();
         } else {
+          deletedChapterIdsRef.current.clear();
+          deletedSubjectIdsRef.current.clear();
           await clearLocalAccountData(savedUser?.id);
-          setSubjects(cachedSubjects?.data ?? []);
+          setSubjects(cachedSubjects?.data.filter(subject => !subject.isDeleted && !deletedSubjectIdsRef.current.has(subject.id)) ?? []);
           setChapters(cachedChapters?.data.filter(chapter => !chapter.isDeleted) ?? []);
           setTopics([]);
           setActiveSession(null);
@@ -505,8 +510,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ]);
 
         if (loadGeneration !== authGenerationRef.current) return;
+        let activeChapterIds: Set<string> | null = null;
         if (subRes.data) {
-          const cloudSubjects = subRes.data.map(mapSubject);
+          const cloudSubjects = subRes.data
+            .map(mapSubject)
+            .filter(subject => !subject.isDeleted && !deletedSubjectIdsRef.current.has(subject.id));
           setSubjects(cloudSubjects);
           void writeUserCache(userId, 'subjects', cloudSubjects);
         }
@@ -514,6 +522,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const activeChapters = chapRes.data
             .map(mapChapter)
             .filter(chapter => !deletedChapterIdsRef.current.has(chapter.id) && chapter.isDeleted === false);
+          activeChapterIds = new Set(activeChapters.map(chapter => chapter.id));
           setChapters(activeChapters);
           await setItem(StorageKeys.CHAPTERS, activeChapters);
           void writeUserCache(userId, 'chapters', activeChapters);
@@ -532,8 +541,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         if (!chapterAnalyticsRes.error && chapterAnalyticsRes.data) {
           const normalizedAnalytics = normalizeChapterAnalyticsRows(chapterAnalyticsRes.data);
-          setChapterAnalytics(normalizedAnalytics);
-          void writeUserCache(userId, 'chapterAnalytics', normalizedAnalytics);
+          const visibleAnalytics = activeChapterIds
+            ? normalizedAnalytics.filter(analytics => activeChapterIds.has(analytics.chapterId))
+            : normalizedAnalytics;
+          setChapterAnalytics(visibleAnalytics);
+          void writeUserCache(userId, 'chapterAnalytics', visibleAnalytics);
         } else if (chapterAnalyticsRes.error) {
           console.warn('[Analytics] Chapter analytics load failed:', chapterAnalyticsRes.error.message);
           if (!cachedAnalytics) setChapterAnalytics([]);
@@ -564,6 +576,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setSubjects([]);
         setChapters([]);
         deletedChapterIdsRef.current.clear();
+        deletedSubjectIdsRef.current.clear();
         setTopics([]);
         setSessions([]);
         setChapterAnalytics([]);
@@ -606,6 +619,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event) => {
       if (event === 'SIGNED_IN') {
+        setIsLoading(true);
         void reload({ force: true });
       } else if (event === 'SIGNED_OUT') {
         authGenerationRef.current += 1;
@@ -614,6 +628,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setSubjects([]);
         setChapters([]);
         deletedChapterIdsRef.current.clear();
+        deletedSubjectIdsRef.current.clear();
         setTopics([]);
         setSessions([]);
         setChapterAnalytics([]);
@@ -642,6 +657,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ── setUser: sync XP/streak fields to Supabase (profile fields saved separately in profile.tsx) ─────────────────────────────────────────────
   const setUser = async (u: UserProfile) => {
     setUserState(u);
+    setIsOnboardedState(Boolean(u.fullName && u.fullName !== 'Student'));
     await setItem(StorageKeys.USER, u);
     void writeUserCache(u.id, 'user', u);
     try {
@@ -704,12 +720,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteSubject = async (id: string) => {
-    const { error } = await supabase.from('subjects').update({ is_deleted: true }).eq('id', id);
+    const { data: deleted, error } = await supabase.rpc('delete_subject_and_chapters', {
+      p_subject_id: id,
+    });
     if (error) throw error;
-    const updatedSubjects = subjects.filter(s => s.id !== id);
+    if (deleted === false) throw new Error('Subject not found or already deleted.');
+
+    const deletedChapterIds = new Set(
+      chapters.filter(chapter => chapter.subjectId === id).map(chapter => chapter.id),
+    );
+    deletedChapterIds.forEach(chapterId => deletedChapterIdsRef.current.add(chapterId));
+    deletedSubjectIdsRef.current.add(id);
+
+    const updatedSubjects = subjects.filter(subject => subject.id !== id);
+    const updatedChapters = chapters.filter(chapter => !deletedChapterIds.has(chapter.id));
+    const updatedTopics = topics.filter(topic => !deletedChapterIds.has(topic.chapterId));
+    const updatedAnalytics = chapterAnalytics.filter(analytics => (
+      analytics.subjectId !== id && !deletedChapterIds.has(analytics.chapterId)
+    ));
+
     setSubjects(updatedSubjects);
+    setChapters(updatedChapters);
+    setTopics(updatedTopics);
+    setChapterAnalytics(updatedAnalytics);
+    await setItem(StorageKeys.CHAPTERS, updatedChapters);
+    await setItem(StorageKeys.TOPICS, updatedTopics);
+
+    if (activeSession?.subjectId === id) {
+      setActiveSession(null);
+      await removeItem(StorageKeys.ACTIVE_SESSION);
+    }
+
     const { data: authData } = await supabase.auth.getSession();
-    if (authData.session?.user?.id) void writeUserCache(authData.session.user.id, 'subjects', updatedSubjects);
+    const userId = authData.session?.user?.id;
+    if (userId) {
+      void writeUserCache(userId, 'subjects', updatedSubjects);
+      void writeUserCache(userId, 'chapters', updatedChapters);
+      void writeUserCache(userId, 'chapterAnalytics', updatedAnalytics);
+    }
+    lastLoadAtRef.current = null;
   };
 
   // ── Chapters ──────────────────────────────────────────────────────────────

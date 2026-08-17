@@ -587,44 +587,59 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* Web Alert */}
-      {(
-        <Modal visible={alertConfig.visible} transparent animationType="fade">
-          <View style={styles.alertOverlay}>
-                      <View style={styles.alertBox}>
-            <View style={styles.alertIcon}><MaterialIcons name={alertConfig.isSignOut ? 'logout' : 'info-outline'} size={22} color={alertConfig.isSignOut ? colors.danger : colors.primary} /></View>
+      {/* Confirmation and alert modal */}
+      <Modal
+        visible={alertConfig.visible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAlertConfig(p => ({ ...p, visible: false }))}
+      >
+        <View style={styles.alertOverlay}>
+          <View style={[styles.alertBox, alertConfig.isSignOut && styles.signOutAlertBox]}>
+            <View style={[styles.alertIcon, alertConfig.isSignOut && styles.signOutAlertIcon]}>
+              <MaterialIcons
+                name={alertConfig.isSignOut ? 'logout' : 'info-outline'}
+                size={24}
+                color={alertConfig.isSignOut ? colors.danger : colors.primary}
+              />
+            </View>
+            {alertConfig.isSignOut ? <Text style={styles.alertEyebrow}>ACCOUNT ACTION</Text> : null}
             <Text style={styles.alertTitle}>{alertConfig.title}</Text>
-
-              <Text style={styles.alertMsg}>{alertConfig.message}</Text>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                {alertConfig.isSignOut ? (
-                  <>
-                    <TouchableOpacity
-                      style={[styles.alertBtn, { backgroundColor: colors.surfaceVariant, flex: 1 }]}
-                      onPress={() => setAlertConfig(p => ({ ...p, visible: false }))}
-                    >
-                      <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.alertBtn, { backgroundColor: colors.danger, flex: 1 }]}
-                      onPress={handleSignOut}
-                    >
-                      <Text style={styles.saveBtnText}>Sign Out</Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
+            <Text style={styles.alertMsg}>{alertConfig.message}</Text>
+            {alertConfig.isSignOut ? (
+              <Text style={styles.alertHint}>Your study progress will remain safely saved.</Text>
+            ) : null}
+            <View style={styles.alertActions}>
+              {alertConfig.isSignOut ? (
+                <>
                   <TouchableOpacity
-                    style={[styles.alertBtn, { flex: 1 }]}
+                    style={[styles.alertBtn, styles.alertBtnSecondary]}
                     onPress={() => setAlertConfig(p => ({ ...p, visible: false }))}
+                    activeOpacity={0.8}
                   >
-                    <Text style={styles.saveBtnText}>OK</Text>
+                    <Text style={styles.alertButtonTextSecondary}>Cancel</Text>
                   </TouchableOpacity>
-                )}
-              </View>
+                  <TouchableOpacity
+                    style={[styles.alertBtn, styles.alertBtnDanger]}
+                    onPress={handleSignOut}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.alertButtonText}>Sign Out</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.alertBtn, { flex: 1 }]}
+                  onPress={() => setAlertConfig(p => ({ ...p, visible: false }))}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.alertButtonText}>OK</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
-        </Modal>
-      )}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -699,12 +714,21 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   cancelBtnText: { color: colors.textSecondary, fontSize: FontSize.md, fontWeight: FontWeight.semiBold },
   saveBtn: { flex: 1, backgroundColor: colors.primary, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center' },
   saveBtnText: { color: colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
-  alertOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'center' },
-  alertBox: { backgroundColor: colors.surface, borderRadius: Radius.xl, padding: Spacing.lg, margin: Spacing.xl, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
-  alertIcon: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.surfaceVariant, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  alertTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: colors.textPrimary, marginBottom: 8 },
-  alertMsg: { fontSize: FontSize.base, color: colors.textSecondary, marginBottom: Spacing.md },
-  alertBtn: { backgroundColor: colors.primary, borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center' },
+  alertOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'center', alignItems: 'center', padding: Spacing.lg },
+  alertBox: { width: '100%', maxWidth: 380, backgroundColor: colors.surface, borderRadius: Radius.xl, padding: Spacing.lg, borderWidth: 1, borderColor: colors.border, alignItems: 'center' },
+  signOutAlertBox: { borderColor: colors.danger + '66' },
+  alertIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  signOutAlertIcon: { backgroundColor: colors.danger + '18' },
+  alertEyebrow: { fontSize: FontSize.xs, color: colors.danger, fontWeight: FontWeight.bold, letterSpacing: 1.2, marginBottom: 6 },
+  alertTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: colors.textPrimary, marginBottom: 8, textAlign: 'center' },
+  alertMsg: { fontSize: FontSize.base, color: colors.textSecondary, marginBottom: 8, textAlign: 'center', lineHeight: 21 },
+  alertHint: { fontSize: FontSize.sm, color: colors.textTertiary, textAlign: 'center', marginBottom: Spacing.lg },
+  alertActions: { flexDirection: 'row', gap: 10, width: '100%', marginTop: Spacing.sm },
+  alertBtn: { flex: 1, minHeight: 46, borderRadius: Radius.md, paddingVertical: 12, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
+  alertBtnSecondary: { backgroundColor: colors.surfaceVariant, borderWidth: 1, borderColor: colors.border },
+  alertBtnDanger: { backgroundColor: colors.danger },
+  alertButtonTextSecondary: { color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
+  alertButtonText: { color: '#FFFFFF', fontSize: FontSize.base, fontWeight: FontWeight.bold },
   signOutOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.75)',
