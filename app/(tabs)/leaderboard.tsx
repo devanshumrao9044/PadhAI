@@ -12,13 +12,9 @@ import { useApp } from '@/hooks/useApp';
 import { supabase } from '@/services/supabase';
 import { getWeeklyZone } from '@/services/weeklyXp';
 import { getItem, setItem } from '@/services/storage';
+import { applyTopThreeRankUpdate, type TopThreeCelebrationState } from '@/services/leaderboardCelebration';
 
 const TOP_THREE_CELEBRATION_KEY_PREFIX = 'padhai_top_three_celebration_v1_';
-
-type TopThreeCelebrationState = {
-  rank: number | null;
-  updatedAt: number;
-};
 
 interface LeaderboardEntry {
   id: string;
@@ -292,22 +288,14 @@ export default function LeaderboardScreen() {
         if (celebrationStorageKey) {
           const currentRank = nextEntries.find(entry => entry.id === user?.id)?.rank ?? null;
           const previousRank = previousTopThreeRankRef.current;
-          const wasAlreadyInTopThree = previousRank != null && previousRank <= 3;
-          const newlyReachedTopThree = currentRank != null
-            && currentRank <= 3
-            && !wasAlreadyInTopThree;
-
           previousTopThreeRankRef.current = currentRank;
-          if (previousRank !== currentRank) {
-            void setItem<TopThreeCelebrationState>(celebrationStorageKey, {
-              rank: currentRank,
-              updatedAt: Date.now(),
-            });
-          }
 
-          if (newlyReachedTopThree) {
-            triggerTopThreeCelebration(currentRank);
-          }
+          void applyTopThreeRankUpdate({
+            previousRank,
+            currentRank,
+            persist: state => setItem<TopThreeCelebrationState>(celebrationStorageKey, state),
+            onCelebrate: triggerTopThreeCelebration,
+          });
         }
       }
     } catch (e) {
