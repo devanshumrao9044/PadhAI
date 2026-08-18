@@ -11,6 +11,8 @@ import StatsRow from '../../components/dashboard/StatsRow';
 import QuickShortcuts from '../../components/dashboard/QuickShortcuts';
 import QuoteCard from '../../components/dashboard/QuoteCard';
 import ChapterAnalyticsCard from '../../components/dashboard/ChapterAnalyticsCard';
+import SideDrawer from '../../components/ui/SideDrawer';
+import StreakOverviewModal from '../../components/ui/StreakOverviewModal';
 import { useApp } from '@/hooks/useApp';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -19,9 +21,11 @@ import { ThemeColors } from '@/constants/theme';
 export default function Dashboard() {
   const router = useRouter();
   const { colors } = useTheme();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, isLoading, subjects, chapters, sessions, dailySummaries, chapterAnalytics, reload } = useApp();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [streakModalOpen, setStreakModalOpen] = useState(false);
   const activeChapterIds = useMemo(() => {
     const activeSubjectIds = new Set(subjects.filter(subject => !subject.isDeleted).map(subject => subject.id));
     return new Set(chapters
@@ -116,24 +120,39 @@ export default function Dashboard() {
         }
       >
         <View style={styles.header}>
-          <Text style={styles.appName}>
-            {language === 'hi' ? 'पढ़' : 'Padh'}<Text style={styles.ai}>AI</Text>
-          </Text>
+          <TouchableOpacity
+            onPress={() => setDrawerOpen(true)}
+            style={styles.menuBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel={t('common.openMenu')}
+          >
+            <View style={styles.menuLine} />
+            <View style={[styles.menuLine, { width: 18 }]} />
+            <View style={styles.menuLine} />
+          </TouchableOpacity>
 
-          {/* Header Right Actions */}
-          <View style={styles.headerRight}>
+          <View style={styles.headerTitleBlock}>
+            <Text style={styles.appName}>
+              {language === 'hi' ? 'पढ़' : 'Padh'}<Text style={styles.ai}>AI</Text>
+            </Text>
             <Text style={styles.date}>
               {new Date().toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-IN', {
                 weekday: 'short', day: 'numeric', month: 'short'
               })}
             </Text>
+          </View>
 
-            <TouchableOpacity
-              style={styles.referralBtn}
-              onPress={() => router.push('/referral')}
-              activeOpacity={0.8}
-            >
-              <MaterialIcons name="card-giftcard" size={22} color={colors.primary} />
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.headerStat} onPress={() => setStreakModalOpen(true)} accessibilityLabel={t('home.streakOverview')}>
+              <MaterialIcons name="local-fire-department" size={17} color={colors.warning} />
+              <Text style={[styles.headerStatText, { color: colors.warning }]}>{user.streakCurrent}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerIconButton} onPress={() => router.push('/referral')} accessibilityLabel={t('home.referAndEarn')}>
+              <MaterialIcons name="card-giftcard" size={21} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerStat} onPress={() => router.push('/(tabs)/leaderboard')} accessibilityLabel={t('home.leaderboard')}>
+              <MaterialIcons name="bolt" size={17} color={colors.primary} />
+              <Text style={[styles.headerStatText, { color: colors.primary }]}>{user.xpTotal}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -149,6 +168,16 @@ export default function Dashboard() {
         <QuickShortcuts />
         <QuoteCard />
       </ScrollView>
+      <SideDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <StreakOverviewModal
+        visible={streakModalOpen}
+        onClose={() => setStreakModalOpen(false)}
+        currentStreak={user.streakCurrent}
+        bestStreak={user.streakLongest}
+        todayMinutes={stats.todayMinutes}
+        dailyGoalMinutes={user.dailyGoalMinutes}
+        dailySummaries={dailySummaries}
+      />
     </View>
   );
 }
@@ -171,24 +200,18 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
   },
+  menuBtn: { gap: 5, padding: 4 },
+  menuLine: { width: 22, height: 2, backgroundColor: colors.textTertiary, borderRadius: 2 },
+  headerTitleBlock: { flex: 1, marginLeft: 8 },
   appName: { fontSize: 28, fontWeight: '900', color: colors.textPrimary },
-  ai: { color: '#A855F7' },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  date: { color: colors.textTertiary, fontSize: 14, fontWeight: '500' },
-  referralBtn: {
-    backgroundColor: colors.primary + '1F',
-    padding: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.primary + '4D',
-  },
+  ai: { color: colors.primary },
+  date: { color: colors.textTertiary, fontSize: 11, fontWeight: '500', marginTop: 2 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  headerStat: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6, paddingVertical: 7, borderRadius: 10, backgroundColor: colors.surfaceVariant },
+  headerStatText: { fontSize: 12, fontWeight: '800', maxWidth: 52 },
+  headerIconButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: colors.surfaceVariant },
 });
 

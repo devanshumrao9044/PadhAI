@@ -102,12 +102,20 @@ export default function ProfileScreen() {
     () => chapters.filter(c => !c.isDeleted && c.status === 'done').length,
     [chapters],
   );
-  const joinDate = useMemo(() => new Date(user?.createdAt || Date.now()).toLocaleDateString('en-IN', {
+  const joinDate = useMemo(() => new Date(user?.createdAt || Date.now()).toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-IN', {
     day: 'numeric', month: 'short', year: 'numeric',
-  }), [user?.createdAt]);
+  }), [language, user?.createdAt]);
   const initials = useMemo(() => user?.fullName?.split(' ')
     .map((w: string) => w[0]).slice(0, 2).join('').toUpperCase() || 'ST', [user?.fullName]);
   const displayAvatar = (user as any)?.avatarUrl || editAvatarUrl;
+  const localizedLevelCopy = useMemo(() => ({
+    1: { title: t('profile.levelBeginner'), exam: t('profile.levelFresher') },
+    2: { title: t('profile.levelGrinder'), exam: t('profile.levelClass11') },
+    3: { title: t('profile.levelConsistent'), exam: t('profile.levelClass12') },
+    4: { title: t('profile.levelBeast'), exam: t('profile.levelDropper') },
+    5: { title: t('profile.levelLegend'), exam: t('profile.levelIitianDoctor') },
+  }), [t]);
+  const currentLevelCopy = localizedLevelCopy[level.rank as keyof typeof localizedLevelCopy] ?? localizedLevelCopy[1];
 
   const recentSessions = useMemo(() => getRecentSessions(sessions, 3), [sessions]);
   if (!user) return null;
@@ -277,7 +285,7 @@ export default function ProfileScreen() {
             <View style={styles.badgesRow}>
               <View style={styles.examBadge}>
                 <Text style={styles.examBadgeText}>
-                  {user.targetExam || 'JEE'} • Class {user.classLevel || '12th'}
+                  {user.targetExam || 'JEE'} • {t('profile.classValue', { value: user.classLevel || '12th' })}
                 </Text>
               </View>
               {rankInfo && (
@@ -295,7 +303,7 @@ export default function ProfileScreen() {
                     color={rankInfo.color}
                   />
                   <Text style={[styles.rankBadgeText, { color: rankInfo.color }]}>
-                    Rank {rankInfo.rank} • {rankInfo.zone}
+                    {t('profile.rankValue', { value: rankInfo.rank })} • {rankInfo.zone === 'Promotion' ? t('leaderboard.promotionZone') : rankInfo.zone === 'Safety' ? t('leaderboard.safetyZone') : t('leaderboard.demotionZone')}
                   </Text>
                 </View>
               )}
@@ -313,18 +321,18 @@ export default function ProfileScreen() {
           <View style={styles.levelHeader}>
             <View>
               <Text style={[styles.levelTitle, { color: level.color }]}>
-                {level.realisticTitle}
+                {currentLevelCopy.title}
               </Text>
-              <Text style={styles.levelExam}>{level.examTitle}</Text>
+              <Text style={styles.levelExam}>{currentLevelCopy.exam}</Text>
             </View>
             <View style={styles.xpBadge}>
               <MaterialIcons name="bolt" size={16} color={colors.warning} />
-              <Text style={styles.xpBadgeText}>{user.xpTotal} Weekly XP</Text>
+              <Text style={styles.xpBadgeText}>{t('profile.weeklyXPValue', { value: user.xpTotal })}</Text>
             </View>
           </View>
           <XPBar xp={user.xpTotal} levelRank={user.levelRank} />
           <Text style={styles.xpNeeded}>
-            {progress.needed - progress.current} XP more to next level
+            {t('profile.xpToNextLevel', { value: progress.needed - progress.current })}
           </Text>
         </View>
 
@@ -333,7 +341,7 @@ export default function ProfileScreen() {
           {[
             { icon: 'local-fire-department', color: colors.danger, val: user.streakCurrent, label: t('profile.currentStreak') },
             { icon: 'emoji-events', color: colors.warning, val: user.streakLongest, label: t('profile.bestStreak') },
-            { icon: 'schedule', color: colors.accent, val: `${totalHours}h`, label: t('profile.totalStudy') },
+            { icon: 'schedule', color: colors.accent, val: `${totalHours}${t('common.hoursShort')}`, label: t('profile.totalStudy') },
             { icon: 'check-circle', color: colors.success, val: doneChapters, label: t('profile.chaptersDone') },
           ].map(item => (
             <View key={item.label} style={styles.statItem}>
@@ -347,7 +355,9 @@ export default function ProfileScreen() {
         {/* Level Roadmap */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{t('profile.levelRoadmap')}</Text>
-          {LEVELS.map(l => (
+          {LEVELS.map(l => {
+            const roadmapCopy = localizedLevelCopy[l.rank as keyof typeof localizedLevelCopy] ?? localizedLevelCopy[1];
+            return (
             <View
               key={l.rank}
               style={[styles.levelRow, level.rank >= l.rank ? styles.levelRowUnlocked : null]}
@@ -359,15 +369,16 @@ export default function ProfileScreen() {
                 <Text style={[styles.levelRowTitle, {
                   color: level.rank >= l.rank ? l.color : colors.textTertiary,
                 }]}>
-                  {l.realisticTitle}
+                  {roadmapCopy.title}
                 </Text>
-                <Text style={styles.levelRowSub}>{l.examTitle} • {l.minXP}+ XP</Text>
+                <Text style={styles.levelRowSub}>{roadmapCopy.exam} • {l.minXP}+ XP</Text>
               </View>
               {level.rank >= l.rank
                 ? <MaterialIcons name="check-circle" size={18} color={l.color} />
                 : null}
             </View>
-          ))}
+            );
+          })}
         </View>
 
         {/* Account Info + Sign Out */}
@@ -505,10 +516,10 @@ export default function ProfileScreen() {
           <Text style={styles.referralStatus}>
             {referralStats.hasUnlockedReward
               ? t('profile.rewardUnlocked')
-              : `${Math.max(0, 5 - referralStats.completed)} more completed referral${Math.max(0, 5 - referralStats.completed) === 1 ? '' : 's'} to unlock your reward`}
+              : t('profile.referralsToUnlock', { value: Math.max(0, 5 - referralStats.completed) })}
           </Text>
           {referralStats.myCode ? (
-            <Text style={styles.referralCode}>Code: {referralStats.myCode.toUpperCase()}</Text>
+            <Text style={styles.referralCode}>{t('profile.referralCodeValue', { value: referralStats.myCode.toUpperCase() })}</Text>
           ) : null}
         </View>
       </ScrollView>

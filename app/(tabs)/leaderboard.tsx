@@ -40,6 +40,7 @@ function LevelBadge({
   levelDef, isCurrent, size,
 }: { levelDef: typeof LEVELS[0]; isCurrent: boolean; size: 'sm' | 'lg' }) {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const scale = useRef(new Animated.Value(isCurrent ? 0.8 : 0.7)).current;
 
@@ -80,7 +81,11 @@ function LevelBadge({
       </View>
       {isCurrent ? (
         <Text style={[styles.badgeLabelCurrent, { color: levelDef.color }]}>
-          {levelDef.realisticTitle}
+          {(levelDef.rank === 1 ? t('profile.levelBeginner')
+            : levelDef.rank === 2 ? t('profile.levelGrinder')
+            : levelDef.rank === 3 ? t('profile.levelConsistent')
+            : levelDef.rank === 4 ? t('profile.levelBeast')
+            : t('profile.levelLegend'))}
         </Text>
       ) : null}
     </Animated.View>
@@ -221,6 +226,11 @@ export default function LeaderboardScreen() {
   const leaderboardRequestIdRef = useRef(0);
 
   const currentLevel = user ? getLevelForUser(user) : LEVELS[0];
+  const currentLevelTitle = currentLevel.rank === 1 ? t('profile.levelBeginner')
+    : currentLevel.rank === 2 ? t('profile.levelGrinder')
+    : currentLevel.rank === 3 ? t('profile.levelConsistent')
+    : currentLevel.rank === 4 ? t('profile.levelBeast')
+    : t('profile.levelLegend');
   const celebrationStorageKey = user?.id
     ? `${TOP_THREE_CELEBRATION_KEY_PREFIX}${user.id}_level_${currentLevel.rank}`
     : null;
@@ -422,7 +432,7 @@ export default function LeaderboardScreen() {
           {/* Podium label */}
           <View style={[styles.podiumLabel, { backgroundColor: currentLevel.color + '22', borderColor: currentLevel.color + '55' }]}>
             <Text style={[styles.podiumText, { color: currentLevel.color }]}>
-              Level {currentLevel.rank} — {currentLevel.realisticTitle}
+              {t('leaderboard.level', { value: currentLevel.rank })} — {currentLevelTitle}
             </Text>
           </View>
 
@@ -446,7 +456,7 @@ export default function LeaderboardScreen() {
               <View style={[styles.miniLevelBadge, { borderColor: currentLevel.color, backgroundColor: currentLevel.color + '22' }]}>
                 <Text style={[styles.miniLevelNum, { color: currentLevel.color }]}>{currentLevel.rank}</Text>
               </View>
-              <Text style={[styles.miniLevelLabel, { color: currentLevel.color }]}>Level {currentLevel.rank}</Text>
+              <Text style={[styles.miniLevelLabel, { color: currentLevel.color }]}>{t('leaderboard.level', { value: currentLevel.rank })}</Text>
             </View>
             {/* Right: rank + XP pills */}
             <View style={styles.rankCardRight}>

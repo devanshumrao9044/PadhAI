@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useApp } from '@/hooks/useApp';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors } from '@/constants/theme';
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
 
 export default function StatsRow({ todayMins = 0, xp = 0, chaptersTotal = 0, chaptersDone = 0 }: Props) {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, getDailySummary } = useApp();
 
@@ -29,24 +31,24 @@ export default function StatsRow({ todayMins = 0, xp = 0, chaptersTotal = 0, cha
       <View style={styles.row}>
         <View style={styles.card}>
           <Text style={styles.emoji}>⏱️</Text>
-          <Text style={styles.value}>{hours}h {minutes}m</Text>
-          <Text style={styles.label}>Today Focus</Text>
+          <Text style={styles.value}>{hours}{t('common.hoursShort')} {minutes}{t('common.minutesShort')}</Text>
+          <Text style={styles.label}>{t('home.todayFocus')}</Text>
         </View>
         <View style={styles.card}>
           <Text style={styles.emoji}>⚡</Text>
           <Text style={[styles.value, { color: colors.warning }]}>{xp || user?.xpTotal || 0}</Text>
-          <Text style={styles.label}>Weekly XP</Text>
+          <Text style={styles.label}>{t('home.weeklyXP')}</Text>
         </View>
         <View style={styles.card}>
           <Text style={styles.emoji}>📚</Text>
           <Text style={styles.value}>{chaptersDone}/{chaptersTotal}</Text>
-          <Text style={styles.label}>Chapters</Text>
+          <Text style={styles.label}>{t('home.chapters')}</Text>
         </View>
       </View>
       <View style={styles.progressContainer}>
         <View style={styles.progressHeader}>
-          <Text style={styles.progressTitle}>Daily Goal Progress</Text>
-          <Text style={styles.progressText}>{todayMinutes} / {goalMinutes} mins</Text>
+          <Text style={styles.progressTitle}>{t('home.dailyGoalProgress')}</Text>
+          <Text style={styles.progressText}>{todayMinutes} / {goalMinutes} {t('common.minutesShort')}</Text>
         </View>
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${percent}%` as any, backgroundColor: percent >= 100 ? colors.success : colors.primary }]} />
