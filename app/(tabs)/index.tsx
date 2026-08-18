@@ -3,6 +3,7 @@ import {
   ScrollView, View, Text, StyleSheet,
   RefreshControl, TouchableOpacity
 } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../services/supabase';
 import GreetingCard from '../../components/dashboard/GreetingCard';
@@ -15,12 +16,16 @@ import { useApp } from '@/hooks/useApp';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors } from '@/constants/theme';
+import { useRouter } from 'expo-router';
+import StreakOverviewModal from '@/components/ui/StreakOverviewModal';
 
 export default function Dashboard() {
   const { colors } = useTheme();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const router = useRouter();
   const { user, isLoading, subjects, chapters, sessions, dailySummaries, chapterAnalytics, reload } = useApp();
+  const [streakModalOpen, setStreakModalOpen] = useState(false);
   const activeChapterIds = useMemo(() => {
     const activeSubjectIds = new Set(subjects.filter(subject => !subject.isDeleted).map(subject => subject.id));
     return new Set(chapters
@@ -136,15 +141,30 @@ export default function Dashboard() {
             <View style={styles.menuLine} />
           </TouchableOpacity>
 
-          <Text style={styles.appName}>
-            {language === 'hi' ? 'पढ़' : 'Padh'}<Text style={styles.ai}>AI</Text>
-          </Text>
+          <View style={styles.headerTitleBlock}>
+            <Text style={styles.appName}>
+              {language === 'hi' ? 'पढ़' : 'Padh'}<Text style={styles.ai}>AI</Text>
+            </Text>
+            <Text style={styles.date}>
+              {new Date().toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-IN', {
+                weekday: 'short', day: 'numeric', month: 'short'
+              })}
+            </Text>
+          </View>
 
-          <Text style={styles.date}>
-            {new Date().toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-IN', {
-              weekday: 'short', day: 'numeric', month: 'short'
-            })}
-          </Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.headerStat} onPress={() => setStreakModalOpen(true)} accessibilityLabel={t('home.streakOverview')}>
+              <MaterialIcons name="local-fire-department" size={17} color={colors.warning} />
+              <Text style={[styles.headerStatText, { color: colors.warning }]}>{user.streakCurrent}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerIconButton} onPress={() => router.push('/rewards')} accessibilityLabel={t('rewards.title')}>
+              <MaterialIcons name="card-giftcard" size={21} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerStat} onPress={() => router.push('/(tabs)/leaderboard')} accessibilityLabel={t('home.leaderboard')}>
+              <MaterialIcons name="bolt" size={17} color={colors.primary} />
+              <Text style={[styles.headerStatText, { color: colors.primary }]}>{user.xpTotal}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <GreetingCard name={user?.fullName || 'Student'} streak={user?.streakCurrent || 0} />
@@ -164,6 +184,15 @@ export default function Dashboard() {
         visible={drawerOpen}
         onClose={() => setDrawerOpen(false)}
       />
+      <StreakOverviewModal
+        visible={streakModalOpen}
+        onClose={() => setStreakModalOpen(false)}
+        currentStreak={user.streakCurrent}
+        bestStreak={user.streakLongest}
+        todayMinutes={stats.todayMinutes}
+        dailyGoalMinutes={user.dailyGoalMinutes}
+        dailySummaries={dailySummaries}
+      />
     </SafeAreaView>
   );
 }
@@ -181,7 +210,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     width: 22, height: 2,
     backgroundColor: '#9CA3AF', borderRadius: 2,
   },
+  headerTitleBlock: { flex: 1, marginLeft: 8 },
   appName: { fontSize: 26, fontWeight: '900', color: colors.textPrimary },
   ai: { color: colors.primary },
-  date: { color: colors.textTertiary, fontSize: 13, fontWeight: '500' },
+  date: { color: colors.textTertiary, fontSize: 11, fontWeight: '500', marginTop: 2 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  headerStat: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6, paddingVertical: 7, borderRadius: 10, backgroundColor: colors.surfaceVariant },
+  headerStatText: { fontSize: 12, fontWeight: '800', maxWidth: 52 },
+  headerIconButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: colors.surfaceVariant },
 });

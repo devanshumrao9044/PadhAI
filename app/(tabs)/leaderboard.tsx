@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  ActivityIndicator, RefreshControl, Animated, TouchableOpacity, Alert,
+  ActivityIndicator, RefreshControl, Animated, TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -16,6 +16,7 @@ import { getWeeklyZone } from '@/services/weeklyXp';
 import { getItem, setItem } from '@/services/storage';
 import { readUserCache, writeUserCache } from '@/services/cache';
 import { applyTopThreeRankUpdate, type TopThreeCelebrationState } from '@/services/leaderboardCelebration';
+import LeaderboardGuideSheet from '@/components/ui/LeaderboardGuideSheet';
 
 const TOP_THREE_CELEBRATION_KEY_PREFIX = 'padhai_top_three_celebration_v1_';
 const MAX_VISIBLE_LEADERBOARD_ENTRIES = 30;
@@ -209,6 +210,7 @@ export default function LeaderboardScreen() {
   const [celebrationRank, setCelebrationRank] = useState<number | null>(null);
   const [celebrationVisible, setCelebrationVisible] = useState(false);
   const [celebrationStateReady, setCelebrationStateReady] = useState(false);
+  const [guideVisible, setGuideVisible] = useState(false);
   const celebrationProgress = useRef(new Animated.Value(0)).current;
   const celebrationAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
   const celebrationAnimatedStyle = useMemo(() => ({
@@ -381,14 +383,21 @@ export default function LeaderboardScreen() {
           </TouchableOpacity>
           <Text style={styles.pageTitle}>{t('leaderboard.pageTitle')}</Text>
           <View style={styles.headerActions}>
-            <MaterialIcons name="emoji-events" size={30} color={colors.warning} />
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel={t('leaderboard.infoTitle')}
-              onPress={() => Alert.alert(t('leaderboard.infoTitle'), t('leaderboard.infoMessage'))}
+              accessibilityLabel={t('rewards.title')}
+              onPress={() => router.push('/rewards')}
               style={styles.headerIconButton}
             >
-              <MaterialIcons name="info-outline" size={27} color={colors.textPrimary} />
+              <MaterialIcons name="emoji-events" size={30} color={colors.warning} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={t('leaderboard.openGuide')}
+              onPress={() => setGuideVisible(true)}
+              style={styles.headerIconButton}
+            >
+              <MaterialIcons name="help-outline" size={28} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -494,6 +503,8 @@ export default function LeaderboardScreen() {
           )}
         </View>
       </ScrollView>
+
+      <LeaderboardGuideSheet visible={guideVisible} onClose={() => setGuideVisible(false)} />
 
       {celebrationVisible && celebrationRank ? (
         <Animated.View
