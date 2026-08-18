@@ -4,6 +4,7 @@ import {
   ActivityIndicator, RefreshControl, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
@@ -12,6 +13,7 @@ import { useApp } from '@/hooks/useApp';
 import { supabase } from '@/services/supabase';
 import { getWeeklyZone } from '@/services/weeklyXp';
 import { getItem, setItem } from '@/services/storage';
+import { readUserCache, writeUserCache } from '@/services/cache';
 import { applyTopThreeRankUpdate, type TopThreeCelebrationState } from '@/services/leaderboardCelebration';
 
 const TOP_THREE_CELEBRATION_KEY_PREFIX = 'padhai_top_three_celebration_v1_';
@@ -25,6 +27,11 @@ interface LeaderboardEntry {
   streak: number;
   rank: number;
 }
+
+type LeaderboardCacheData = {
+  level: number;
+  entries: LeaderboardEntry[];
+};
 
 // ── Hero Badge: single level badge for carousel ──────────────────────────────
 function LevelBadge({
@@ -197,6 +204,7 @@ export default function LeaderboardScreen() {
     transform: [{ scale: celebrationProgress.interpolate({ inputRange: [0, 1], outputRange: [0.985, 1] }) }],
   }), [celebrationProgress]);
   const previousTopThreeRankRef = useRef<number | null | undefined>(undefined);
+  const leaderboardRequestIdRef = useRef(0);
 
   const currentLevel = user ? getLevelForUser(user) : LEVELS[0];
   const celebrationStorageKey = user?.id
@@ -267,19 +275,26 @@ export default function LeaderboardScreen() {
     celebrationAnimationRef.current = null;
   }, []);
 
-  const fetchLeaderboard = useCallback(async () => {
-    if (!celebrationStateReady) return;
+  const syncLeaderboard = useCallback(async (showSpinner = true) => {
+    if (!celebrationStateReady || !user?.id) return;
+    const requestId = ++leaderboardRequestIdRef.current;
+    if (showSpinner) setLoading(true);
 
     try {
       const { data, error } = await supabase.rpc('get_level_leaderboard', {
         p_level: currentLevel.rank,
       });
+      if (requestId !== leaderboardRequestIdRef.current) return;
       if (!error && data) {
         const nextEntries = data as LeaderboardEntry[];
         setEntries(nextEntries);
+        void writeUserCache<LeaderboardCacheData>(user.id, 'leaderboard', {
+          level: currentLevel.rank,
+          entries: nextEntries,
+        });
 
         if (celebrationStorageKey) {
-          const currentRank = nextEntries.find(entry => entry.id === user?.id)?.rank ?? null;
+          const currentRank = nextEntries.find(entry => entry.id === user.id)?.rank ?? null;
           const previousRank = previousTopThreeRankRef.current;
           previousTopThreeRankRef.current = currentRank;
 
@@ -294,21 +309,30 @@ export default function LeaderboardScreen() {
     } catch (e) {
       console.log('Leaderboard fetch error:', e);
     } finally {
-      setLoading(false);
+      if (showSpinner && requestId === leaderboardRequestIdRef.current) setLoading(false);
     }
   }, [celebrationStateReady, celebrationStorageKey, currentLevel.rank, triggerTopThreeCelebration, user?.id]);
 
-  useEffect(() => {
-    void fetchLeaderboard();
-    const liveRefresh = setInterval(() => { void fetchLeaderboard(); }, 30_000);
-    return () => clearInterval(liveRefresh);
-  }, [fetchLeaderboard]);
+  const loadLeaderboard = useCallback(async () => {
+    if (!celebrationStateReady || !user?.id) return;
+    const cached = await readUserCache<LeaderboardCacheData>(user.id, 'leaderboard');
+    const hasMatchingCache = cached?.data.level === currentLevel.rank;
+    if (hasMatchingCache) {
+      setEntries(cached.data.entries);
+      setLoading(false);
+    }
+    await syncLeaderboard(!hasMatchingCache);
+  }, [celebrationStateReady, currentLevel.rank, syncLeaderboard, user?.id]);
+
+  useFocusEffect(useCallback(() => {
+    void loadLeaderboard();
+  }, [loadLeaderboard]));
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchLeaderboard();
+    await syncLeaderboard(false);
     setRefreshing(false);
-  }, [fetchLeaderboard]);
+  }, [syncLeaderboard]);
 
   // Build carousel: show currentLevel ±2 levels
   const carouselLevels = LEVELS.filter(

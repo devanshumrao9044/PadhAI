@@ -13,7 +13,8 @@ export type CacheKind =
   | 'dailySummaries'
   | 'xpLog'
   | 'chapterAnalytics'
-  | 'referralMeta';
+  | 'referralMeta'
+  | 'leaderboard';
 
 export const CACHE_TTL_MS: Record<CacheKind, number> = {
   user: 5 * 60 * 1000,
@@ -24,6 +25,7 @@ export const CACHE_TTL_MS: Record<CacheKind, number> = {
   xpLog: 5 * 60 * 1000,
   chapterAnalytics: 60 * 1000,
   referralMeta: 5 * 60 * 1000,
+  leaderboard: 30 * 1000,
 };
 
 type CacheEnvelope<T> = {
