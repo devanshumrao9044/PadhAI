@@ -65,6 +65,7 @@ export type AppContextType = {
   sessions: FocusSession[];
   dailySummaries: DailySummary[];
   last7Days: DailySummary[];
+  last30Days: DailySummary[];
   last90Days: DailySummary[];
   activeSession: ActiveSession | null;
   startSession: (plannedMins: number, subjectId: string | null, chapterId: string | null, isRecoverySession?: boolean, recoveryLostStreak?: number) => Promise<string>;
@@ -72,6 +73,7 @@ export type AppContextType = {
   breakSession: (sessionId: string, actualMins: number) => Promise<FocusSession | null>;
   getDailySummary: (date: string) => DailySummary | null;
   getLast7Days: () => DailySummary[];
+  getLast30Days: () => DailySummary[];
   getLast90Days: () => DailySummary[];
   xpLog: XPTransaction[];
   awardXP: (amount: number, reason: string) => Promise<void>;
@@ -1170,11 +1172,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     () => Array.from({ length: 7 }, (_, i) => getEmptySummary(6 - i)),
     [dailySummaries, user?.id, user?.dailyGoalMinutes],
   );
+  const last30Days = useMemo(
+    () => Array.from({ length: 30 }, (_, i) => getEmptySummary(29 - i)),
+    [dailySummaries, user?.id, user?.dailyGoalMinutes],
+  );
   const last90Days = useMemo(
     () => Array.from({ length: 90 }, (_, i) => getEmptySummary(89 - i)),
     [dailySummaries, user?.id, user?.dailyGoalMinutes],
   );
   const getLast7Days = () => last7Days;
+  const getLast30Days = () => last30Days;
   const getLast90Days = () => last90Days;
 
   const stableSetUser = useStableCallback(setUser);
@@ -1196,6 +1203,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const stableBreakSession = useStableCallback(breakSession);
   const stableGetDailySummary = useStableCallback(getDailySummary);
   const stableGetLast7Days = useStableCallback(getLast7Days);
+  const stableGetLast30Days = useStableCallback(getLast30Days);
   const stableGetLast90Days = useStableCallback(getLast90Days);
   const stableAwardXP = useStableCallback(awardXP);
   const stableDeductXP = useStableCallback(deductXP);
@@ -1209,20 +1217,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateChapter: stableUpdateChapter, deleteChapter: stableDeleteChapter, bulkDeleteChapters: stableBulkDeleteChapters,
     topics, getTopicsForChapter: stableGetTopicsForChapter, addTopic: stableAddTopic,
     toggleTopic: stableToggleTopic, deleteTopic: stableDeleteTopic,
-    sessions, dailySummaries, last7Days, last90Days, activeSession, startSession: stableStartSession, completeSession: stableCompleteSession, breakSession: stableBreakSession,
-    getDailySummary: stableGetDailySummary, getLast7Days: stableGetLast7Days, getLast90Days: stableGetLast90Days,
+    sessions, dailySummaries, last7Days, last30Days, last90Days, activeSession, startSession: stableStartSession, completeSession: stableCompleteSession, breakSession: stableBreakSession,
+    getDailySummary: stableGetDailySummary, getLast7Days: stableGetLast7Days, getLast30Days: stableGetLast30Days, getLast90Days: stableGetLast90Days,
     xpLog, awardXP: stableAwardXP, deductXP: stableDeductXP,
     comebackPending, setComebackPending: stableSetComebackPending,
     hasUnlockedReward, setHasUnlockedReward: stableSetHasUnlockedReward, referralCount,
     streakRecoveryPending, lostStreakCount, setStreakRecoveryPending: stableSetStreakRecoveryPending,
     isLoading, reload,
   }), [
-    user, isOnboarded, subjects, chapters, chapterAnalytics, topics, sessions, dailySummaries, last7Days, last90Days, activeSession, xpLog,
+    user, isOnboarded, subjects, chapters, chapterAnalytics, topics, sessions, dailySummaries, last7Days, last30Days, last90Days, activeSession, xpLog,
     comebackPending, hasUnlockedReward, referralCount, streakRecoveryPending, lostStreakCount, isLoading,
     stableSetUser, stableSetOnboarded, stableAddSubject, stableUpdateSubject, stableDeleteSubject,
     stableGetChaptersForSubject, stableAddChapter, stableUpdateChapter, stableDeleteChapter, stableBulkDeleteChapters,
     stableGetTopicsForChapter, stableAddTopic, stableToggleTopic, stableDeleteTopic, stableStartSession,
-    stableCompleteSession, stableBreakSession, stableGetDailySummary, stableGetLast7Days, stableGetLast90Days,
+    stableCompleteSession, stableBreakSession, stableGetDailySummary, stableGetLast7Days, stableGetLast30Days, stableGetLast90Days,
     stableAwardXP, stableDeductXP, stableSetComebackPending, stableSetHasUnlockedReward, stableSetStreakRecoveryPending, reload,
   ]);
 

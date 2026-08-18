@@ -124,3 +124,27 @@ export interface Referral {
   createdAt: string;
   completedAt: string | null;
 }
+
+export interface TodoItem {
+  id: string;
+  userId: string;
+  title: string;
+  subjectId: string | null;
+  date: string;
+  completed: boolean;
+  createdAt: string;
+}
+
+export interface CalendarEvent {
+  id: string;
+  userId: string;
+  title: string;
+  date: string;
+  isDayOff: boolean;
+  createdAt: string;
+}
+
+export interface SubjectTimerState {
+  elapsedSeconds: number;
+  startedAt: number | null;
+}

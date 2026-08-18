@@ -64,7 +64,7 @@ export default function AnalyticsScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const chartConfig = useMemo(() => createChartConfig(colors), [colors]);
   const lineChartConfig = useMemo(() => createLineChartConfig(colors), [colors]);
-  const { user, sessions, last7Days: last7, last90Days: last90, chapters, chapterAnalytics, getDailySummary, reload } = useApp();
+  const { user, sessions, last7Days: last7, last30Days: last30, chapters, chapterAnalytics, getDailySummary, reload } = useApp();
   const userId = user?.id ?? null;
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -394,16 +394,16 @@ export default function AnalyticsScreen() {
           </View>
         </View>
 
-        {/* ── Heatmap: 90-day Consistency ──────────────────────────────────── */}
+        {/* ── Heatmap: 30-day Consistency ──────────────────────────────────── */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>{t('analytics.consistency90')}</Text>
+          <Text style={styles.cardTitle}>{t('analytics.consistency30')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.heatmap}>
-              {Array.from({ length: 13 }, (_, weekIdx) => (
+              {Array.from({ length: 5 }, (_, weekIdx) => (
                 <View key={weekIdx} style={styles.heatCol}>
                   {Array.from({ length: 7 }, (_, dayIdx) => {
                     const idx = weekIdx * 7 + dayIdx;
-                    const entry = last90[idx];
+                    const entry = last30[idx];
                     return (
                       <View
                         key={dayIdx}

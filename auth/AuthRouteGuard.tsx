@@ -29,6 +29,8 @@ export default function AuthRouteGuard() {
     routeSegments[0] === 'tracker' ||
     routeSegments[0] === 'streak-broken' ||
     routeSegments[0] === 'referral' ||
+    routeSegments[0] === 'todo' ||
+    routeSegments[0] === 'calendar' ||
     routeSegments[0] === 'first-time-help';
   const isSessionAllowedPublicRoute =
     routeSegments[0] === 'privacy-policy' ||

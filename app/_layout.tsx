@@ -36,6 +36,8 @@ function AppNavigation() {
         <Stack.Screen name="focus/levelup" options={{ animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="focus/broken" options={{ animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="referral" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="todo" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="calendar" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="tracker/[subjectId]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="tracker/chapters/[chapterId]" options={{ animation: 'slide_from_right' }} />
       </Stack>
