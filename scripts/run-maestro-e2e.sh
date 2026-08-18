@@ -10,8 +10,10 @@ fi
 : "${PADHAI_E2E_PASSWORD:?Set PADHAI_E2E_PASSWORD in the CI secret store or shell environment}"
 PADHAI_E2E_EXPECTED_RANK="${PADHAI_E2E_EXPECTED_RANK:-1}"
 
-exec maestro test \
-  -e "PADHAI_E2E_EMAIL=${PADHAI_E2E_EMAIL}" \
-  -e "PADHAI_E2E_PASSWORD=${PADHAI_E2E_PASSWORD}" \
-  -e "PADHAI_E2E_EXPECTED_RANK=${PADHAI_E2E_EXPECTED_RANK}" \
-  .maestro/leaderboard-rank-transition.yaml
+# Maestro exposes MAESTRO_* environment variables inside the flow. Keeping the
+# values out of the command line avoids showing credentials in process listings.
+export MAESTRO_PADHAI_E2E_EMAIL="$PADHAI_E2E_EMAIL"
+export MAESTRO_PADHAI_E2E_PASSWORD="$PADHAI_E2E_PASSWORD"
+export MAESTRO_PADHAI_E2E_EXPECTED_RANK="$PADHAI_E2E_EXPECTED_RANK"
+
+exec maestro test .maestro/leaderboard-rank-transition.yaml

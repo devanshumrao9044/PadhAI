@@ -2,17 +2,18 @@ appId: com.padhai.app
 name: Leaderboard rank transition and celebration
 
 ---
-# PADHAI_E2E_EMAIL and PADHAI_E2E_PASSWORD must be supplied through the
-# Maestro environment; credentials are intentionally not stored in this file.
+# The runner exports MAESTRO_* variables from secret storage; credentials are
+# intentionally not stored in this file or passed as command-line arguments.
 - launchApp:
     clearState: true
 
 - tapOn:
     id: auth-email
-- inputText: ${PADHAI_E2E_EMAIL}
+- inputText: ${MAESTRO_PADHAI_E2E_EMAIL}
 - tapOn:
     id: auth-password
-- inputText: ${PADHAI_E2E_PASSWORD}
+- inputText: ${MAESTRO_PADHAI_E2E_PASSWORD}
+- hideKeyboard
 - tapOn:
     id: auth-submit
 
@@ -42,7 +43,7 @@ name: Leaderboard rank transition and celebration
       id: top-three-celebration
     timeout: 10000
 - assertVisible: Top 3 achievement!
-- assertVisible: You reached rank ${PADHAI_E2E_EXPECTED_RANK}.
+- assertVisible: "You reached rank ${MAESTRO_PADHAI_E2E_EXPECTED_RANK}."
 
 # The optimized native-driven animation fades out and removes its overlay.
 - extendedWaitUntil:

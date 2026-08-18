@@ -16,17 +16,16 @@ Build the app with the staging Supabase URL and anon key injected through Expo e
 
 ## Run
 
-Pass the test account and expected current rank at runtime:
+Pass the test account and expected current rank through the wrapper:
 
 ```bash
-maestro test \
-  -e PADHAI_E2E_EMAIL="$PADHAI_E2E_EMAIL" \
-  -e PADHAI_E2E_PASSWORD="$PADHAI_E2E_PASSWORD" \
-  -e PADHAI_E2E_EXPECTED_RANK="1" \
-  .maestro/leaderboard-rank-transition.yaml
+export PADHAI_E2E_EMAIL="e2e-user@example.com"
+export PADHAI_E2E_PASSWORD="<secret-store-value>"
+export PADHAI_E2E_EXPECTED_RANK="1"
+pnpm e2e:maestro
 ```
 
-The password is supplied only through the shell/CI secret store. The flow intentionally contains no account credentials.
+The wrapper maps these values to `MAESTRO_*` environment variables, which the flow reads at runtime. The password is supplied only through the shell/CI secret store and is not passed as a Maestro command-line argument. The flow intentionally contains no account credentials.
 
 ## CI guidance
 
