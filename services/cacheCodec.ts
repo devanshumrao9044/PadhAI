@@ -9,6 +9,7 @@ export type CacheKind =
   | 'user'
   | 'subjects'
   | 'chapters'
+  | 'topics'
   | 'sessions'
   | 'dailySummaries'
   | 'xpLog'
@@ -20,6 +21,7 @@ export const CACHE_TTL_MS: Record<CacheKind, number> = {
   user: 5 * 60 * 1000,
   subjects: 5 * 60 * 1000,
   chapters: 5 * 60 * 1000,
+  topics: 5 * 60 * 1000,
   sessions: 60 * 1000,
   dailySummaries: 5 * 60 * 1000,
   xpLog: 5 * 60 * 1000,

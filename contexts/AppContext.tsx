@@ -21,6 +21,7 @@ import {
 import { calculateSessionXP, XP_REWARDS, getLevelForUser } from '@/constants/levels';
 import { processReferralOnFirstSession } from '@/services/referralService';
 import { normalizeChapterAnalyticsRows } from '@/services/chapterAnalytics';
+import { reconcileTrackerState } from '@/services/trackerState';
 import { getRecoveredStreak, isStreakRecoveryEligible } from '@/services/streakRecovery';
 import {
   buildBaselineMarker,
@@ -423,10 +424,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const userId = authUser.id;
         currentUserIdRef.current = userId;
         const sameAccount = savedUser?.id === userId;
-        const [cachedUser, cachedSubjects, cachedChapters, cachedSessions, cachedSummaries, cachedXP, cachedAnalytics, cachedReferral] = await Promise.all([
+        const [cachedUser, cachedSubjects, cachedChapters, cachedTopics, cachedSessions, cachedSummaries, cachedXP, cachedAnalytics, cachedReferral] = await Promise.all([
           readUserCache<UserProfile>(userId, 'user'),
           readUserCache<Subject[]>(userId, 'subjects'),
           readUserCache<Chapter[]>(userId, 'chapters'),
+          readUserCache<Topic[]>(userId, 'topics'),
           readUserCache<FocusSession[]>(userId, 'sessions'),
           readUserCache<DailySummary[]>(userId, 'dailySummaries'),
           readUserCache<XPTransaction[]>(userId, 'xpLog'),
@@ -437,13 +439,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setUserState(cachedUser.data);
           setIsOnboardedState(cachedUser.data.fullName !== 'Student');
         }
-        if (cachedSubjects) {
-          setSubjects(cachedSubjects.data.filter(subject => !subject.isDeleted && !deletedSubjectIdsRef.current.has(subject.id)));
-        }
+        const localTopics = sameAccount
+          ? (cachedTopics?.data ?? savedTopics ?? [])
+          : (cachedTopics?.data ?? []);
+        const cachedTracker = reconcileTrackerState(
+          cachedSubjects?.data.filter(subject => !deletedSubjectIdsRef.current.has(subject.id)) ?? [],
+          cachedChapters?.data.filter(chapter => !deletedChapterIdsRef.current.has(chapter.id)) ?? [],
+          localTopics,
+        );
         const cachedActiveChapterIds = cachedChapters
-          ? new Set(cachedChapters.data.filter(chapter => !chapter.isDeleted).map(chapter => chapter.id))
+          ? new Set(cachedTracker.chapters.map(chapter => chapter.id))
           : null;
-        if (cachedChapters) setChapters(cachedChapters.data.filter(chapter => !chapter.isDeleted));
+        if (cachedSubjects) setSubjects(cachedTracker.subjects);
+        if (cachedChapters) setChapters(cachedTracker.chapters);
+        if (cachedTopics || sameAccount) setTopics(cachedTracker.topics);
         if (cachedAnalytics) {
           setChapterAnalytics(cachedActiveChapterIds
             ? cachedAnalytics.data.filter(analytics => cachedActiveChapterIds.has(analytics.chapterId))
@@ -455,7 +464,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
 
         if (sameAccount) {
-          setTopics(savedTopics ?? []);
+          setTopics(cachedTracker.topics);
           setActiveSession(savedActive ?? null);
           setSessions(cachedSessions?.data ?? savedSessions ?? []);
           setDailySummaries(cachedSummaries?.data ?? savedSummaries ?? []);
@@ -465,9 +474,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           deletedChapterIdsRef.current.clear();
           deletedSubjectIdsRef.current.clear();
           await clearLocalAccountData(savedUser?.id);
-          setSubjects(cachedSubjects?.data.filter(subject => !subject.isDeleted && !deletedSubjectIdsRef.current.has(subject.id)) ?? []);
-          setChapters(cachedChapters?.data.filter(chapter => !chapter.isDeleted) ?? []);
-          setTopics([]);
+          setSubjects(cachedTracker.subjects);
+          setChapters(cachedTracker.chapters);
+          setTopics(cachedTracker.topics);
           setActiveSession(null);
           setSessions(cachedSessions?.data ?? []);
           setChapterAnalytics(cachedActiveChapterIds
@@ -521,22 +530,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (loadGeneration !== authGenerationRef.current) return;
         let activeChapterIds: Set<string> | null = null;
-        if (subRes.data) {
-          const cloudSubjects = subRes.data
+        const cloudSubjects = subRes.data
+          ? subRes.data
             .map(mapSubject)
-            .filter(subject => !subject.isDeleted && !deletedSubjectIdsRef.current.has(subject.id));
-          setSubjects(cloudSubjects);
-          void writeUserCache(userId, 'subjects', cloudSubjects);
+            .filter(subject => !subject.isDeleted && !deletedSubjectIdsRef.current.has(subject.id))
+          : cachedTracker.subjects;
+        const cloudChapters = chapRes.data
+          ? chapRes.data
+            .map(mapChapter)
+            .filter(chapter => !deletedChapterIdsRef.current.has(chapter.id) && chapter.isDeleted === false)
+          : cachedTracker.chapters;
+        const reconciledTracker = reconcileTrackerState(cloudSubjects, cloudChapters, cachedTracker.topics);
+        activeChapterIds = new Set(reconciledTracker.chapters.map(chapter => chapter.id));
+        if (subRes.data) {
+          setSubjects(reconciledTracker.subjects);
+          void writeUserCache(userId, 'subjects', reconciledTracker.subjects);
         }
         if (chapRes.data) {
-          const activeChapters = chapRes.data
-            .map(mapChapter)
-            .filter(chapter => !deletedChapterIdsRef.current.has(chapter.id) && chapter.isDeleted === false);
-          activeChapterIds = new Set(activeChapters.map(chapter => chapter.id));
-          setChapters(activeChapters);
-          await setItem(StorageKeys.CHAPTERS, activeChapters);
-          void writeUserCache(userId, 'chapters', activeChapters);
+          setChapters(reconciledTracker.chapters);
+          await setItem(StorageKeys.CHAPTERS, reconciledTracker.chapters);
+          void writeUserCache(userId, 'chapters', reconciledTracker.chapters);
         }
+        setTopics(reconciledTracker.topics);
+        await setItem(StorageKeys.TOPICS, reconciledTracker.topics);
+        void writeUserCache(userId, 'topics', reconciledTracker.topics);
         if (sessRes.data) {
           const cloudSess = sessRes.data.map(mapSession);
           setSessions(cloudSess);
@@ -766,6 +783,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (userId) {
       void writeUserCache(userId, 'subjects', updatedSubjects);
       void writeUserCache(userId, 'chapters', updatedChapters);
+      void writeUserCache(userId, 'topics', updatedTopics);
       void writeUserCache(userId, 'chapterAnalytics', updatedAnalytics);
     }
     lastLoadAtRef.current = null;
@@ -809,12 +827,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
     deletedChapterIdsRef.current.add(id);
     const updatedChapters = chapters.filter(c => c.id !== id);
+    const updatedTopics = topics.filter(topic => topic.chapterId !== id);
     const updatedAnalytics = chapterAnalytics.filter(analytics => analytics.chapterId !== id);
     setChapters(updatedChapters);
+    setTopics(updatedTopics);
     setChapterAnalytics(updatedAnalytics);
+    await setItem(StorageKeys.TOPICS, updatedTopics);
     const { data: authData } = await supabase.auth.getSession();
     if (authData.session?.user?.id) {
       void writeUserCache(authData.session.user.id, 'chapters', updatedChapters);
+      void writeUserCache(authData.session.user.id, 'topics', updatedTopics);
       void writeUserCache(authData.session.user.id, 'chapterAnalytics', updatedAnalytics);
     }
   };
@@ -826,26 +848,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
     ids.forEach(id => deletedChapterIdsRef.current.add(id));
     const deletedChapterIds = new Set(ids);
     const updatedChapters = chapters.filter(c => !deletedChapterIds.has(c.id));
+    const updatedTopics = topics.filter(topic => !deletedChapterIds.has(topic.chapterId));
     const updatedAnalytics = chapterAnalytics.filter(analytics => !deletedChapterIds.has(analytics.chapterId));
     setChapters(updatedChapters);
+    setTopics(updatedTopics);
     setChapterAnalytics(updatedAnalytics);
+    await setItem(StorageKeys.TOPICS, updatedTopics);
     const { data: authData } = await supabase.auth.getSession();
     if (authData.session?.user?.id) {
       void writeUserCache(authData.session.user.id, 'chapters', updatedChapters);
+      void writeUserCache(authData.session.user.id, 'topics', updatedTopics);
       void writeUserCache(authData.session.user.id, 'chapterAnalytics', updatedAnalytics);
     }
   };
 
   // ── Topics (local only) ───────────────────────────────────────────────────
   const getTopicsForChapter = (chapterId: string) =>
-    topics.filter(t => t.chapterId === chapterId && !t.isDeleted).sort((a, b) => a.displayOrder - b.displayOrder);
+    topics
+      .filter(topic => topic.chapterId === chapterId && !topic.isDeleted)
+      .sort((a, b) => a.displayOrder - b.displayOrder);
 
   const addTopic = async (chapterId: string, name: string): Promise<Topic> => {
+    const chapterExists = chapters.some(chapter => (
+      chapter.id === chapterId && !chapter.isDeleted && subjects.some(subject => (
+        subject.id === chapter.subjectId && !subject.isDeleted
+      ))
+    ));
+    if (!chapterExists) throw new Error('Cannot add a topic to an inactive chapter.');
     const existing = topics.filter(t => t.chapterId === chapterId && !t.isDeleted);
-    const t: Topic = { id: uuidv4(), chapterId, name, isDone: false, displayOrder: existing.length, isDeleted: false };
+    const t: Topic = { id: uuidv4(), chapterId, name: name.trim(), isDone: false, displayOrder: existing.length, isDeleted: false };
     const updated = [...topics, t];
     setTopics(updated);
     await setItem(StorageKeys.TOPICS, updated);
+    if (user?.id) void writeUserCache(user.id, 'topics', updated);
     return t;
   };
 
@@ -853,12 +888,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const updated = topics.map(t => t.id === id ? { ...t, isDone: !t.isDone } : t);
     setTopics(updated);
     await setItem(StorageKeys.TOPICS, updated);
+    if (user?.id) void writeUserCache(user.id, 'topics', updated);
   };
 
   const deleteTopic = async (id: string) => {
     const updated = topics.map(t => t.id === id ? { ...t, isDeleted: true } : t);
     setTopics(updated);
     await setItem(StorageKeys.TOPICS, updated);
+    if (user?.id) void writeUserCache(user.id, 'topics', updated);
   };
 
   // ── XP ────────────────────────────────────────────────────────────────────

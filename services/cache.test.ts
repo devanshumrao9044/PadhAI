@@ -22,7 +22,9 @@ test('compressed cache codec round-trips Unicode data', () => {
 test('cache keys are user-scoped and TTLs distinguish volatile data', () => {
   assert.notEqual(cacheKey('user-a', 'sessions'), cacheKey('user-b', 'sessions'));
   assert.notEqual(cacheKey('user-a', 'leaderboard'), cacheKey('user-b', 'leaderboard'));
+  assert.notEqual(cacheKey('user-a', 'topics'), cacheKey('user-b', 'topics'));
   assert.equal(CACHE_TTL_MS.leaderboard, 30 * 1000);
+  assert.equal(CACHE_TTL_MS.topics, 5 * 60 * 1000);
   assert.ok(CACHE_TTL_MS.sessions < CACHE_TTL_MS.subjects);
 });
 
