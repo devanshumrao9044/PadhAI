@@ -5,6 +5,7 @@ const TRANSLATIONS = {
   en: {
     common: {
       cancel: 'Cancel',
+      back: 'Back',
       save: 'Save',
       close: 'Close',
       loading: 'Loading…',
@@ -101,6 +102,11 @@ const TRANSLATIONS = {
       rank: 'Rank',
       live: 'LIVE',
       title: 'LEVEL {value} LEADERBOARD',
+      pageTitle: 'Leaderboard',
+      infoTitle: 'How the leaderboard works',
+      infoMessage: 'Your level ranking is based on weekly XP. The leaderboard resets every Sunday.',
+      updatesIn: 'Leaderboard updates in {value}',
+      days: 'days',
       subtitle: 'Top 30 students in your current level',
       loading: 'Loading rankings…',
       noRankings: 'No rankings yet.\nComplete a session to appear!',
@@ -179,6 +185,7 @@ const TRANSLATIONS = {
   hi: {
     common: {
       cancel: 'रद्द करें',
+      back: 'वापस',
       save: 'सहेजें',
       close: 'बंद करें',
       loading: 'लोड हो रहा है…',
@@ -275,6 +282,11 @@ const TRANSLATIONS = {
       rank: 'रैंक',
       live: 'लाइव',
       title: 'लेवल {value} लीडरबोर्ड',
+      pageTitle: 'लीडरबोर्ड',
+      infoTitle: 'लीडरबोर्ड कैसे काम करता है',
+      infoMessage: 'आपकी लेवल रैंकिंग साप्ताहिक XP पर आधारित है। लीडरबोर्ड हर रविवार रीसेट होता है।',
+      updatesIn: 'लीडरबोर्ड {value} में अपडेट होगा',
+      days: 'दिन',
       subtitle: 'आपके वर्तमान लेवल के टॉप 30 छात्र',
       loading: 'रैंकिंग लोड हो रही है…',
       noRankings: 'अभी कोई रैंकिंग नहीं है।\nसेशन पूरा करके दिखाई दें!',

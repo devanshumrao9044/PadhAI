@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  ActivityIndicator, RefreshControl, Animated,
+  ActivityIndicator, RefreshControl, Animated, TouchableOpacity, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -199,6 +199,7 @@ export default function LeaderboardScreen() {
   const { colors } = useTheme();
   const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const router = useRouter();
   const { user } = useApp();
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -225,6 +226,10 @@ export default function LeaderboardScreen() {
     ? { ...entry, xp: user.xpTotal, level: currentLevel.rank }
     : entry);
   const visibleEntries = displayEntries.slice(0, MAX_VISIBLE_LEADERBOARD_ENTRIES);
+  const daysUntilReset = useMemo(() => {
+    const day = new Date().getDay();
+    return day === 0 ? 7 : 7 - day;
+  }, []);
 
   const triggerTopThreeCelebration = useCallback((rank: number) => {
     celebrationAnimationRef.current?.stop();
@@ -363,6 +368,29 @@ export default function LeaderboardScreen() {
           />
         }
       >
+        <View style={styles.pageHeader}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={t('common.back')}
+            onPress={() => router.back()}
+            style={styles.headerIconButton}
+          >
+            <MaterialIcons name="arrow-back" size={28} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.pageTitle}>{t('leaderboard.pageTitle')}</Text>
+          <View style={styles.headerActions}>
+            <MaterialIcons name="emoji-events" size={30} color={colors.warning} />
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={t('leaderboard.infoTitle')}
+              onPress={() => Alert.alert(t('leaderboard.infoTitle'), t('leaderboard.infoMessage'))}
+              style={styles.headerIconButton}
+            >
+              <MaterialIcons name="info-outline" size={27} color={colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* ── Section 1: Hero Level Carousel ────────────────────────────── */}
         <View style={styles.heroSection}>
           {/* Spotlight glow behind current level */}
@@ -395,6 +423,11 @@ export default function LeaderboardScreen() {
 
         {/* ── Section 2: Rank Status Card ───────────────────────────────── */}
         <View style={styles.rankCard}>
+          <View style={styles.weeklyUpdateCard}>
+            <Text style={styles.weeklyUpdateText}>{t('leaderboard.updatesIn', { value: `${daysUntilReset} ${t('leaderboard.days')}` })}</Text>
+            <MaterialIcons name="info-outline" size={21} color={colors.textSecondary} />
+          </View>
+
           {/* Top info row */}
           <View style={styles.rankCardTop}>
             {/* Left: level badge + title */}
@@ -503,13 +536,42 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   celebrationSubtitle: { color: colors.textSecondary, fontSize: FontSize.xs, marginTop: 2 },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 100 },
+  pageHeader: {
+    minHeight: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md,
+    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  headerIconButton: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pageTitle: {
+    flex: 1,
+    marginLeft: 4,
+    fontSize: 27,
+    lineHeight: 32,
+    fontWeight: FontWeight.extraBold,
+    color: colors.textPrimary,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
 
   // ── Section 1 Hero ────────────────────────────────────────────────────────
   heroSection: {
     alignItems: 'center',
-    paddingTop: Spacing.xl,
-    paddingBottom: Spacing.xl,
-    backgroundColor: '#E8F0FE18',
+    paddingTop: 18,
+    paddingBottom: 20,
+    backgroundColor: '#E8F0FE',
     overflow: 'hidden',
   },
   spotlight: {
@@ -573,12 +635,31 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   // ── Section 2 Rank Card ────────────────────────────────────────────────────
   rankCard: {
     backgroundColor: colors.surface,
-    borderRadius: Radius.xl,
+    borderRadius: 18,
     marginHorizontal: Spacing.md,
     marginBottom: Spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: Spacing.md,
+    padding: 14,
+  },
+  weeklyUpdateCard: {
+    minHeight: 74,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+    borderRadius: 12,
+    backgroundColor: '#EEF3FF',
+    borderWidth: 1,
+    borderColor: '#D6E1FB',
+  },
+  weeklyUpdateText: {
+    color: colors.textPrimary,
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.semiBold,
+    textAlign: 'center',
   },
   rankCardTop: {
     flexDirection: 'row',
@@ -723,14 +804,16 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   sectionSubtitle: { color: colors.textTertiary, fontSize: FontSize.xs, marginBottom: Spacing.sm },
   promotionHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, marginBottom: 4 },
   promotionHintText: { color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.bold },
-  listContainer: { gap: 6, paddingBottom: Spacing.xl },
+  listContainer: { gap: 8, paddingBottom: Spacing.xl },
   boardRow: {
+    minHeight: 78,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     backgroundColor: colors.surface,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -743,14 +826,14 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     backgroundColor: colors.primary + '12',
   },
   boardRankBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 11,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  medalBadge: { width: 48, height: 42, borderRadius: 14, gap: 1 },
+  medalBadge: { width: 48, height: 48, borderRadius: 13, gap: 1 },
   boardRankText: {
     fontSize: FontSize.base,
     fontWeight: FontWeight.extraBold,
@@ -758,7 +841,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   boardName: {
     flex: 1,
-    fontSize: FontSize.base,
+    fontSize: FontSize.lg,
+    lineHeight: 25,
     fontWeight: FontWeight.semiBold,
     color: colors.textPrimary,
   },
@@ -772,8 +856,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     gap: 6,
   },
   boardXPText: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
+    fontSize: 24,
+    lineHeight: 28,
+    fontWeight: FontWeight.extraBold,
     color: colors.textPrimary,
     includeFontPadding: false,
   },
