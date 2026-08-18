@@ -6,14 +6,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { STREAK_RECOVERY_MINUTES } from '@/services/streakRecovery';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { STREAK_BROKEN_MESSAGES } from '@/constants/messages';
 import { useApp } from '@/hooks/useApp';
 
-const RECOVERY_MINS = 30;
+const RECOVERY_MINS = STREAK_RECOVERY_MINUTES;
 
 export default function StreakBrokenScreen() {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const params = useLocalSearchParams<{ lost?: string }>();
@@ -71,7 +74,7 @@ export default function StreakBrokenScreen() {
     try {
       // Record that this session is a streak-recovery attempt with how much was lost
       setStreakRecoveryPending(true, displayLost);
-      await startSession(RECOVERY_MINS, null, null);
+      await startSession(RECOVERY_MINS, null, null, true, displayLost);
       router.replace('/focus/active');
     } catch {
       setStreakRecoveryPending(false, 0);
@@ -92,26 +95,24 @@ export default function StreakBrokenScreen() {
           <View style={styles.iconBg}>
             <Text style={styles.zeroText}>0</Text>
           </View>
-          <Text style={styles.dayLabel}>DAY STREAK</Text>
+          <Text style={styles.dayLabel}>{t('home.streak')}</Text>
         </Animated.View>
 
         {/* ── Text block ── */}
         <Animated.View style={[styles.textSection, { opacity: fadeAnim }]}>
-          <Text style={styles.title}>Streak Toot Gayi</Text>
+          <Text style={styles.title}>{t('recovery.title')}</Text>
           <Text style={styles.subtitle}>{message}</Text>
 
           {displayLost > 0 ? (
             <View style={styles.infoCard}>
               <View style={styles.infoRow}>
                 <MaterialIcons name="local-fire-department" size={18} color={colors.danger} />
-                <Text style={styles.infoText}>
-                  <Text style={styles.infoBold}>{displayLost} day</Text> ki streak gayi.
-                </Text>
+                  <Text style={styles.infoText}>{t('recovery.lostStreak', { value: displayLost })}</Text>
               </View>
               <View style={styles.infoRow}>
                 <MaterialIcons name="emoji-events" size={18} color={colors.warning} />
                 <Text style={styles.infoText}>
-                  Best: <Text style={styles.infoBold}>{user?.streakLongest ?? 0} days</Text>
+                  {t('recovery.best', { value: user?.streakLongest ?? 0 })}
                 </Text>
               </View>
             </View>
@@ -133,35 +134,35 @@ export default function StreakBrokenScreen() {
               <Text style={styles.challengeEmoji}>⚡</Text>
             </View>
             <View style={styles.challengeHeaderText}>
-              <Text style={styles.challengeTitle}>COMEBACK CHALLENGE</Text>
-              <Text style={styles.challengeSub}>30 min session = streak wapas</Text>
+              <Text style={styles.challengeTitle}>{t('recovery.challenge')}</Text>
+              <Text style={styles.challengeSub}>{t('recovery.challengeSub')}</Text>
             </View>
           </View>
 
           <View style={styles.recoveryRow}>
             <View style={styles.recoveryItem}>
               <Text style={styles.recoveryNum}>0</Text>
-              <Text style={styles.recoveryLabel}>Abhi streak</Text>
+              <Text style={styles.recoveryLabel}>{t('recovery.current')}</Text>
             </View>
             <MaterialIcons name="arrow-forward" size={20} color={colors.textTertiary} />
             <View style={styles.recoveryItem}>
               <Text style={[styles.recoveryNum, { color: colors.success }]}>
                 {halfRecovered}
               </Text>
-              <Text style={styles.recoveryLabel}>Recover hogi</Text>
+              <Text style={styles.recoveryLabel}>{t('recovery.restored')}</Text>
             </View>
             <MaterialIcons name="info-outline" size={14} color={colors.textTertiary} />
-            <Text style={styles.recoveryNote}>Half back</Text>
+            <Text style={styles.recoveryNote}>{t('recovery.halfBack')}</Text>
           </View>
 
           <View style={styles.rulePillRow}>
             <View style={styles.rulePill}>
               <MaterialIcons name="timer" size={13} color={colors.primary} />
-              <Text style={styles.rulePillText}>30 minutes full</Text>
+              <Text style={styles.rulePillText}>{t('recovery.fullThirty')}</Text>
             </View>
             <View style={styles.rulePill}>
               <MaterialIcons name="close" size={13} color={colors.danger} />
-              <Text style={styles.rulePillText}>Break allowed nahi</Text>
+              <Text style={styles.rulePillText}>{t('recovery.noBreak')}</Text>
             </View>
           </View>
 
@@ -174,7 +175,7 @@ export default function StreakBrokenScreen() {
             >
               <MaterialIcons name="bolt" size={20} color={colors.background} />
               <Text style={styles.challengeBtnText}>
-                {starting ? 'Starting...' : `Abhi Shuru Karo — ${RECOVERY_MINS} Min`}
+                {starting ? t('recovery.starting') : t('recovery.start', { value: RECOVERY_MINS })}
               </Text>
             </TouchableOpacity>
           </Animated.View>
@@ -187,7 +188,7 @@ export default function StreakBrokenScreen() {
             onPress={() => router.replace('/(tabs)')}
             activeOpacity={0.7}
           >
-            <Text style={styles.homeBtnText}>Baad Mein Karunga</Text>
+            <Text style={styles.homeBtnText}>{t('recovery.later')}</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>

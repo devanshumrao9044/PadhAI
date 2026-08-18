@@ -9,6 +9,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '@/services/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { useAuthSession } from '@/auth/AuthSessionProvider';
@@ -27,6 +28,7 @@ import {
 
 export default function ProfileScreen() {
   const { colors, mode, toggleTheme } = useTheme();
+  const { language, setLanguage, t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, setUser, sessions, chapters } = useApp();
   const router = useRouter();
@@ -128,7 +130,7 @@ export default function ProfileScreen() {
     try {
       await signOut();
     } catch (error: any) {
-      showAlert('Sign Out Failed', error?.message ?? 'Please try again.');
+      showAlert(t('profile.signOutFailed'), error?.message ?? t('profile.tryAgain'));
     }
   };
 
@@ -145,7 +147,7 @@ export default function ProfileScreen() {
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      showAlert('Permission Denied', 'Gallery access is required to change photo.');
+      showAlert(t('profile.permissionDenied'), t('profile.galleryPermission'));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -166,16 +168,16 @@ export default function ProfileScreen() {
         setAvatarError(null);
         setEditAvatarUrl(asset.uri);
       } catch (error: any) {
-        setAvatarError(error?.message ?? 'Selected photo को पढ़ा नहीं जा सका।');
+          setAvatarError(error?.message ?? t('profile.tryAgain'));
       }
     }
   };
 
   const handleSaveProfile = async () => {
     const mins = parseInt(editGoal);
-    if (!editName.trim()) { showAlert('Error', 'Name cannot be blank.'); return; }
+    if (!editName.trim()) { showAlert(t('common.error'), t('profile.namePlaceholder')); return; }
     if (isNaN(mins) || mins < 15 || mins > 720) {
-      showAlert('Invalid Goal', 'Goal must be between 15 and 720 minutes.');
+      showAlert(t('profile.invalidGoal'), t('profile.goalRange'));
       return;
     }
     setLoading(true);
@@ -241,7 +243,7 @@ export default function ProfileScreen() {
       setEditVisible(false);
     } catch (error: any) {
       const message = error?.message || 'Unknown error occurred.';
-      showAlert('Save Failed', message.includes('compressed photo')
+      showAlert(t('profile.saveFailed'), message.includes('compressed photo')
         ? `${message} Maximum final size is ${formatFileSize(MAX_AVATAR_OUTPUT_BYTES)}.`
         : message);
       setAvatarError(message);
@@ -302,7 +304,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity style={styles.editProfileBtn} onPress={openEditModal}>
             <MaterialIcons name="edit" size={16} color={colors.background} />
-            <Text style={styles.editProfileBtnText}>Edit Profile</Text>
+            <Text style={styles.editProfileBtnText}>{t('profile.editProfile')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -329,10 +331,10 @@ export default function ProfileScreen() {
         {/* Stats */}
         <View style={styles.statsGrid}>
           {[
-            { icon: 'local-fire-department', color: colors.danger, val: user.streakCurrent, label: 'Current Streak' },
-            { icon: 'emoji-events', color: colors.warning, val: user.streakLongest, label: 'Best Streak' },
-            { icon: 'schedule', color: colors.accent, val: `${totalHours}h`, label: 'Total Study' },
-            { icon: 'check-circle', color: colors.success, val: doneChapters, label: 'Chapters Done' },
+            { icon: 'local-fire-department', color: colors.danger, val: user.streakCurrent, label: t('profile.currentStreak') },
+            { icon: 'emoji-events', color: colors.warning, val: user.streakLongest, label: t('profile.bestStreak') },
+            { icon: 'schedule', color: colors.accent, val: `${totalHours}h`, label: t('profile.totalStudy') },
+            { icon: 'check-circle', color: colors.success, val: doneChapters, label: t('profile.chaptersDone') },
           ].map(item => (
             <View key={item.label} style={styles.statItem}>
               <MaterialIcons name={item.icon as any} size={22} color={item.color} />
@@ -344,7 +346,7 @@ export default function ProfileScreen() {
 
         {/* Level Roadmap */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>LEVEL ROADMAP</Text>
+          <Text style={styles.cardTitle}>{t('profile.levelRoadmap')}</Text>
           {LEVELS.map(l => (
             <View
               key={l.rank}
@@ -370,20 +372,20 @@ export default function ProfileScreen() {
 
         {/* Account Info + Sign Out */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>ACCOUNT INFO</Text>
+          <Text style={styles.cardTitle}>{t('profile.accountInfo')}</Text>
 
           <View style={styles.settingRow}>
             <MaterialIcons name="flag" size={20} color={colors.primary} />
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Daily Goal</Text>
-              <Text style={styles.settingValue}>{user.dailyGoalMinutes} minutes</Text>
+              <Text style={styles.settingLabel}>{t('profile.dailyGoal')}</Text>
+              <Text style={styles.settingValue}>{t('profile.goalMinutes', { value: user.dailyGoalMinutes })}</Text>
             </View>
           </View>
 
           <View style={styles.settingRow}>
             <MaterialIcons name="calendar-today" size={20} color={colors.textSecondary} />
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Member Since</Text>
+              <Text style={styles.settingLabel}>{t('profile.memberSince')}</Text>
               <Text style={styles.settingValue}>{joinDate}</Text>
             </View>
           </View>
@@ -395,8 +397,8 @@ export default function ProfileScreen() {
           >
             <MaterialIcons name="privacy-tip" size={20} color={colors.primary} />
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Privacy Policy</Text>
-              <Text style={styles.settingValue}>How PadhAI uses and protects your data</Text>
+              <Text style={styles.settingLabel}>{t('profile.privacyPolicy')}</Text>
+              <Text style={styles.settingValue}>{t('profile.privacyDescription')}</Text>
             </View>
             <MaterialIcons name="chevron-right" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
@@ -404,8 +406,8 @@ export default function ProfileScreen() {
           <View style={styles.settingRow}>
             <MaterialIcons name="dark-mode" size={20} color={colors.primary} />
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Theme</Text>
-              <Text style={styles.settingValue}>{mode === 'dark' ? 'Dark mode' : 'Light mode'}</Text>
+              <Text style={styles.settingLabel}>{t('profile.theme')}</Text>
+              <Text style={styles.settingValue}>{mode === 'dark' ? t('profile.darkMode') : t('profile.lightMode')}</Text>
             </View>
             <Switch
               value={mode === 'light'}
@@ -415,11 +417,33 @@ export default function ProfileScreen() {
             />
           </View>
 
+          <View style={styles.settingRow}>
+            <MaterialIcons name="language" size={20} color={colors.primary} />
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>{t('profile.language')}</Text>
+              <Text style={styles.settingValue}>{t('settings.languageDescription')}</Text>
+            </View>
+            <View style={styles.languageOptions}>
+              {(['en', 'hi'] as const).map(option => (
+                <TouchableOpacity
+                  key={option}
+                  style={[styles.languageOption, language === option && styles.languageOptionActive]}
+                  onPress={() => { void setLanguage(option); }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.languageOptionText, language === option && styles.languageOptionTextActive]}>
+                    {option === 'en' ? t('profile.english') : t('profile.hindi')}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
           {(user as any).myReferralCode ? (
             <View style={styles.settingRow}>
               <MaterialIcons name="card-giftcard" size={20} color={colors.primary} />
               <View style={styles.settingInfo}>
-                <Text style={styles.settingLabel}>Your Referral Code</Text>
+                <Text style={styles.settingLabel}>{t('profile.referralCode')}</Text>
                 <Text style={styles.settingValue}>{String((user as any).myReferralCode).toUpperCase()}</Text>
               </View>
             </View>
@@ -427,13 +451,13 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.signOutRow}
-            onPress={() => showAlert('Sign Out', 'Are you sure you want to sign out?', true)}
+            onPress={() => showAlert(t('profile.signOutTitle'), t('profile.signOutMessage'), true)}
             disabled={signingOut}
             activeOpacity={0.7}
           >
             <MaterialIcons name="logout" size={20} color={colors.danger} />
             <View style={styles.settingInfo}>
-              <Text style={styles.signOutLabel}>{signingOut ? 'Signing out…' : 'Sign Out'}</Text>
+              <Text style={styles.signOutLabel}>{signingOut ? t('profile.signingOut') : t('profile.signOut')}</Text>
             </View>
             <MaterialIcons name="chevron-right" size={20} color={colors.danger} />
           </TouchableOpacity>
@@ -441,13 +465,13 @@ export default function ProfileScreen() {
 
         {recentSessions.length > 0 ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>RECENT SESSIONS (LATEST 3)</Text>
+            <Text style={styles.cardTitle}>{t('profile.recentSessions')}</Text>
             {recentSessions.map(session => (
               <View key={session.id} style={styles.sessionRow}>
                 <MaterialIcons name={session.completed ? 'check-circle' : 'cancel'} size={17} color={session.completed ? colors.success : colors.danger} />
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingLabel}>{session.sessionDate}</Text>
-                  <Text style={styles.settingValue}>{session.durationActualMins} minutes {session.completed ? 'completed' : 'broken'}</Text>
+                  <Text style={styles.settingValue}>{t('profile.goalMinutes', { value: session.durationActualMins })} {session.completed ? t('profile.completed') : t('profile.broken')}</Text>
                 </View>
                 <Text style={[styles.xpAmount, { color: session.completed ? colors.success : colors.danger }]}>{session.completed ? `+${session.xpEarned}` : `-${session.xpDeducted}`} XP</Text>
               </View>
@@ -457,20 +481,20 @@ export default function ProfileScreen() {
 
         {/* Referral Rewards */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>REFERRAL REWARDS</Text>
+          <Text style={styles.cardTitle}>{t('profile.referralRewards')}</Text>
           <View style={styles.xpRow}>
             <MaterialIcons name="group" size={16} color={colors.primary} />
-            <Text style={styles.xpReason}>Completed referrals</Text>
+            <Text style={styles.xpReason}>{t('profile.completedReferrals')}</Text>
             <Text style={[styles.xpAmount, { color: colors.primary }]}>{referralStats.completed}</Text>
           </View>
           <View style={styles.xpRow}>
             <MaterialIcons name="hourglass-empty" size={16} color={colors.warning} />
-            <Text style={styles.xpReason}>Pending referrals</Text>
+            <Text style={styles.xpReason}>{t('profile.pendingReferrals')}</Text>
             <Text style={[styles.xpAmount, { color: colors.warning }]}>{referralStats.pending}</Text>
           </View>
           <Text style={styles.referralStatus}>
             {referralStats.hasUnlockedReward
-              ? 'Reward unlocked'
+              ? t('profile.rewardUnlocked')
               : `${Math.max(0, 5 - referralStats.completed)} more completed referral${Math.max(0, 5 - referralStats.completed) === 1 ? '' : 's'} to unlock your reward`}
           </Text>
           {referralStats.myCode ? (
@@ -503,16 +527,16 @@ export default function ProfileScreen() {
               </TouchableOpacity>
               {avatarError ? <Text style={styles.avatarError}>{avatarError}</Text> : null}
 
-              <Text style={styles.inputLabel}>FULL NAME</Text>
+              <Text style={styles.inputLabel}>{t('profile.fullName')}</Text>
               <TextInput
                 style={styles.input}
                 value={editName}
                 onChangeText={setEditName}
-                placeholder="Enter your name"
+                placeholder={t('profile.namePlaceholder')}
                 placeholderTextColor={colors.textTertiary}
               />
 
-              <Text style={styles.inputLabel}>TARGET EXAM</Text>
+              <Text style={styles.inputLabel}>{t('profile.targetExam')}</Text>
               <View style={styles.chipRow}>
                 {['JEE', 'NEET', 'BOARDS'].map(exam => (
                   <TouchableOpacity
@@ -527,7 +551,7 @@ export default function ProfileScreen() {
                 ))}
               </View>
 
-              <Text style={styles.inputLabel}>CLASS</Text>
+              <Text style={styles.inputLabel}>{t('profile.classLabel')}</Text>
               <View style={styles.chipRow}>
                 {['11th', '12th', 'Dropper'].map(cls => (
                   <TouchableOpacity
@@ -542,13 +566,13 @@ export default function ProfileScreen() {
                 ))}
               </View>
 
-              <Text style={styles.inputLabel}>DAILY GOAL (MINUTES)</Text>
+              <Text style={styles.inputLabel}>{t('profile.dailyGoalMinutes')}</Text>
               <TextInput
                 style={styles.input}
                 value={editGoal}
                 onChangeText={setEditGoal}
                 keyboardType="number-pad"
-                placeholder="e.g. 120"
+                placeholder={t('profile.goalPlaceholder')}
                 placeholderTextColor={colors.textTertiary}
               />
 
@@ -557,7 +581,7 @@ export default function ProfileScreen() {
                   style={styles.cancelBtn}
                   onPress={() => setEditVisible(false)}
                 >
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                  <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.saveBtn}
@@ -566,7 +590,7 @@ export default function ProfileScreen() {
                 >
                   {loading
                     ? <ActivityIndicator color={colors.background} />
-                    : <Text style={styles.saveBtnText}>Save</Text>}
+                    : <Text style={styles.saveBtnText}>{t('common.save')}</Text>}
                 </TouchableOpacity>
               </View>
             </View>
@@ -578,7 +602,7 @@ export default function ProfileScreen() {
       <Modal visible={signingOut} transparent animationType="fade">
         <View style={styles.signOutOverlay}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.signOutOverlayText}>Signing out...</Text>
+            <Text style={styles.signOutOverlayText}>{t('profile.signingOut')}</Text>
         </View>
       </Modal>
 
@@ -598,7 +622,7 @@ export default function ProfileScreen() {
                 color={alertConfig.isSignOut ? colors.danger : colors.primary}
               />
             </View>
-            {alertConfig.isSignOut ? <Text style={styles.alertEyebrow}>ACCOUNT ACTION</Text> : null}
+            {alertConfig.isSignOut ? <Text style={styles.alertEyebrow}>{t('profile.accountAction')}</Text> : null}
             <Text style={styles.alertTitle}>{alertConfig.title}</Text>
             <Text style={styles.alertMsg}>{alertConfig.message}</Text>
             {alertConfig.isSignOut ? (
@@ -612,14 +636,14 @@ export default function ProfileScreen() {
                     onPress={() => setAlertConfig(p => ({ ...p, visible: false }))}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.alertButtonTextSecondary}>Cancel</Text>
+                    <Text style={styles.alertButtonTextSecondary}>{t('common.cancel')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.alertBtn, styles.alertBtnDanger]}
                     onPress={handleSignOut}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.alertButtonText}>Sign Out</Text>
+                    <Text style={styles.alertButtonText}>{t('profile.signOut')}</Text>
                   </TouchableOpacity>
                 </>
               ) : (
@@ -628,7 +652,7 @@ export default function ProfileScreen() {
                   onPress={() => setAlertConfig(p => ({ ...p, visible: false }))}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.alertButtonText}>OK</Text>
+                  <Text style={styles.alertButtonText}>{t('common.ok')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -678,6 +702,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   levelRowTitle: { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
   levelRowSub: { fontSize: FontSize.xs, color: colors.textTertiary },
   settingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  languageOptions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  languageOption: { borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 7, paddingVertical: 5 },
+  languageOptionActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  languageOptionText: { color: colors.textSecondary, fontSize: 10, fontWeight: FontWeight.bold },
+  languageOptionTextActive: { color: colors.background },
   settingInfo: { flex: 1 },
   settingLabel: { fontSize: FontSize.base, color: colors.textPrimary },
   settingValue: { fontSize: FontSize.sm, color: colors.textSecondary, marginTop: 2 },

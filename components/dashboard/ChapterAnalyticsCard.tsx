@@ -2,12 +2,14 @@ import { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { FontSize, FontWeight, Radius, Spacing, ThemeColors } from '@/constants/theme';
 import { ChapterAnalytics } from '@/types/models';
-import { buildChapterAnalyticsViewModel } from '@/services/chapterAnalytics';
+import { buildChapterAnalyticsViewModel, filterChapterAnalyticsByActiveChapterIds } from '@/services/chapterAnalytics';
 
 type Props = {
   analytics: ChapterAnalytics[];
+  activeChapterIds: ReadonlySet<string>;
 };
 
 function getStatusColor(status: ChapterAnalytics['chapterStatus'], colors: ThemeColors): string {
@@ -16,12 +18,14 @@ function getStatusColor(status: ChapterAnalytics['chapterStatus'], colors: Theme
   return colors.primary;
 }
 
-export default function ChapterAnalyticsCard({ analytics }: Props) {
+export default function ChapterAnalyticsCard({ analytics, activeChapterIds }: Props) {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const studiedAnalytics = useMemo(
-    () => analytics.filter(row => row.totalSessions > 0 || row.totalMinutes > 0),
-    [analytics],
+    () => filterChapterAnalyticsByActiveChapterIds(analytics, activeChapterIds)
+      .filter(row => row.totalSessions > 0 || row.totalMinutes > 0),
+    [activeChapterIds, analytics],
   );
   const visibleRows = useMemo(() => buildChapterAnalyticsViewModel(studiedAnalytics), [studiedAnalytics]);
 
@@ -29,14 +33,14 @@ export default function ChapterAnalyticsCard({ analytics }: Props) {
     <View style={styles.card}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>CHAPTER FOCUS</Text>
-          <Text style={styles.subtitle}>Time spent by chapter</Text>
+          <Text style={styles.title}>{t('home.chapterFocus')}</Text>
+          <Text style={styles.subtitle}>{t('home.timeSpentByChapter')}</Text>
         </View>
         <MaterialIcons name="auto-graph" size={20} color={colors.primary} />
       </View>
 
       {visibleRows.length === 0 ? (
-        <Text style={styles.empty}>No chapter-linked sessions yet. Start a Study Session from Tracker.</Text>
+        <Text style={styles.empty}>{t('home.noChapterSessions')}</Text>
       ) : (
         <>
           {visibleRows.map(view => {

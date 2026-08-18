@@ -4,11 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { SESSION_BREAK_MESSAGES } from '@/constants/messages';
 
 export default function FocusBrokenScreen() {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const params = useLocalSearchParams<{ penalty: string }>();
@@ -48,28 +50,28 @@ export default function FocusBrokenScreen() {
         </Animated.View>
 
         <Animated.View style={[styles.messageSection, { opacity: fadeAnim }]}>
-           <Text style={styles.brokenTitle}>Session Broke</Text>
+           <Text style={styles.brokenTitle}>{t('focus.brokenTitle')}</Text>
           <Text style={styles.rudeMessage}>{messageRef.current}</Text>
 
           <View style={styles.consequences}>
             <View style={styles.consequenceRow}>
               <MaterialIcons name="remove-circle" size={18} color={colors.danger} />
-              <Text style={styles.consequenceText}>{penalty > 0 ? `-${penalty} XP deducted` : 'XP penalized'}</Text>
+              <Text style={styles.consequenceText}>{penalty > 0 ? t('focus.xpDeducted', { value: penalty }) : t('focus.xpPenalized')}</Text>
             </View>
             <View style={styles.consequenceRow}>
               <MaterialIcons name="remove-circle" size={18} color={colors.danger} />
-              <Text style={styles.consequenceText}>Streak reset to 0</Text>
+              <Text style={styles.consequenceText}>{t('focus.streakReset')}</Text>
             </View>
             <View style={styles.consequenceRow}>
               <MaterialIcons name="remove-circle" size={18} color={colors.danger} />
-              <Text style={styles.consequenceText}>Consistency damaged</Text>
+              <Text style={styles.consequenceText}>{t('focus.consistencyDamaged')}</Text>
             </View>
           </View>
 
           {penalty > 0 && (
             <View style={styles.penaltyCard}>
               <Text style={styles.penaltyText}>-{penalty} XP</Text>
-              <Text style={styles.penaltyLabel}>Penalty</Text>
+              <Text style={styles.penaltyLabel}>{t('focus.penalty')}</Text>
             </View>
           )}
         </Animated.View>
@@ -77,10 +79,10 @@ export default function FocusBrokenScreen() {
         <Animated.View style={[styles.actions, { opacity: fadeAnim }]}>
           <TouchableOpacity style={styles.tryAgainBtn} onPress={() => router.replace('/(tabs)/focus')} activeOpacity={0.85}>
             <MaterialIcons name="replay" size={20} color={colors.background} />
-            <Text style={styles.tryAgainText}>Retry</Text>
+            <Text style={styles.tryAgainText}>{t('focus.retry')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.homeBtn} onPress={() => router.replace('/(tabs)')} activeOpacity={0.85}>
-            <Text style={styles.homeBtnText}>Return Home</Text>
+            <Text style={styles.homeBtnText}>{t('focus.returnHome')}</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>

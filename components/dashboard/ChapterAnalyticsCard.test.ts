@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildChapterAnalyticsViewModel,
+  filterChapterAnalyticsByActiveChapterIds,
   formatChapterAnalyticsMinutes,
 } from '../../services/chapterAnalytics.ts';
 import type { ChapterAnalytics } from '../../types/models.ts';
@@ -51,6 +52,15 @@ test('ChapterAnalyticsCard limits the dashboard list to five chapters', () => {
   }));
 
   assert.equal(buildChapterAnalyticsViewModel(analytics).length, 5);
+});
+
+test('ChapterAnalyticsCard filters analytics to active tracker chapters', () => {
+  const visible = filterChapterAnalyticsByActiveChapterIds([
+    makeAnalytics({ chapterId: 'active' }),
+    makeAnalytics({ chapterId: 'deleted' }),
+  ], new Set(['active']));
+
+  assert.deepEqual(visible.map(row => row.chapterId), ['active']);
 });
 
 test('ChapterAnalyticsCard produces an empty state model when no chapters exist', () => {

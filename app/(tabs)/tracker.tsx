@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 
@@ -15,6 +16,7 @@ const ICON_OPTIONS = ['book', 'functions', 'biotech', 'shutter-speed', 'psycholo
 
 export default function TrackerScreen() {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { subjects, addSubject } = useApp();
@@ -44,7 +46,7 @@ export default function TrackerScreen() {
       console.error("Error creating subject:", error);
       Alert.alert(
         "Error",
-        "Subject save nahi ho paya. Please try again."
+        t('tracker.saveFailed')
       );
     } finally {
       setSaving(false);
@@ -55,7 +57,7 @@ export default function TrackerScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>📚 Study Tracker</Text>
+          <Text style={styles.headerTitle}>📚 {t('tracker.title')}</Text>
         <TouchableOpacity
           style={styles.addBtn}
           onPress={() => setModalVisible(true)}
@@ -69,8 +71,8 @@ export default function TrackerScreen() {
       {!subjects || subjects.length === 0 ? (
         <View style={styles.empty}>
           <MaterialIcons name="library-books" size={48} color={colors.textTertiary} />
-          <Text style={styles.emptyTitle}>No subjects found</Text>
-          <Text style={styles.emptyText}>Tap + to add your first subject</Text>
+          <Text style={styles.emptyTitle}>{t('tracker.noSubjects')}</Text>
+          <Text style={styles.emptyText}>{t('tracker.addFirstSubject')}</Text>
         </View>
       ) : (
         <FlatList
@@ -100,7 +102,7 @@ export default function TrackerScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Naya Subject</Text>
+              <Text style={styles.modalTitle}>{t('tracker.newSubject')}</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <MaterialIcons name="close" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
@@ -108,7 +110,7 @@ export default function TrackerScreen() {
 
             <TextInput
               style={styles.input}
-              placeholder="Subject name (e.g. Physics)"
+              placeholder={t('tracker.subjectPlaceholder')}
               placeholderTextColor={colors.textTertiary}
               value={subjectName}
               onChangeText={setSubjectName}
@@ -117,7 +119,7 @@ export default function TrackerScreen() {
             />
 
             {/* Color Selection */}
-            <Text style={styles.sectionLabel}>Select Color</Text>
+            <Text style={styles.sectionLabel}>{t('tracker.selectColor')}</Text>
             <View style={styles.optionsRow}>
               {COLOR_OPTIONS.map(c => (
                 <TouchableOpacity
@@ -129,7 +131,7 @@ export default function TrackerScreen() {
             </View>
 
             {/* Icon Selection */}
-            <Text style={styles.sectionLabel}>Select Icon</Text>
+            <Text style={styles.sectionLabel}>{t('tracker.selectIcon')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.iconScrollRow}>
               {ICON_OPTIONS.map(icon => (
                 <TouchableOpacity
@@ -158,7 +160,7 @@ export default function TrackerScreen() {
               {saving ? (
                 <ActivityIndicator color={colors.background} />
               ) : (
-                <Text style={styles.saveBtnText}>Subject Add Karo</Text>
+                <Text style={styles.saveBtnText}>{t('tracker.addSubject')}</Text>
               )}
             </TouchableOpacity>
           </View>

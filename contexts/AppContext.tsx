@@ -21,6 +21,7 @@ import {
 import { calculateSessionXP, XP_REWARDS, getLevelForUser } from '@/constants/levels';
 import { processReferralOnFirstSession } from '@/services/referralService';
 import { normalizeChapterAnalyticsRows } from '@/services/chapterAnalytics';
+import { getRecoveredStreak, isStreakRecoveryEligible } from '@/services/streakRecovery';
 import {
   buildBaselineMarker,
   buildWeeklySettlement,
@@ -65,7 +66,7 @@ export type AppContextType = {
   last7Days: DailySummary[];
   last90Days: DailySummary[];
   activeSession: ActiveSession | null;
-  startSession: (plannedMins: number, subjectId: string | null, chapterId: string | null) => Promise<string>;
+  startSession: (plannedMins: number, subjectId: string | null, chapterId: string | null, isRecoverySession?: boolean, recoveryLostStreak?: number) => Promise<string>;
   completeSession: (sessionId: string, actualMins: number) => Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number; referralXpAwarded?: number }) | null>;
   breakSession: (sessionId: string, actualMins: number) => Promise<FocusSession | null>;
   getDailySummary: (date: string) => DailySummary | null;
@@ -439,8 +440,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (cachedSubjects) {
           setSubjects(cachedSubjects.data.filter(subject => !subject.isDeleted && !deletedSubjectIdsRef.current.has(subject.id)));
         }
+        const cachedActiveChapterIds = cachedChapters
+          ? new Set(cachedChapters.data.filter(chapter => !chapter.isDeleted).map(chapter => chapter.id))
+          : null;
         if (cachedChapters) setChapters(cachedChapters.data.filter(chapter => !chapter.isDeleted));
-        if (cachedAnalytics) setChapterAnalytics(cachedAnalytics.data);
+        if (cachedAnalytics) {
+          setChapterAnalytics(cachedActiveChapterIds
+            ? cachedAnalytics.data.filter(analytics => cachedActiveChapterIds.has(analytics.chapterId))
+            : []);
+        }
         if (cachedReferral) {
           setReferralCount(cachedReferral.data.referralCount);
           setHasUnlockedRewardState(cachedReferral.data.hasUnlockedReward);
@@ -462,7 +470,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setTopics([]);
           setActiveSession(null);
           setSessions(cachedSessions?.data ?? []);
-          setChapterAnalytics(cachedAnalytics?.data ?? []);
+          setChapterAnalytics(cachedActiveChapterIds
+            ? cachedAnalytics?.data.filter(analytics => cachedActiveChapterIds.has(analytics.chapterId)) ?? []
+            : []);
           setDailySummaries(cachedSummaries?.data ?? []);
           setXpLog(cachedXP?.data ?? []);
         }
@@ -799,9 +809,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
     deletedChapterIdsRef.current.add(id);
     const updatedChapters = chapters.filter(c => c.id !== id);
+    const updatedAnalytics = chapterAnalytics.filter(analytics => analytics.chapterId !== id);
     setChapters(updatedChapters);
+    setChapterAnalytics(updatedAnalytics);
     const { data: authData } = await supabase.auth.getSession();
-    if (authData.session?.user?.id) void writeUserCache(authData.session.user.id, 'chapters', updatedChapters);
+    if (authData.session?.user?.id) {
+      void writeUserCache(authData.session.user.id, 'chapters', updatedChapters);
+      void writeUserCache(authData.session.user.id, 'chapterAnalytics', updatedAnalytics);
+    }
   };
 
   const bulkDeleteChapters = async (ids: string[]) => {
@@ -809,10 +824,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.from('chapters').update({ is_deleted: true }).in('id', ids);
     if (error) throw error;
     ids.forEach(id => deletedChapterIdsRef.current.add(id));
-    const updatedChapters = chapters.filter(c => !ids.includes(c.id));
+    const deletedChapterIds = new Set(ids);
+    const updatedChapters = chapters.filter(c => !deletedChapterIds.has(c.id));
+    const updatedAnalytics = chapterAnalytics.filter(analytics => !deletedChapterIds.has(analytics.chapterId));
     setChapters(updatedChapters);
+    setChapterAnalytics(updatedAnalytics);
     const { data: authData } = await supabase.auth.getSession();
-    if (authData.session?.user?.id) void writeUserCache(authData.session.user.id, 'chapters', updatedChapters);
+    if (authData.session?.user?.id) {
+      void writeUserCache(authData.session.user.id, 'chapters', updatedChapters);
+      void writeUserCache(authData.session.user.id, 'chapterAnalytics', updatedAnalytics);
+    }
   };
 
   // ── Topics (local only) ───────────────────────────────────────────────────
@@ -874,9 +895,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // ── Sessions ──────────────────────────────────────────────────────────────
-  const startSession = async (plannedMins: number, subjectId: string | null, chapterId: string | null): Promise<string> => {
+  const startSession = async (plannedMins: number, subjectId: string | null, chapterId: string | null, isRecoverySession?: boolean, recoveryLostStreak?: number): Promise<string> => {
     const sessionId = uuidv4();
-    const active: ActiveSession = { sessionId, startedAt: new Date().toISOString(), plannedMins, subjectId, chapterId };
+    const active: ActiveSession = {
+      sessionId,
+      startedAt: new Date().toISOString(),
+      plannedMins,
+      subjectId,
+      chapterId,
+      isRecovery: isRecoverySession ?? streakRecoveryPending,
+      recoveryLostStreak: isRecoverySession ? (recoveryLostStreak ?? lostStreakCount) : undefined,
+    };
     setActiveSession(active);
     await setItem(StorageKeys.ACTIVE_SESSION, active);
     return sessionId;
@@ -885,6 +914,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const COMEBACK_BONUS_XP = 50;
 
   const completeSession = async (sessionId: string, actualMins: number): Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number; referralXpAwarded?: number }) | null> => {
+    const isRecoverySession = Boolean(activeSession?.isRecovery || streakRecoveryPending);
+    if (!isStreakRecoveryEligible(isRecoverySession, actualMins)) return null;
+
     try {
       const activeUser = user ?? await getItem<UserProfile>(StorageKeys.USER);
       const bonusFromComeback = comebackPending ? COMEBACK_BONUS_XP : 0;
@@ -922,7 +954,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setActiveSession(null);
       await setItem(StorageKeys.ACTIVE_SESSION, null);
       if (activeUser) {
-        const postSessionResult = await processPostSessionData(actualMins, xp, true, activeUser);
+        const recoveryStreak = isRecoverySession
+          ? getRecoveredStreak(activeSession?.recoveryLostStreak ?? lostStreakCount)
+          : undefined;
+        const postSessionResult = await processPostSessionData(actualMins, xp, true, activeUser, recoveryStreak);
         newXPTotal = postSessionResult.newXPTotal;
         let sessionSaved = false;
         try {
@@ -1014,6 +1049,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     xpDelta: number,
     isCompleted: boolean,
     activeUser: UserProfile,
+    recoveredStreak?: number,
   ): Promise<{ finalXP: number; newXPTotal: number }> => {
     try {
       const today = todayStr();
@@ -1057,7 +1093,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       const yesterday = daysAgoStr(1);
       let newStreak = activeUser.streakCurrent;
-      if (isCompleted && activeUser.lastStudyDate !== today) {
+      if (isCompleted && recoveredStreak !== undefined) {
+        newStreak = recoveredStreak;
+      } else if (isCompleted && activeUser.lastStudyDate !== today) {
         newStreak = (activeUser.lastStudyDate === yesterday || activeUser.lastStudyDate === null) ? newStreak + 1 : 1;
       } else if (!isCompleted) {
         newStreak = 0;

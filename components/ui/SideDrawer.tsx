@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { getLevelForUser } from '@/constants/levels';
@@ -19,16 +20,17 @@ interface Props {
 }
 
 const MENU_ITEMS = [
-  { icon: 'home' as const,           label: 'Home',          route: '/(tabs)'           },
-  { icon: 'timer' as const,          label: 'Study Session', route: '/(tabs)/focus'     },
-  { icon: 'menu-book' as const,      label: 'Study Tracker', route: '/(tabs)/tracker'   },
-  { icon: 'bar-chart' as const,      label: 'Analytics',     route: '/(tabs)/analytics' },
-  { icon: 'leaderboard' as const,    label: 'Leaderboard',   route: '/(tabs)/leaderboard' },
-  { icon: 'person' as const,         label: 'Profile',       route: '/(tabs)/profile'   },
+  { icon: 'home' as const, key: 'home' as const, route: '/(tabs)' },
+  { icon: 'timer' as const, key: 'studySession' as const, route: '/(tabs)/focus' },
+  { icon: 'menu-book' as const, key: 'tracker' as const, route: '/(tabs)/tracker' },
+  { icon: 'bar-chart' as const, key: 'analytics' as const, route: '/(tabs)/analytics' },
+  { icon: 'leaderboard' as const, key: 'leaderboard' as const, route: '/(tabs)/leaderboard' },
+  { icon: 'person' as const, key: 'profile' as const, route: '/(tabs)/profile' },
 ];
 
 export default function SideDrawer({ visible, onClose }: Props) {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -120,10 +122,10 @@ export default function SideDrawer({ visible, onClose }: Props) {
         {user ? (
           <View style={styles.xpStrip}>
             <MaterialIcons name="bolt" size={14} color={colors.warning} />
-            <Text style={styles.xpText}>{user.xpTotal} Weekly XP</Text>
+            <Text style={styles.xpText}>{t('home.weeklyXp', { value: user.xpTotal })}</Text>
             <View style={styles.xpDivider} />
             <MaterialIcons name="local-fire-department" size={14} color={colors.danger} />
-            <Text style={styles.xpText}>{user.streakCurrent} day streak</Text>
+            <Text style={styles.xpText}>{t('home.dayStreak', { value: user.streakCurrent })}</Text>
           </View>
         ) : null}
 
@@ -141,7 +143,7 @@ export default function SideDrawer({ visible, onClose }: Props) {
               <View style={styles.menuIconWrap}>
                 <MaterialIcons name={item.icon} size={20} color={colors.textSecondary} />
               </View>
-              <Text style={styles.menuLabel}>{item.label}</Text>
+              <Text style={styles.menuLabel}>{item.key === 'tracker' ? t('tracker.title') : item.key === 'leaderboard' ? t('home.leaderboard') : t(`home.${item.key}`)}</Text>
               <MaterialIcons name="chevron-right" size={18} color={colors.textTertiary} />
             </TouchableOpacity>
           ))}
@@ -158,11 +160,11 @@ export default function SideDrawer({ visible, onClose }: Props) {
               <MaterialIcons name="card-giftcard" size={20} color={colors.primary} />
             </View>
             <View style={styles.referTextBlock}>
-              <Text style={styles.referLabel}>Refer and earn</Text>
-              <Text style={styles.referSub}>Invite friends, earn rewards</Text>
+              <Text style={styles.referLabel}>{t('home.referAndEarn')}</Text>
+              <Text style={styles.referSub}>{t('home.inviteRewards')}</Text>
             </View>
             <View style={styles.referBadge}>
-              <Text style={styles.referBadgeText}>NEW</Text>
+              <Text style={styles.referBadgeText}>{t('home.new')}</Text>
             </View>
           </TouchableOpacity>
         </ScrollView>

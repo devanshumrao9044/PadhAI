@@ -7,6 +7,7 @@ import { AppProvider } from '@/contexts/AppContext';
 import { AuthSessionProvider, useAuthSession } from '@/auth/AuthSessionProvider';
 import AuthRouteGuard from '@/auth/AuthRouteGuard';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
+import { LanguageProvider, useLanguage } from '@/contexts/LanguageContext';
 import { useApp } from '@/hooks/useApp';
 
 void SplashScreen.preventAutoHideAsync();
@@ -15,11 +16,12 @@ function AppNavigation() {
   const { mode, colors } = useTheme();
   const { ready: authReady } = useAuthSession();
   const { isLoading: appLoading } = useApp();
+  const { ready: languageReady } = useLanguage();
 
   useEffect(() => {
-    if (!authReady || appLoading) return;
+    if (!authReady || appLoading || !languageReady) return;
     void SplashScreen.hideAsync();
-  }, [appLoading, authReady]);
+  }, [appLoading, authReady, languageReady]);
   return (
     <>
       <StatusBar style={mode === 'dark' ? 'light' : 'dark'} backgroundColor={colors.background} />
@@ -46,11 +48,13 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <AuthSessionProvider>
-          <AppProvider>
-            <AppNavigation />
-          </AppProvider>
-        </AuthSessionProvider>
+        <LanguageProvider>
+          <AuthSessionProvider>
+            <AppProvider>
+              <AppNavigation />
+            </AppProvider>
+          </AuthSessionProvider>
+        </LanguageProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

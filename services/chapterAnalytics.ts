@@ -60,6 +60,13 @@ export function normalizeChapterAnalyticsRows(rows: unknown): ChapterAnalytics[]
     .filter((row): row is ChapterAnalytics => row !== null);
 }
 
+export function filterChapterAnalyticsByActiveChapterIds(
+  analytics: ChapterAnalytics[],
+  activeChapterIds: ReadonlySet<string>,
+): ChapterAnalytics[] {
+  return analytics.filter(row => activeChapterIds.has(row.chapterId));
+}
+
 export function formatChapterAnalyticsMinutes(minutes: number): string {
   if (minutes < 60) return `${minutes}m`;
   const hours = Math.floor(minutes / 60);

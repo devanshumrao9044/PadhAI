@@ -13,12 +13,20 @@ import ChapterAnalyticsCard from '../../components/dashboard/ChapterAnalyticsCar
 import SideDrawer from '../../components/ui/SideDrawer';
 import { useApp } from '@/hooks/useApp';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors } from '@/constants/theme';
 
 export default function Dashboard() {
   const { colors } = useTheme();
+  const { language } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { user, isLoading, chapters, sessions, dailySummaries, chapterAnalytics, reload } = useApp();
+  const { user, isLoading, subjects, chapters, sessions, dailySummaries, chapterAnalytics, reload } = useApp();
+  const activeChapterIds = useMemo(() => {
+    const activeSubjectIds = new Set(subjects.filter(subject => !subject.isDeleted).map(subject => subject.id));
+    return new Set(chapters
+      .filter(chapter => !chapter.isDeleted && activeSubjectIds.has(chapter.subjectId))
+      .map(chapter => chapter.id));
+  }, [chapters, subjects]);
   const [refreshing, setRefreshing] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -129,11 +137,11 @@ export default function Dashboard() {
           </TouchableOpacity>
 
           <Text style={styles.appName}>
-            पढ़<Text style={styles.ai}>AI</Text>
+            {language === 'hi' ? 'पढ़' : 'Padh'}<Text style={styles.ai}>AI</Text>
           </Text>
 
           <Text style={styles.date}>
-            {new Date().toLocaleDateString('en-IN', {
+            {new Date().toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-IN', {
               weekday: 'short', day: 'numeric', month: 'short'
             })}
           </Text>
@@ -146,7 +154,7 @@ export default function Dashboard() {
           chaptersTotal={stats.chaptersTotal}
           chaptersDone={stats.chaptersDone}
         />
-        <ChapterAnalyticsCard analytics={chapterAnalytics} />
+        <ChapterAnalyticsCard analytics={chapterAnalytics} activeChapterIds={activeChapterIds} />
         <QuickShortcuts />
         <QuoteCard />
       </ScrollView>

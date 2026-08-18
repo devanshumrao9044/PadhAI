@@ -111,6 +111,8 @@ export interface ActiveSession {
   plannedMins: number;
   subjectId: string | null;
   chapterId: string | null;
+  isRecovery?: boolean;
+  recoveryLostStreak?: number;
 }
 
 export interface Referral {

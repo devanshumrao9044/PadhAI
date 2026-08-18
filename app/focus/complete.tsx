@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { getLevelForUser } from '@/constants/levels';
@@ -61,6 +62,7 @@ const CONFETTI_COLORS = [
 
 export default function FocusCompleteScreen() {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -92,15 +94,10 @@ export default function FocusCompleteScreen() {
     COMPLETION_MESSAGES[Math.floor(Math.random() * COMPLETION_MESSAGES.length)]
   );
   const level = user ? getLevelForUser(user) : null;
-  const recoveryAppliedRef = useRef(false);
   const referralAppliedRef = useRef(false);
 
-  // ✅ Restore half-streak when this is a recovery session
-  useEffect(() => {
-    if (recoveryAppliedRef.current || !isRecovery || !user || lostStreak <= 0) return;
-    recoveryAppliedRef.current = true;
-    void setUser({ ...user, streakCurrent: recoveredStreak });
-  }, [isRecovery, lostStreak, recoveredStreak, setUser, user]);
+  // AppContext applies streak recovery only after the full recovery session passes
+  // the 30-minute policy. This screen only renders the confirmed result.
 
   // AppContext awards the referral bonus once, during the completed-session write.
   // This effect only hydrates the returned amount into the local user state.
@@ -166,15 +163,15 @@ export default function FocusCompleteScreen() {
     : [];
 
   const screenTitle = isRecovery
-    ? 'Wapas Aa Gaye!'
+    ? t('focus.recovery')
     : isComeback
-    ? 'Wapas Aa Gaye!'
-    : 'Session Complete!';
+    ? t('focus.comeback')
+    : t('focus.sessionComplete');
 
   const screenMessage = isRecovery
-    ? `${recoveredStreak} din ki streak recover ho gayi!\nZiddi student waisa hi karta hai.`
+    ? t('focus.recoveryDetail', { lost: lostStreak, recovered: recoveredStreak })
     : isComeback
-    ? 'Streak toot gayi thi — par aaj tune wapas shuruat ki.\nYahi asli ziddi student hota hai.'
+    ? t('focus.comebackDescription')
     : messageRef.current;
 
   const heroIcon = isRecovery ? 'local-fire-department' : isComeback ? 'whatshot' : 'emoji-events';
@@ -220,15 +217,15 @@ export default function FocusCompleteScreen() {
           <View style={[styles.xpCard, (isComeback || isRecovery) && { backgroundColor: heroColor + '22', borderColor: heroColor + '55' }]}>
             <MaterialIcons name="bolt" size={28} color={colors.warning} />
             <Text style={styles.xpAmount}>+{xp} XP</Text>
-            <Text style={styles.xpLabel}>earned</Text>
+            <Text style={styles.xpLabel}>{t('focus.earned')}</Text>
           </View>
 
           {referralXpAwarded > 0 ? (
             <View style={styles.referralBonusBanner}>
               <View style={styles.referralBonusIcon}><MaterialIcons name="people" size={22} color={colors.success} /></View>
               <View style={styles.referralBonusText}>
-                <Text style={styles.referralBonusTitle}>REFERRAL BONUS</Text>
-                <Text style={styles.referralBonusSub}>Your first completed session unlocked extra XP.</Text>
+                <Text style={styles.referralBonusTitle}>{t('focus.referralBonus')}</Text>
+                <Text style={styles.referralBonusSub}>{t('focus.referralDescription')}</Text>
               </View>
               <View style={styles.referralBonusBadge}>
                 <Text style={styles.referralBonusAmount}>+{referralXpAwarded}</Text>
@@ -251,14 +248,12 @@ export default function FocusCompleteScreen() {
               <View style={styles.recoveryBannerInner}>
                 <Text style={styles.recoveryEmoji}>🔥</Text>
                 <View style={styles.recoveryTextBlock}>
-                  <Text style={styles.recoveryTitle}>STREAK RECOVERED</Text>
-                  <Text style={styles.recoverySub}>
-                    {lostStreak} din gayi thi — {recoveredStreak} din wapas mili
-                  </Text>
+                  <Text style={styles.recoveryTitle}>{t('focus.streakRecovered')}</Text>
+                  <Text style={styles.recoverySub}>{t('focus.recoveryDetail', { lost: lostStreak, recovered: recoveredStreak })}</Text>
                 </View>
                 <View style={styles.recoveryStreakBadge}>
                   <Text style={styles.recoveryStreakNum}>{recoveredStreak}</Text>
-                  <Text style={styles.recoveryStreakLabel}>days</Text>
+                  <Text style={styles.recoveryStreakLabel}>{t('focus.days')}</Text>
                 </View>
               </View>
             </Animated.View>
@@ -288,8 +283,8 @@ export default function FocusCompleteScreen() {
               <View style={styles.comebackBannerInner}>
                 <Text style={styles.comebackEmoji}>🔥</Text>
                 <View style={styles.comebackTextBlock}>
-                  <Text style={styles.comebackTitle}>COMEBACK BONUS</Text>
-                  <Text style={styles.comebackSub}>Came back after breaking the streak </Text>
+                <Text style={styles.comebackTitle}>{t('focus.comebackBonus')}</Text>
+                <Text style={styles.comebackSub}>{t('focus.comebackDescription')}</Text>
                 </View>
                 <View style={styles.comebackXPBadge}>
                   <Text style={styles.comebackXP}>+{COMEBACK_BONUS}</Text>
@@ -320,7 +315,7 @@ export default function FocusCompleteScreen() {
             activeOpacity={0.85}
           >
             <Text style={styles.continueBtnText}>
-              {isRecovery ? 'Ghar Chalo — Hero ' : isComeback ? 'Ghar Chalo — Hero ' : 'Return Home '}
+                {isRecovery || isComeback ? t('focus.goHomeHero') : t('focus.returnHome')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity

@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { useMemo } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors } from '@/constants/theme';
 
 interface Props {
@@ -10,13 +11,14 @@ interface Props {
 
 export default function GreetingCard({ name, streak }: Props) {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   function getGreeting() {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
+    if (hour < 12) return t('home.goodMorning');
+    if (hour < 17) return t('home.goodAfternoon');
+    return t('home.goodEvening');
   }
 
   return (
@@ -25,12 +27,12 @@ export default function GreetingCard({ name, streak }: Props) {
         <View>
           <Text style={styles.greeting}>{getGreeting()} 👋</Text>
           <Text style={styles.name}>{name}</Text>
-          <Text style={styles.sub}>Aaj bhi padhai karni hai! 💪</Text>
+          <Text style={styles.sub}>{t('home.studyToday')}</Text>
         </View>
         <View style={styles.streakBox}>
           <Text style={styles.streakEmoji}>🔥</Text>
           <Text style={styles.streakNum}>{streak}</Text>
-          <Text style={styles.streakLabel}>Streak</Text>
+          <Text style={styles.streakLabel}>{t('home.streak')}</Text>
         </View>
       </View>
     </View>

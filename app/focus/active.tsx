@@ -6,9 +6,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { supabase } from '@/services/supabase';
+import { isStreakRecoveryEligible, STREAK_RECOVERY_MINUTES } from '@/services/streakRecovery';
 
 function formatTime(secs: number): string {
   const m = Math.floor(secs / 60);
@@ -18,6 +20,7 @@ function formatTime(secs: number): string {
 
 export default function FocusActiveScreen() {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const {
@@ -76,8 +79,8 @@ export default function FocusActiveScreen() {
   };
 
   const subjectName = activeSession?.subjectId
-    ? subjects.find(s => s.id === activeSession.subjectId)?.name ?? 'General'
-    : 'General';
+    ? subjects.find(s => s.id === activeSession.subjectId)?.name ?? t('focus.general')
+    : t('focus.general');
 
   const subjectColor = activeSession?.subjectId
     ? subjects.find(s => s.id === activeSession.subjectId)?.colorHex ?? colors.primary
@@ -87,12 +90,14 @@ export default function FocusActiveScreen() {
     const {
       activeSession: sessionToComplete,
       completeSession: complete,
+      breakSession: breakCurrent,
       streakRecoveryPending: isRecovery,
       lostStreakCount: recoveredStreak,
       setStreakRecoveryPending: setRecovery,
       router: currentRouter,
     } = liveStateRef.current;
     if (isCompletingRef.current || !sessionToComplete) return;
+    const recoveryLostStreak = sessionToComplete.recoveryLostStreak ?? recoveredStreak;
     isCompletingRef.current = true;
     setIsProcessing(true);
 
@@ -100,7 +105,25 @@ export default function FocusActiveScreen() {
 
     try {
       const actualMins = Math.floor(elapsedRef.current / 60);
+      const recoveryEligible = isStreakRecoveryEligible(Boolean(isRecovery), actualMins);
+      if (!recoveryEligible) {
+        const brokenSession = await breakCurrent(sessionToComplete.sessionId, actualMins);
+        setRecovery(false, 0);
+        currentRouter.replace(`/focus/broken?penalty=${brokenSession?.xpDeducted ?? 0}&recovery=1&required=${STREAK_RECOVERY_MINUTES}`);
+        return;
+      }
+
       const session = await complete(sessionToComplete.sessionId, actualMins);
+      if (!session) {
+        if (isRecovery) {
+          const brokenSession = await breakCurrent(sessionToComplete.sessionId, actualMins);
+          setRecovery(false, 0);
+          currentRouter.replace(`/focus/broken?penalty=${brokenSession?.xpDeducted ?? 0}&recovery=1&required=${STREAK_RECOVERY_MINUTES}`);
+          return;
+        }
+        currentRouter.replace('/focus/complete?xp=0&comeback=0');
+        return;
+      }
 
       const comebackParam = (session as any)?.comebackBonus > 0 ? '1' : '0';
         const xpEarned = session?.xpEarned ?? 0;
@@ -108,16 +131,16 @@ export default function FocusActiveScreen() {
 
         if (isRecovery) setRecovery(false, 0);
 
-      if (session?.leveledUp && session?.newLevelRank) {
+      if (session.leveledUp && session.newLevelRank) {
         const { LEVELS } = await import('@/constants/levels');
         const levelDef = LEVELS.find(l => l.rank === session.newLevelRank);
         const totalXPAfter = session?.totalXP ?? xpEarned;
                   currentRouter.replace(
-          `/focus/levelup?newLevel=${session.newLevelRank}&title=${encodeURIComponent(levelDef?.realisticTitle ?? '')}&examTitle=${encodeURIComponent(levelDef?.examTitle ?? '')}&color=${encodeURIComponent(levelDef?.color ?? '#A855F7')}&totalXP=${totalXPAfter}&xpEarned=${xpEarned}&referralXp=${referralXpAwarded}&recovery=${isRecovery ? '1' : '0'}&lostStreak=${recoveredStreak}`
+          `/focus/levelup?newLevel=${session.newLevelRank}&title=${encodeURIComponent(levelDef?.realisticTitle ?? '')}&examTitle=${encodeURIComponent(levelDef?.examTitle ?? '')}&color=${encodeURIComponent(levelDef?.color ?? '#A855F7')}&totalXP=${totalXPAfter}&xpEarned=${xpEarned}&referralXp=${referralXpAwarded}&recovery=${isRecovery ? '1' : '0'}&lostStreak=${recoveryLostStreak}`
         );
 
       } else {
-        currentRouter.replace(`/focus/complete?xp=${xpEarned}&referralXp=${referralXpAwarded}&comeback=${comebackParam}&recovery=${isRecovery ? '1' : '0'}&lostStreak=${recoveredStreak}`);
+            currentRouter.replace(`/focus/complete?xp=${xpEarned}&referralXp=${referralXpAwarded}&comeback=${comebackParam}&recovery=${isRecovery ? '1' : '0'}&lostStreak=${recoveryLostStreak}`);
       }
     } catch (error) {
       console.error('Silent Complete Error:', error);
@@ -311,16 +334,16 @@ export default function FocusActiveScreen() {
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, { width: `${progress * 100}%` as any }]} />
           </View>
-          <Text style={styles.progressPct}>{Math.round(progress * 100)}% complete</Text>
+          <Text style={styles.progressPct}>{t('focus.percentComplete', { value: Math.round(progress * 100) })}</Text>
         </View>
 
-        <Text style={styles.hint}>
-          {tapCount > 0 ? `${3 - tapCount} more taps for emergency exit` : 'Triple tap for emergency exit'}
+          <Text style={styles.hint}>
+          {tapCount > 0 ? t('focus.moreTaps', { value: 3 - tapCount }) : t('focus.tripleTapExit')}
         </Text>
 
         <View style={styles.motivationStrip}>
           <MaterialIcons name="lock" size={14} color={colors.primary} />
-          <Text style={styles.motivationText}>Locked In — Focus Mode Active</Text>
+          <Text style={styles.motivationText}>{t('focus.lockedIn')}</Text>
         </View>
       </TouchableOpacity>
 
@@ -328,23 +351,21 @@ export default function FocusActiveScreen() {
         <View style={styles.exitOverlay}>
           <View style={styles.exitCard}>
             <MaterialIcons name="warning" size={36} color={colors.danger} />
-            <Text style={styles.exitTitle}>Do you want to break the session? </Text>
-            <Text style={styles.exitSub}>
-              The streak will be reset.{'\n'}XP will be deducted.{'\n'} There is a need to focus well
-            </Text>
+            <Text style={styles.exitTitle}>{t('focus.breakTitle')}</Text>
+            <Text style={styles.exitSub}>{t('focus.breakMessage')}</Text>
             <TouchableOpacity
               style={[styles.exitConfirm, isProcessing && { opacity: 0.5 }]}
               onPress={handleBreak}
               disabled={isProcessing}
             >
-              <Text style={styles.exitConfirmText}>{isProcessing ? 'Processing...' : 'Yes Break it.'}</Text>
+              <Text style={styles.exitConfirmText}>{isProcessing ? t('focus.processing') : t('focus.breakSession')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.exitCancel}
               onPress={() => setShowExit(false)}
               disabled={isProcessing}
             >
-              <Text style={styles.exitCancelText}>Regain your Focus</Text>
+              <Text style={styles.exitCancelText}>{t('focus.regainFocus')}</Text>
             </TouchableOpacity>
           </View>
         </View>

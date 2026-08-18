@@ -36,6 +36,7 @@ const KEYS = {
   XP_LOG: 'padhai_xp_log',
   ONBOARDED: 'padhai_onboarded',
   ACTIVE_SESSION: 'padhai_active_session',
+  LANGUAGE: 'padhai_language_v1',
 };
 
 export async function getItem<T>(key: string): Promise<T | null> {

@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { LEVELS, getLevelForUser } from '@/constants/levels';
 import { useApp } from '@/hooks/useApp';
@@ -88,6 +89,7 @@ function LevelBadge({
 // ── Rank Zone Bar ─────────────────────────────────────────────────────────────
 function RankZoneBar({ rank, total }: { rank: number; total: number }) {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const safeTotal = Math.max(1, Math.floor(total));
   const safeRank = Math.min(safeTotal, Math.max(1, Math.floor(rank)));
@@ -109,9 +111,9 @@ function RankZoneBar({ rank, total }: { rank: number; total: number }) {
   return (
     <View style={styles.zoneBarContainer}>
       <View style={styles.zoneLabels}>
-        <Text style={[styles.zoneLabel, { color: colors.danger }]}>Demotion zone</Text>
-        <Text style={[styles.zoneLabel, { color: colors.warning }]}>Safety zone</Text>
-        <Text style={[styles.zoneLabel, { color: colors.success }]}>Promotion zone</Text>
+        <Text style={[styles.zoneLabel, { color: colors.danger }]}>{t('leaderboard.demotionZone')}</Text>
+        <Text style={[styles.zoneLabel, { color: colors.warning }]}>{t('leaderboard.safetyZone')}</Text>
+        <Text style={[styles.zoneLabel, { color: colors.success }]}>{t('leaderboard.promotionZone')}</Text>
       </View>
 
       {/* Rank badge above bar */}
@@ -144,8 +146,66 @@ function RankZoneBar({ rank, total }: { rank: number; total: number }) {
 }
 
 // ── Leaderboard row ───────────────────────────────────────────────────────────
+function TopThreePodium({ entries, currentUserId }: { entries: LeaderboardEntry[]; currentUserId?: string }) {
+  const { colors } = useTheme();
+  const { t } = useLanguage();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const medalMeta: Record<number, { label: string; color: string; icon: 'emoji-events' | 'military-tech' | 'workspace-premium' }> = {
+    1: { label: t('leaderboard.gold'), color: '#F5B700', icon: 'emoji-events' },
+    2: { label: t('leaderboard.silver'), color: '#AEB8C4', icon: 'military-tech' },
+    3: { label: t('leaderboard.bronze'), color: '#C77B30', icon: 'workspace-premium' },
+  };
+  const ordered = [2, 1, 3]
+    .map(rank => entries.find(entry => entry.rank === rank))
+    .filter((entry): entry is LeaderboardEntry => Boolean(entry));
+
+  return (
+    <View style={styles.podiumSection}>
+      <View style={styles.podiumHeadingRow}>
+        <View>
+          <Text style={styles.podiumEyebrow}>{t('leaderboard.topThree')}</Text>
+          <Text style={styles.podiumHeading}>{t('leaderboard.rankChange')}</Text>
+        </View>
+        <MaterialIcons name="emoji-events" size={24} color="#F5B700" />
+      </View>
+      <View style={styles.podiumCardsRow}>
+        {ordered.map(entry => {
+          const meta = medalMeta[entry.rank];
+          const isMe = entry.id === currentUserId;
+          return (
+            <View
+              key={entry.id}
+              accessibilityLabel={`${entry.name}, ${meta.label}, rank ${entry.rank}, ${entry.xp} XP`}
+              style={[
+                styles.podiumCard,
+                entry.rank === 1 && styles.podiumCardFirst,
+                isMe && styles.podiumCardMe,
+                { borderColor: meta.color, backgroundColor: `${meta.color}18` },
+              ]}
+            >
+              <View style={[styles.podiumMedal, { backgroundColor: `${meta.color}25`, borderColor: meta.color }]}>
+                <MaterialIcons name={meta.icon} size={24} color={meta.color} />
+              </View>
+              <Text style={[styles.podiumRank, { color: meta.color }]}>#{entry.rank}</Text>
+              <Text style={[styles.podiumMedalLabel, { color: meta.color }]}>{meta.label}</Text>
+              <Text style={[styles.podiumName, isMe && { color: colors.primary }]} numberOfLines={1}>
+                {entry.name}{isMe ? ` (${t('leaderboard.you')})` : ''}
+              </Text>
+              <View style={styles.podiumXpRow}>
+                <Text style={styles.podiumXp}>{entry.xp}</Text>
+                <Text style={styles.podiumXpLabel}>{t('leaderboard.xpEarned')}</Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const levelDef = LEVELS.find(l => l.rank === entry.level) ?? LEVELS[0];
   const rankColors: Record<number, string> = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32' };
@@ -157,10 +217,15 @@ function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
   };
   const isTopThree = entry.rank <= 3;
   const medalIcon = medalIcons[entry.rank];
+  const medalLabel = entry.rank === 1
+    ? t('leaderboard.goldMedal')
+    : entry.rank === 2
+    ? t('leaderboard.silverMedal')
+    : t('leaderboard.bronzeMedal');
 
   return (
     <View
-      accessibilityLabel={isTopThree ? `${entry.name}, ${entry.rank === 1 ? 'gold' : entry.rank === 2 ? 'silver' : 'bronze'} medal, rank ${entry.rank}, ${entry.xp} XP` : `${entry.name}, rank ${entry.rank}, ${entry.xp} XP`}
+      accessibilityLabel={isTopThree ? `${entry.name}, ${medalLabel}, ${t('leaderboard.rank')} ${entry.rank}, ${entry.xp} ${t('common.xp')}` : `${entry.name}, ${t('leaderboard.rank')} ${entry.rank}, ${entry.xp} ${t('common.xp')}`}
       style={[
         styles.boardRow,
         isMe && styles.boardRowMe,
@@ -175,12 +240,12 @@ function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
         <Text style={[styles.boardRankText, { color: rankBg }]}>{entry.rank}</Text>
       </View>
       <Text style={[styles.boardName, isMe && styles.boardNameMe]} numberOfLines={1}>
-        {entry.name}{isMe ? ' (You)' : ''}
+        {entry.name}{isMe ? ` (${t('leaderboard.you')})` : ''}
       </Text>
       <View style={styles.boardXPBadge}>
         <Text style={styles.boardXPText}>{entry.xp}</Text>
         <View style={styles.xpMiniTag}>
-          <Text style={styles.xpMiniText}>XP</Text>
+          <Text style={styles.xpMiniText}>{t('common.xp')}</Text>
         </View>
       </View>
     </View>
@@ -189,6 +254,7 @@ function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
 
 export default function LeaderboardScreen() {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user } = useApp();
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
@@ -404,7 +470,7 @@ export default function LeaderboardScreen() {
               <View style={[styles.infoPill, { backgroundColor: colors.warning + '22', borderColor: colors.warning + '55' }]}>
                 <Text style={[styles.infoPillVal, { color: colors.warning }]}>{user?.xpTotal ?? 0}</Text>
                 <View style={styles.xpMiniTag}>
-                  <Text style={styles.xpMiniText}>XP</Text>
+                  <Text style={styles.xpMiniText}>{t('common.xp')}</Text>
                 </View>
               </View>
             </View>
@@ -419,27 +485,30 @@ export default function LeaderboardScreen() {
         {/* ── Section 3: Leaderboard List ───────────────────────────────── */}
         <View style={styles.listSection}>
             <View style={styles.sectionHeadingRow}>
-              <Text style={styles.sectionTitle}>LEVEL {currentLevel.rank} LEADERBOARD</Text>
-              <View testID="leaderboard-live" style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>LIVE</Text></View>
+              <Text style={styles.sectionTitle}>{t('leaderboard.title', { value: currentLevel.rank })}</Text>
+              <View testID="leaderboard-live" style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>{t('leaderboard.live')}</Text></View>
             </View>
-            <Text style={styles.sectionSubtitle}>Top 30 students in your current level · updates every 30 seconds</Text>
+            <Text style={styles.sectionSubtitle}>{t('leaderboard.subtitle')}</Text>
 
           {loading ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={styles.loadingText}>Loading rankings...</Text>
+              <Text style={styles.loadingText}>{t('leaderboard.loading')}</Text>
             </View>
           ) : entries.length === 0 ? (
             <View style={styles.emptyBox}>
               <MaterialIcons name="emoji-events" size={48} color={colors.textTertiary} />
-              <Text style={styles.emptyText}>No rankings yet.{'\n'}Complete a session to appear!</Text>
+              <Text style={styles.emptyText}>{t('leaderboard.noRankings')}{'\n'}</Text>
             </View>
           ) : (
-            <View style={styles.listContainer}>
-              {visibleEntries.map(entry => (
-                <BoardRow key={entry.id} entry={entry} isMe={entry.id === user?.id} />
-              ))}
-            </View>
+            <>
+              <TopThreePodium entries={visibleEntries.filter(entry => entry.rank <= 3)} currentUserId={user?.id} />
+              <View style={styles.listContainer}>
+                {visibleEntries.filter(entry => entry.rank > 3).map(entry => (
+                  <BoardRow key={entry.id} entry={entry} isMe={entry.id === user?.id} />
+                ))}
+              </View>
+            </>
           )}
         </View>
       </ScrollView>
@@ -455,8 +524,8 @@ export default function LeaderboardScreen() {
         >
           <MaterialIcons name="emoji-events" size={26} color="#FFD700" />
           <View style={styles.celebrationCopy}>
-            <Text style={styles.celebrationTitle}>Top 3 achievement!</Text>
-            <Text style={styles.celebrationSubtitle}>You reached rank {celebrationRank}. Keep it up.</Text>
+            <Text style={styles.celebrationTitle}>{t('leaderboard.topThreeAchievement')}</Text>
+            <Text style={styles.celebrationSubtitle}>{t('leaderboard.reachedRank', { value: celebrationRank })}</Text>
           </View>
           <MaterialIcons name="star" size={20} color="#FFD700" />
         </Animated.View>
@@ -687,6 +756,64 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
+
+  // ── Top-three podium ──────────────────────────────────────────────────────
+  podiumSection: {
+    backgroundColor: colors.surface,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  podiumHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.md,
+  },
+  podiumEyebrow: {
+    color: '#F5B700',
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.extraBold,
+    letterSpacing: 1.5,
+  },
+  podiumHeading: { color: colors.textSecondary, fontSize: FontSize.xs, marginTop: 3 },
+  podiumCardsRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+  podiumCard: {
+    flex: 1,
+    minHeight: 166,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 5,
+    paddingVertical: 12,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+  },
+  podiumCardFirst: { minHeight: 198, paddingTop: 18 },
+  podiumCardMe: {
+    borderWidth: 2,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.24,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  podiumMedal: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  podiumRank: { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold, includeFontPadding: false },
+  podiumMedalLabel: { fontSize: 9, fontWeight: FontWeight.extraBold, letterSpacing: 0.7, marginTop: 2 },
+  podiumName: { color: colors.textPrimary, fontSize: FontSize.sm, fontWeight: FontWeight.bold, marginTop: 8, maxWidth: '100%' },
+  podiumXpRow: { flexDirection: 'row', alignItems: 'baseline', gap: 3, marginTop: 6 },
+  podiumXp: { color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
+  podiumXpLabel: { color: colors.textTertiary, fontSize: 9 },
 
   // ── Section 3 List ─────────────────────────────────────────────────────────
   listSection: {
