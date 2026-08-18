@@ -1,13 +1,25 @@
+import { useEffect } from 'react';
+import * as SplashScreen from 'expo-splash-screen';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider } from '@/contexts/AppContext';
-import { AuthSessionProvider } from '@/auth/AuthSessionProvider';
+import { AuthSessionProvider, useAuthSession } from '@/auth/AuthSessionProvider';
 import AuthRouteGuard from '@/auth/AuthRouteGuard';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
+import { useApp } from '@/hooks/useApp';
+
+void SplashScreen.preventAutoHideAsync();
 
 function AppNavigation() {
   const { mode, colors } = useTheme();
+  const { ready: authReady } = useAuthSession();
+  const { isLoading: appLoading } = useApp();
+
+  useEffect(() => {
+    if (!authReady || appLoading) return;
+    void SplashScreen.hideAsync();
+  }, [appLoading, authReady]);
   return (
     <>
       <StatusBar style={mode === 'dark' ? 'light' : 'dark'} backgroundColor={colors.background} />
