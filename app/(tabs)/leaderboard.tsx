@@ -15,6 +15,7 @@ import { getItem, setItem } from '@/services/storage';
 import { applyTopThreeRankUpdate, type TopThreeCelebrationState } from '@/services/leaderboardCelebration';
 
 const TOP_THREE_CELEBRATION_KEY_PREFIX = 'padhai_top_three_celebration_v1_';
+const MAX_VISIBLE_LEADERBOARD_ENTRIES = 30;
 
 interface LeaderboardEntry {
   id: string;
@@ -206,6 +207,7 @@ export default function LeaderboardScreen() {
   const displayEntries = entries.map(entry => entry.id === user?.id && user
     ? { ...entry, xp: user.xpTotal, level: currentLevel.rank }
     : entry);
+  const visibleEntries = displayEntries.slice(0, MAX_VISIBLE_LEADERBOARD_ENTRIES);
 
   const triggerTopThreeCelebration = useCallback((rank: number) => {
     celebrationAnimationRef.current?.stop();
@@ -396,7 +398,7 @@ export default function LeaderboardScreen() {
               <Text style={styles.sectionTitle}>LEVEL {currentLevel.rank} LEADERBOARD</Text>
               <View testID="leaderboard-live" style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>LIVE</Text></View>
             </View>
-            <Text style={styles.sectionSubtitle}>All users in your current level · updates every 30 seconds</Text>
+            <Text style={styles.sectionSubtitle}>Top 30 students in your current level · updates every 30 seconds</Text>
 
           {loading ? (
             <View style={styles.loadingBox}>
@@ -410,7 +412,7 @@ export default function LeaderboardScreen() {
             </View>
           ) : (
             <View style={styles.listContainer}>
-              {displayEntries.map(entry => (
+              {visibleEntries.map(entry => (
                 <BoardRow key={entry.id} entry={entry} isMe={entry.id === user?.id} />
               ))}
             </View>
