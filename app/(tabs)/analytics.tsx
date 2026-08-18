@@ -7,11 +7,10 @@ import { useFocusEffect } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { BarChart, LineChart } from 'react-native-chart-kit';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { supabase } from '@/services/supabase';
 import { useApp } from '@/hooks/useApp';
-
-const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function formatMins(mins: number): string {
   if (mins === 0) return '0m';
@@ -61,6 +60,7 @@ function createLineChartConfig(colors: ThemeColors) {
 
 export default function AnalyticsScreen() {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const chartConfig = useMemo(() => createChartConfig(colors), [colors]);
   const lineChartConfig = useMemo(() => createLineChartConfig(colors), [colors]);
@@ -114,6 +114,10 @@ export default function AnalyticsScreen() {
   const CHART_WIDTH = Math.max(1, screenWidth - Spacing.md * 2 - 2);
 
   const today = new Date().toISOString().split('T')[0];
+  const shortDays = useMemo(() => [
+    t('analytics.sun'), t('analytics.mon'), t('analytics.tue'), t('analytics.wed'),
+    t('analytics.thu'), t('analytics.fri'), t('analytics.sat'),
+  ], [t]);
 
   // ── Summary Stats ────────────────────────────────────────────────────────
   const {
@@ -175,11 +179,11 @@ export default function AnalyticsScreen() {
   const barData = useMemo(() => {
     const labels = last7.map(d => {
       const dateObj = new Date(d.date + 'T12:00:00');
-      return SHORT_DAYS[dateObj.getDay()];
+      return shortDays[dateObj.getDay()];
     });
     const data = last7.map(d => Math.round(d.totalMinutes));
     return { labels, datasets: [{ data }] };
-  }, [last7]);
+  }, [last7, shortDays]);
 
   // ── Line Chart: Chapter completion over last 7 days ───────────────────────
   const lineData = useMemo(() => {
@@ -187,7 +191,7 @@ export default function AnalyticsScreen() {
     const dates = last7.map(d => d.date);
     const labels = last7.map(d => {
       const dateObj = new Date(d.date + 'T12:00:00');
-      return SHORT_DAYS[dateObj.getDay()];
+      return shortDays[dateObj.getDay()];
     });
 
     const doneCounts = dates.map(date => {
@@ -197,44 +201,44 @@ export default function AnalyticsScreen() {
     });
 
     return { labels, datasets: [{ data: doneCounts.length > 0 ? doneCounts : [0, 0, 0, 0, 0, 0, 0] }] };
-  }, [last7, chapters]);
+  }, [last7, chapters, shortDays]);
 
   // ── XP trend (last 7 days) ────────────────────────────────────────────────
   const xpBarData = useMemo(() => {
     const labels = last7.map(d => {
       const dateObj = new Date(d.date + 'T12:00:00');
-      return SHORT_DAYS[dateObj.getDay()];
+      return shortDays[dateObj.getDay()];
     });
     const data = last7.map(d => d.xpEarned ?? 0);
     return { labels, datasets: [{ data }] };
-  }, [last7]);
+  }, [last7, shortDays]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        <Text style={styles.title}>Analytics</Text>
+        <Text style={styles.title}>{t('analytics.title')}</Text>
 
         {/* ── Top Stats Grid ─────────────────────────────────────────────── */}
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
             <MaterialIcons name="local-fire-department" size={20} color={colors.danger} />
             <Text style={styles.statVal}>{user?.streakCurrent ?? 0}</Text>
-            <Text style={styles.statLabel}>Current Streak</Text>
+            <Text style={styles.statLabel}>{t('analytics.currentStreak')}</Text>
           </View>
           <View style={styles.statCard}>
             <MaterialIcons name="schedule" size={20} color={colors.accent} />
             <Text style={styles.statVal}>{formatMins(totalMins)}</Text>
-            <Text style={styles.statLabel}>This Week</Text>
+            <Text style={styles.statLabel}>{t('analytics.thisWeek')}</Text>
           </View>
           <View style={styles.statCard}>
             <MaterialIcons name="bolt" size={20} color={colors.warning} />
             <Text style={styles.statVal}>{focusScore}%</Text>
-            <Text style={styles.statLabel}>Focus Score</Text>
+            <Text style={styles.statLabel}>{t('analytics.focusScore')}</Text>
           </View>
           <View style={styles.statCard}>
             <MaterialIcons name="check-circle" size={20} color={colors.success} />
             <Text style={styles.statVal}>{doneChapters}/{totalChapters}</Text>
-            <Text style={styles.statLabel}>Chapters Done</Text>
+            <Text style={styles.statLabel}>{t('analytics.chaptersDone')}</Text>
           </View>
         </View>
 
@@ -242,7 +246,7 @@ export default function AnalyticsScreen() {
         <View style={styles.goalCard}>
           <View style={styles.goalHeader}>
             <View>
-              <Text style={styles.goalLabel}>{"TODAY'S GOAL"}</Text>
+              <Text style={styles.goalLabel}>{t('analytics.todaysGoal')}</Text>
               <Text style={styles.goalFraction}>
                 <Text style={[styles.goalCurrent, goalMet && { color: colors.success }]}>
                   {formatMins(todayMins)}
@@ -253,7 +257,7 @@ export default function AnalyticsScreen() {
             </View>
             <View style={[styles.goalBadge, goalMet && styles.goalBadgeMet]}>
               <Text style={[styles.goalBadgeText, goalMet && styles.goalBadgeTextMet]}>
-                {goalMet ? '✓ Done' : `${Math.round(goalProgress * 100)}%`}
+                {goalMet ? t('analytics.done') : `${Math.round(goalProgress * 100)}%`}
               </Text>
             </View>
           </View>
@@ -278,7 +282,7 @@ export default function AnalyticsScreen() {
           <View style={styles.weekRow}>
             {last7GoalMet.map((met, i) => {
               const d = last7[i];
-              const dayLabel = SHORT_DAYS[new Date(d.date + 'T12:00:00').getDay()];
+              const dayLabel = shortDays[new Date(d.date + 'T12:00:00').getDay()];
               const isToday = d.date === today;
               return (
                 <View key={i} style={styles.weekDayCol}>
@@ -305,8 +309,8 @@ export default function AnalyticsScreen() {
         {/* ── Bar Chart: Focus Minutes ───────────────────────────────────── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>DAILY FOCUS (MINUTES)</Text>
-            <Text style={styles.cardSubtitle}>Last 7 days</Text>
+            <Text style={styles.cardTitle}>{t('analytics.dailyFocus')}</Text>
+            <Text style={styles.cardSubtitle}>{t('analytics.last7Days')}</Text>
           </View>
           <BarChart
             data={barData}
@@ -326,8 +330,8 @@ export default function AnalyticsScreen() {
         {/* ── Line Chart: Chapter Completion Trend ─────────────────────────── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>CHAPTER COMPLETION TREND</Text>
-            <Text style={styles.cardSubtitle}>Cumulative over 7 days</Text>
+            <Text style={styles.cardTitle}>{t('analytics.chapterCompletionTrend')}</Text>
+            <Text style={styles.cardSubtitle}>{t('analytics.cumulative7Days')}</Text>
           </View>
           <LineChart
             data={lineData}
@@ -344,15 +348,15 @@ export default function AnalyticsScreen() {
           />
           <View style={styles.legendRow}>
             <View style={[styles.legendDot, { backgroundColor: colors.accent }]} />
-            <Text style={styles.legendText}>Chapters completed (cumulative)</Text>
+            <Text style={styles.legendText}>{t('analytics.chaptersCompletedCumulative')}</Text>
           </View>
         </View>
 
         {/* ── Bar Chart: XP Earned Per Day ─────────────────────────────────── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>XP EARNED PER DAY</Text>
-            <Text style={styles.cardSubtitle}>Last 7 days</Text>
+            <Text style={styles.cardTitle}>{t('analytics.xpEarnedPerDay')}</Text>
+            <Text style={styles.cardSubtitle}>{t('analytics.last7Days')}</Text>
           </View>
           <BarChart
             data={xpBarData}
@@ -373,15 +377,15 @@ export default function AnalyticsScreen() {
 
         {/* ── Focus Score ──────────────────────────────────────────────────── */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>FOCUS SCORE</Text>
+          <Text style={styles.cardTitle}>{t('analytics.focusScoreDetails')}</Text>
           <View style={styles.focusScoreRow}>
             <Text style={styles.focusScoreVal}>{focusScore}%</Text>
             <View style={styles.focusScoreDetails}>
               <Text style={styles.focusScoreDetail}>
-                <Text style={styles.focusScoreGreen}>{completedSessions}</Text> completed
+                <Text style={styles.focusScoreGreen}>{completedSessions}</Text> {t('analytics.completed')}
               </Text>
               <Text style={styles.focusScoreDetail}>
-                <Text style={styles.focusScoreRed}>{totalSessions - completedSessions}</Text> broken
+                <Text style={styles.focusScoreRed}>{totalSessions - completedSessions}</Text> {t('analytics.broken')}
               </Text>
             </View>
           </View>
@@ -392,7 +396,7 @@ export default function AnalyticsScreen() {
 
         {/* ── Heatmap: 90-day Consistency ──────────────────────────────────── */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>CONSISTENCY (90 DAYS)</Text>
+          <Text style={styles.cardTitle}>{t('analytics.consistency90')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.heatmap}>
               {Array.from({ length: 13 }, (_, weekIdx) => (
@@ -414,18 +418,18 @@ export default function AnalyticsScreen() {
             </View>
           </ScrollView>
           <View style={styles.heatLegend}>
-            <Text style={styles.heatLegendText}>Less</Text>
+            <Text style={styles.heatLegendText}>{t('analytics.less')}</Text>
             {[0, 30, 60, 120, 180].map(v => (
               <View key={v} style={[styles.heatLegendDot, { backgroundColor: getHeatColor(v, colors) }]} />
             ))}
-            <Text style={styles.heatLegendText}>More</Text>
+            <Text style={styles.heatLegendText}>{t('analytics.more')}</Text>
           </View>
         </View>
 
         {/* ── Weak Chapters ────────────────────────────────────────────────── */}
         {weakChapters.length > 0 ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>WEAK CHAPTERS ({weakChapters.length})</Text>
+            <Text style={styles.cardTitle}>{t('analytics.weakChapters', { value: weakChapters.length })}</Text>
             {weakChapters.map(c => (
               <View key={c.id} style={styles.weakRow}>
                 <MaterialIcons name="warning" size={14} color={colors.warning} />

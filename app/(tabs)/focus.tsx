@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { calculateSessionXP } from '@/constants/levels';
@@ -16,6 +17,7 @@ const CUSTOM_KEY = -1;
 
 export default function FocusScreen() {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { subjectId: routeSubjectId, chapterId: routeChapterId } = useLocalSearchParams<{ subjectId?: string; chapterId?: string }>();
@@ -75,7 +77,7 @@ export default function FocusScreen() {
       await startSession(effectiveMins, selectedSubjectId, selectedChapterId);
       router.push('/focus/active');
     } catch {
-      Alert.alert('Could Not Start Session', 'Please check your connection and try again.');
+      Alert.alert(t('focus.startErrorTitle'), t('focus.startErrorMessage'));
     } finally {
       setStarting(false);
     }
@@ -85,11 +87,11 @@ export default function FocusScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
-        <Text style={styles.title}>Study Session</Text>
-        <Text style={styles.subtitle}>Study Tracker ke chapter ke saath session link karo.</Text>
+        <Text style={styles.title}>{t('focus.screenTitle')}</Text>
+        <Text style={styles.subtitle}>{t('focus.screenSubtitle')}</Text>
 
         {/* Duration selector */}
-        <Text style={styles.sectionLabel}>DURATION CHUNO</Text>
+        <Text style={styles.sectionLabel}>{t('focus.durationChoose')}</Text>
         <View style={styles.durationGrid}>
           {DURATIONS.map(d => (
             <Pressable
@@ -101,7 +103,7 @@ export default function FocusScreen() {
                 {d}
               </Text>
               <Text style={[styles.durationLabel, !isCustomSelected && selectedMins === d ? styles.durationLabelActive : null]}>
-                min
+                {t('focus.durationMin')}
               </Text>
             </Pressable>
           ))}
@@ -116,7 +118,7 @@ export default function FocusScreen() {
               color={isCustomSelected ? colors.primary : colors.textTertiary}
             />
             <Text style={[styles.durationLabel, isCustomSelected ? styles.durationLabelActive : null]}>
-              custom
+              {t('focus.custom')}
             </Text>
           </Pressable>
         </View>
@@ -130,12 +132,12 @@ export default function FocusScreen() {
               value={customInput}
               onChangeText={handleCustomChange}
               keyboardType="number-pad"
-              placeholder="e.g. 50"
+              placeholder={t('focus.customPlaceholder')}
               placeholderTextColor={colors.textTertiary}
               maxLength={3}
               returnKeyType="done"
             />
-            <Text style={styles.customInputLabel}>minutes</Text>
+            <Text style={styles.customInputLabel}>{t('focus.minutes')}</Text>
             {customInput.length > 0 && parseInt(customInput, 10) > 0 ? (
               <View style={styles.customXPPreview}>
                 <MaterialIcons name="bolt" size={14} color={colors.warning} />
@@ -149,14 +151,14 @@ export default function FocusScreen() {
         <View style={styles.xpPreview}>
           <MaterialIcons name="bolt" size={18} color={colors.warning} />
           <Text style={styles.xpPreviewText}>
-            Is session mein milega: <Text style={styles.xpPreviewBold}>+{expectedXP} XP</Text>
+            {t('focus.sessionXP')} <Text style={styles.xpPreviewBold}>+{expectedXP} XP</Text>
           </Text>
         </View>
 
         {/* Subject selector */}
         {activeSubjects.length > 0 ? (
           <View>
-            <Text style={styles.sectionLabel}>SUBJECT (OPTIONAL)</Text>
+            <Text style={styles.sectionLabel}>{t('focus.subjectOptional')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.subjectScroll}>
               <View style={styles.subjectRow}>
                 <Pressable
@@ -164,7 +166,7 @@ export default function FocusScreen() {
                     onPress={() => { setSelectedSubjectId(null); setSelectedChapterId(null); }}
                 >
                   <Text style={[styles.subjectChipText, selectedSubjectId === null ? styles.subjectChipTextActive : null]}>
-                    General
+                    {t('focus.general')}
                   </Text>
                 </Pressable>
                 {activeSubjects.map(s => (
@@ -187,7 +189,7 @@ export default function FocusScreen() {
 
         {selectedSubjectId && activeChapters.length > 0 ? (
           <View>
-            <Text style={styles.sectionLabel}>TRACKER CHAPTER (OPTIONAL)</Text>
+            <Text style={styles.sectionLabel}>{t('focus.trackerChapterOptional')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.subjectScroll}>
               <View style={styles.subjectRow}>
                 <Pressable
@@ -195,7 +197,7 @@ export default function FocusScreen() {
                   onPress={() => setSelectedChapterId(null)}
                 >
                   <Text style={[styles.subjectChipText, selectedChapterId === null ? styles.subjectChipTextActive : null]}>
-                    General
+                    {t('focus.general')}
                   </Text>
                 </Pressable>
                 {activeChapters.map(chapter => (
@@ -214,25 +216,25 @@ export default function FocusScreen() {
             </ScrollView>
           </View>
         ) : selectedSubjectId ? (
-          <Text style={styles.trackerHint}>No active chapters in this subject. Add one in Study Tracker to link your session.</Text>
+          <Text style={styles.trackerHint}>{t('focus.noActiveChapters')}</Text>
         ) : (
-          <Text style={styles.trackerHint}>Select a Study Tracker subject and chapter to keep this session synced with your tracker.</Text>
+          <Text style={styles.trackerHint}>{t('focus.selectTracker')}</Text>
         )}
 
         {/* Rules reminder */}
         <View style={styles.rulesCard}>
-          <Text style={styles.rulesTitle}>Focus Rules</Text>
+          <Text style={styles.rulesTitle}>{t('focus.focusRules')}</Text>
           <View style={styles.ruleRow}>
             <MaterialIcons name="lock" size={14} color={colors.primary} />
-            <Text style={styles.ruleText}>Session ke beech app band karna = streak reset</Text>
+            <Text style={styles.ruleText}>{t('focus.ruleBackground')}</Text>
           </View>
           <View style={styles.ruleRow}>
             <MaterialIcons name="warning" size={14} color={colors.warning} />
-            <Text style={styles.ruleText}>Session todne par XP kata jayega</Text>
+            <Text style={styles.ruleText}>{t('focus.ruleBroken')}</Text>
           </View>
           <View style={styles.ruleRow}>
             <MaterialIcons name="touch-app" size={14} color={colors.textSecondary} />
-            <Text style={styles.ruleText}>Emergency exit: screen par triple tap</Text>
+            <Text style={styles.ruleText}>{t('focus.ruleEmergency')}</Text>
           </View>
         </View>
 
@@ -245,7 +247,7 @@ export default function FocusScreen() {
         >
           <MaterialIcons name="lock" size={24} color={colors.background} />
           <Text style={styles.lockInText}>
-            {starting ? 'Starting...' : (isCustomSelected && effectiveMins > 0 ? `LOCK IN — ${effectiveMins} MIN` : 'LOCK IN')}
+            {starting ? t('focus.starting') : (isCustomSelected && effectiveMins > 0 ? t('focus.lockInMinutes', { value: effectiveMins }) : t('focus.lockIn'))}
           </Text>
         </TouchableOpacity>
 

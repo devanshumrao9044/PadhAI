@@ -6,6 +6,8 @@ import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
 import AuthInput from './AuthInput';
 import AuthButton from './AuthButton';
+import { useLanguage } from '@/contexts/LanguageContext';
+import type { TranslationKey } from '@/constants/translations';
 
 interface Props {
   onSwitchToSignup: () => void;
@@ -13,32 +15,35 @@ interface Props {
 
 type Mode = 'login' | 'forgot';
 
-function getLoginErrors(email: string, password: string) {
+type Translate = (key: TranslationKey) => string;
+
+function getLoginErrors(email: string, password: string, t: Translate) {
   const errors: { email?: string; password?: string } = {};
   if (!email.trim()) {
-    errors.email = 'Email is required.';
+    errors.email = t('auth.emailRequired');
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-    errors.email = 'Please enter a valid email address.';
+    errors.email = t('auth.emailInvalid');
   }
   if (!password.trim()) {
-    errors.password = 'Password is required.';
+    errors.password = t('auth.passwordRequired');
   } else if (password.length < 6) {
-    errors.password = 'Password must be at least 6 characters.';
+    errors.password = t('auth.passwordMin');
   }
   return errors;
 }
 
-function getForgotErrors(email: string) {
+function getForgotErrors(email: string, t: Translate) {
   const errors: { email?: string } = {};
   if (!email.trim()) {
-    errors.email = 'Email is required.';
+    errors.email = t('auth.emailRequired');
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-    errors.email = 'Please enter a valid email address.';
+    errors.email = t('auth.emailInvalid');
   }
   return errors;
 }
 
 export default function LoginForm({ onSwitchToSignup }: Props) {
+  const { t } = useLanguage();
   const [mode, setMode] = useState<Mode>('login');
 
   // Login state
@@ -56,11 +61,11 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
   const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
 
   // Login errors — computed during render
-  const loginErrors = loginSubmitted ? getLoginErrors(email, password) : {};
+  const loginErrors = loginSubmitted ? getLoginErrors(email, password, t) : {};
   const loginHasErrors = Object.keys(loginErrors).length > 0;
 
   // Forgot errors — computed during render
-  const forgotErrors = forgotSubmitted ? getForgotErrors(forgotEmail) : {};
+  const forgotErrors = forgotSubmitted ? getForgotErrors(forgotEmail, t) : {};
 
   function switchToForgot() {
     setMode('forgot');
@@ -79,7 +84,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
     setLoginSubmitted(true);
     setLoginApiError(null);
 
-    if (Object.keys(getLoginErrors(email, password)).length > 0) return;
+    if (Object.keys(getLoginErrors(email, password, t)).length > 0) return;
 
     setLoginLoading(true);
     try {
@@ -94,9 +99,9 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
           error.message.toLowerCase().includes('invalid credentials') ||
           error.message.toLowerCase().includes('wrong password')
         ) {
-          setLoginApiError('Incorrect email or password. Please try again.');
+          setLoginApiError(t('auth.incorrectCredentials'));
         } else {
-          setLoginApiError(error.message ?? 'Sign in failed. Please try again.');
+          setLoginApiError(error.message ?? t('auth.signInFailed'));
         }
         return;
       }
@@ -104,7 +109,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
       if (data?.session) {
         if (!data.user?.email_confirmed_at) {
           await supabase.auth.signOut();
-          setLoginApiError('Please verify your email address before signing in.');
+          setLoginApiError(t('auth.verifyEmail'));
           return;
         }
 
@@ -121,7 +126,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
         }
       }
     } catch (err: any) {
-      setLoginApiError(err?.message ?? 'An unexpected error occurred.');
+      setLoginApiError(err?.message ?? t('auth.unexpected'));
     } finally {
       setLoginLoading(false);
     }
@@ -133,7 +138,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
     setForgotApiError(null);
     setForgotSuccess(null);
 
-    if (Object.keys(getForgotErrors(forgotEmail)).length > 0) return;
+    if (Object.keys(getForgotErrors(forgotEmail, t)).length > 0) return;
 
     setForgotLoading(true);
     try {
@@ -147,16 +152,16 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
       if (resetError) {
         const resetMessage = resetError.message.toLowerCase();
         setForgotApiError(resetMessage.includes('rate') || resetMessage.includes('too many')
-          ? 'Too many requests. Please wait before trying again.'
-          : 'We could not send a reset link. Please check the address and try again.');
+          ? t('auth.tooManyRequests')
+          : t('auth.resetFailed'));
         return;
       }
 
       setForgotSuccess(
-        `Password reset link sent to ${trimmedEmail}. Check your inbox.`
+        t('auth.resetSent', { value: trimmedEmail })
       );
     } catch (err: any) {
-      setForgotApiError(err?.message ?? 'An unexpected error occurred.');
+      setForgotApiError(err?.message ?? t('auth.unexpected'));
     } finally {
       setForgotLoading(false);
     }
@@ -173,13 +178,11 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Text style={styles.backArrow}>{'←'}</Text>
-          <Text style={styles.backText}>Back to Sign In</Text>
+          <Text style={styles.backText}>{t('auth.backToSignIn')}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>Reset password</Text>
-        <Text style={styles.subtitle}>
-          Enter your email and we will send a reset link.
-        </Text>
+        <Text style={styles.title}>{t('auth.resetPassword')}</Text>
+        <Text style={styles.subtitle}>{t('auth.resetSubtitle')}</Text>
 
         {forgotApiError ? (
           <View style={styles.errorBox}>
@@ -198,8 +201,8 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
         {!forgotSuccess ? (
           <>
             <AuthInput
-              label="Email Address"
-              placeholder="your@email.com"
+              label={t('auth.emailAddress')}
+              placeholder={t('auth.emailPlaceholder')}
               value={forgotEmail}
               onChangeText={(t) => {
                 setForgotEmail(t);
@@ -212,7 +215,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
             />
 
             <AuthButton
-              label={forgotLoading ? 'Sending...' : 'Send Reset Link →'}
+              label={forgotLoading ? t('auth.sending') : t('auth.sendResetLink')}
               onPress={handleForgotPassword}
               loading={forgotLoading}
               style={styles.submitBtn}
@@ -220,7 +223,7 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
           </>
         ) : (
           <AuthButton
-            label="Back to Sign In"
+            label={t('auth.backToSignIn')}
             onPress={switchToLogin}
             variant="secondary"
             style={styles.submitBtn}
@@ -233,8 +236,8 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
   // ── LOGIN VIEW ─────────────────────────────────────────────────────────────
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Welcome back</Text>
-      <Text style={styles.subtitle}>Sign in to continue your streak</Text>
+      <Text style={styles.title}>{t('auth.welcomeBack')}</Text>
+      <Text style={styles.subtitle}>{t('auth.loginSubtitle')}</Text>
 
       {loginApiError ? (
         <View style={styles.errorBox}>
@@ -244,8 +247,8 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
       ) : null}
 
       <AuthInput
-        label="Email Address"
-        placeholder="your@email.com"
+        label={t('auth.emailAddress')}
+        placeholder={t('auth.emailPlaceholder')}
         value={email}
         onChangeText={(t) => { setEmail(t); setLoginApiError(null); }}
         keyboardType="email-address"
@@ -255,8 +258,8 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
       />
 
       <AuthInput
-        label="Password"
-        placeholder="Enter your password"
+        label={t('auth.password')}
+        placeholder={t('auth.passwordPlaceholder')}
         value={password}
         onChangeText={(t) => { setPassword(t); setLoginApiError(null); }}
         secureTextEntry
@@ -269,11 +272,11 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
         activeOpacity={0.7}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
-        <Text style={styles.forgotText}>Forgot password?</Text>
+        <Text style={styles.forgotText}>{t('auth.forgotPassword')}</Text>
       </TouchableOpacity>
 
       <AuthButton
-        label={loginLoading ? 'Signing in...' : 'Sign In →'}
+        label={loginLoading ? t('auth.signingIn') : t('auth.signIn')}
         onPress={handleLogin}
         loading={loginLoading}
         disabled={loginSubmitted && loginHasErrors}
@@ -281,13 +284,13 @@ export default function LoginForm({ onSwitchToSignup }: Props) {
       />
 
       <View style={styles.switchRow}>
-        <Text style={styles.switchText}>{"Don't have an account? "}</Text>
+        <Text style={styles.switchText}>{t('auth.noAccount')}</Text>
         <TouchableOpacity
           onPress={onSwitchToSignup}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           activeOpacity={0.7}
         >
-          <Text style={styles.switchLink}>Create account</Text>
+          <Text style={styles.switchLink}>{t('auth.createAccountLink')}</Text>
         </TouchableOpacity>
       </View>
     </View>

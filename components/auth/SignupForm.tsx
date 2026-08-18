@@ -7,12 +7,16 @@ import { supabase } from '@/services/supabase';
 import AuthInput from './AuthInput';
 import AuthButton from './AuthButton';
 import { getPasswordProviderError, validatePassword } from '@/auth/passwordPolicy';
+import { useLanguage } from '@/contexts/LanguageContext';
+import type { TranslationKey } from '@/constants/translations';
 
 interface Props {
   onSwitchToLogin: () => void;
 }
 
-function getSignupErrors(name: string, email: string, password: string) {
+type Translate = (key: TranslationKey) => string;
+
+function getSignupErrors(name: string, email: string, password: string, t: Translate) {
   const errors: {
     name?: string;
     email?: string;
@@ -20,23 +24,23 @@ function getSignupErrors(name: string, email: string, password: string) {
   } = {};
 
   if (!name.trim()) {
-    errors.name = 'Full name is required.';
+    errors.name = t('auth.nameRequired');
   } else if (name.trim().length < 3) {
-    errors.name = 'Name must be at least 3 characters.';
+    errors.name = t('auth.nameMin');
   } else if (name.trim().length > 40) {
-    errors.name = 'Name must be under 40 characters.';
+    errors.name = t('auth.nameMax');
   }
 
   if (!email.trim()) {
-    errors.email = 'Email is required.';
+    errors.email = t('auth.emailRequired');
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-    errors.email = 'Please enter a valid email address.';
+    errors.email = t('auth.emailInvalid');
   }
 
   if (!password.trim()) {
-    errors.password = 'Password is required.';
+    errors.password = t('auth.passwordRequired');
   } else if (password.length > 72) {
-    errors.password = 'Password must be under 72 characters.';
+    errors.password = t('auth.passwordMax');
   } else {
     const passwordResult = validatePassword(password);
     if (!passwordResult.valid) errors.password = passwordResult.error;
@@ -46,6 +50,7 @@ function getSignupErrors(name: string, email: string, password: string) {
 }
 
 export default function SignupForm({ onSwitchToLogin }: Props) {
+  const { t } = useLanguage();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -55,7 +60,7 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
   const [apiError, setApiError] = useState<string | null>(null);
   const [apiSuccess, setApiSuccess] = useState<string | null>(null);
 
-  const errors = submitted ? getSignupErrors(name, email, password) : {};
+  const errors = submitted ? getSignupErrors(name, email, password, t) : {};
   const hasErrors = Object.keys(errors).length > 0;
 
   async function handleSignup() {
@@ -63,7 +68,7 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
     setApiError(null);
     setApiSuccess(null);
 
-    const currentErrors = getSignupErrors(name, email, password);
+    const currentErrors = getSignupErrors(name, email, password, t);
     if (Object.keys(currentErrors).length > 0) return;
 
     setLoading(true);
@@ -89,15 +94,15 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
         if (passwordProviderError) {
           setApiError(passwordProviderError);
         } else if (msg.includes('referral code') || (normalizedReferralCode && msg.includes('database error saving new user'))) {
-          setApiError('Invalid referral code. Please check and try again.');
+          setApiError(t('auth.invalidReferral'));
         } else if (
           msg.includes('already registered') ||
           msg.includes('already exists') ||
           msg.includes('user already')
         ) {
-          setApiError('This email is already registered. Please Log-in instead.');
+          setApiError(t('auth.alreadyRegistered'));
         } else {
-          setApiError(signupError.message ?? 'Sign up failed. Please try again.');
+          setApiError(signupError.message ?? t('auth.signUpFailed'));
         }
         return;
       }
@@ -106,7 +111,7 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
 
       if (signupData?.session && signupUser && !signupUser.email_confirmed_at) {
         await supabase.auth.signOut();
-        setApiSuccess('Account created. Please verify your email, then sign in.');
+        setApiSuccess(t('auth.accountCreatedVerify'));
         return;
       }
 
@@ -126,7 +131,7 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
       }
 
       if (signupUser && !signupUser.email_confirmed_at) {
-        setApiSuccess('Account created. Please verify your email, then sign in.');
+        setApiSuccess(t('auth.accountCreatedVerify'));
         return;
       }
 
@@ -143,18 +148,18 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
         }
 
         if (signInError?.message === 'Email not confirmed') {
-          setApiSuccess('Account created! Please verify your email, then sign in.');
+          setApiSuccess(t('auth.accountCreatedVerify'));
           return;
         }
 
-        setApiSuccess('Account created! Please sign in.');
+        setApiSuccess(t('auth.accountCreatedSignIn'));
         return;
       }
 
-      setApiError('Something went wrong. Please try again.');
+      setApiError(t('auth.somethingWrong'));
 
     } catch (err: any) {
-      setApiError(err?.message ?? 'An unexpected error occurred.');
+      setApiError(err?.message ?? t('auth.unexpected'));
     } finally {
       setLoading(false);
     }
@@ -162,8 +167,8 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Create account</Text>
-      <Text style={styles.subtitle}>Start your focused study journey today</Text>
+      <Text style={styles.title}>{t('auth.createAccount')}</Text>
+      <Text style={styles.subtitle}>{t('auth.signupSubtitle')}</Text>
 
       {apiError ? (
         <View style={styles.apiErrorBox}>
@@ -179,9 +184,9 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
         </View>
       ) : null}
 
-      <AuthInput
-        label="Full Name"
-        placeholder="e.g. Devansh"
+        <AuthInput
+        label={t('auth.fullName')}
+        placeholder={t('auth.namePlaceholder')}
         value={name}
         onChangeText={(t) => {
           setName(t);
@@ -194,8 +199,8 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
       />
 
       <AuthInput
-        label="Email Address"
-        placeholder="your@email.com"
+        label={t('auth.emailAddress')}
+        placeholder={t('auth.emailPlaceholder')}
         value={email}
         onChangeText={(t) => {
           setEmail(t);
@@ -209,8 +214,8 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
       />
 
       <AuthInput
-        label="Password"
-        placeholder="At least 6 characters"
+        label={t('auth.password')}
+        placeholder={t('auth.passwordSignupPlaceholder')}
         value={password}
         onChangeText={(t) => {
           setPassword(t);
@@ -222,8 +227,8 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
       />
 
       <AuthInput
-        label="Referral Code (Optional)"
-        placeholder="e.g. DEVS12345"
+        label={t('auth.referralOptional')}
+        placeholder={t('auth.referralPlaceholder')}
         value={referralCode}
         onChangeText={(t) => setReferralCode(t.toUpperCase())}
         autoCapitalize="characters"
@@ -231,7 +236,7 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
       />
 
       <AuthButton
-        label={loading ? 'Creating account...' : 'Create Account →'}
+        label={loading ? t('auth.creatingAccount') : t('auth.createAccount')}
         onPress={handleSignup}
         loading={loading}
         disabled={submitted && hasErrors}
@@ -239,13 +244,13 @@ export default function SignupForm({ onSwitchToLogin }: Props) {
       />
 
       <View style={styles.switchRow}>
-        <Text style={styles.switchText}>Already have an account? </Text>
+        <Text style={styles.switchText}>{t('auth.alreadyAccount')}</Text>
         <TouchableOpacity
           onPress={onSwitchToLogin}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           activeOpacity={0.7}
         >
-          <Text style={styles.switchLink}>Sign in</Text>
+          <Text style={styles.switchLink}>{t('auth.signIn')}</Text>
         </TouchableOpacity>
       </View>
     </View>

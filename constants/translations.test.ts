@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { translate } from './translations.ts';
+
+test('core screens return the selected language without duplicating JSX copy', () => {
+  assert.equal(translate('en', 'focus.lockInMinutes', { value: 30 }), 'LOCK IN — 30 MIN');
+  assert.equal(translate('hi', 'focus.lockInMinutes', { value: 30 }), 'फोकस शुरू करें — 30 मिनट');
+  assert.equal(translate('en', 'analytics.weakChapters', { value: 2 }), 'WEAK CHAPTERS (2)');
+  assert.equal(translate('hi', 'analytics.weakChapters', { value: 2 }), 'कमज़ोर अध्याय (2)');
+  assert.equal(translate('en', 'referral.moreReferrals', { value: 3 }), '3 more referrals to unlock your reward.');
+  assert.equal(translate('hi', 'referral.moreReferrals', { value: 3 }), 'रिवॉर्ड अनलॉक करने के लिए 3 और रेफरल चाहिए।');
+});
+
+test('translation interpolation preserves unresolved placeholders instead of silently dropping them', () => {
+  assert.equal(translate('en', 'common.minutes', {}), '{value} minutes');
+});

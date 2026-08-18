@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors } from '@/constants/theme';
 import {
   View, Text, StyleSheet, TouchableOpacity,
@@ -18,6 +19,7 @@ const EMAIL_ADDRESS = 'materialhubx@gmail.com';
 
 export default function ReferralScreen() {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [loading, setLoading] = useState(true);
   const [myCode, setMyCode] = useState<string | null>(null);
@@ -72,8 +74,8 @@ export default function ReferralScreen() {
   async function handleShare() {
     if (!myCode) return;
     await Share.share({
-      message: `Join PadhAI — the focus app for serious students! 🔥\n\nUse my referral code: ${myCode}\n\nSign up and complete your first focus session to earn +50 XP bonus!\n\nDownload: https://padhai.app`,
-      title: 'Join PadhAI,Start your focused journey with my referral code',
+      message: t('referral.shareMessage', { code: myCode }),
+      title: t('referral.shareTitle'),
     });
   }
 
@@ -87,8 +89,10 @@ export default function ReferralScreen() {
   }
 
   async function claimViaEmail() {
+    const code = myCode;
+    if (!code) return;
     await Linking.openURL(
-      `mailto:${EMAIL_ADDRESS}?subject=PadhAI Referral Reward Claim&body=Hi! I have completed 5 referrals on PadhAI. My referral code is ${myCode}. Please process my reward. Thank you!`
+      `mailto:${EMAIL_ADDRESS}?subject=${encodeURIComponent(t('referral.emailSubject'))}&body=${encodeURIComponent(t('referral.emailBody', { code }))}`
     );
   }
 
@@ -114,7 +118,7 @@ export default function ReferralScreen() {
         >
           <Text style={styles.backArrow}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Refer & Earn</Text>
+        <Text style={styles.headerTitle}>{t('referral.title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -126,15 +130,13 @@ export default function ReferralScreen() {
         {/* Hero */}
         <View style={styles.hero}>
           <Text style={styles.heroEmoji}>🎁</Text>
-          <Text style={styles.heroTitle}>Invite friends. Earn XP and vouchers.</Text>
-          <Text style={styles.heroSubtitle}>
-            Share your code — you earn +25 XP for every friend who completes their first session.
-          </Text>
+          <Text style={styles.heroTitle}>{t('referral.heroTitle')}</Text>
+          <Text style={styles.heroSubtitle}>{t('referral.heroSubtitle')}</Text>
         </View>
 
         {/* Referral Code Card */}
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>YOUR REFERRAL CODE</Text>
+          <Text style={styles.cardLabel}>{t('referral.codeLabel')}</Text>
           <View style={styles.codeRow}>
             <Text style={styles.codeText}>{myCode ?? '——————'}</Text>
             <TouchableOpacity
@@ -143,7 +145,7 @@ export default function ReferralScreen() {
               activeOpacity={0.8}
             >
               <Text style={styles.copyBtnText}>
-                {copied ? '✓ Copied' : 'Copy'}
+                {copied ? t('referral.copied') : t('referral.copy')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -153,14 +155,14 @@ export default function ReferralScreen() {
             onPress={handleShare}
             activeOpacity={0.8}
           >
-            <Text style={styles.shareBtnText}>Share Code →</Text>
+              <Text style={styles.shareBtnText}>{t('referral.share')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Progress */}
         <View style={styles.card}>
           <View style={styles.progressHeader}>
-            <Text style={styles.cardLabel}>REFERRAL PROGRESS</Text>
+            <Text style={styles.cardLabel}>{t('referral.progress')}</Text>
             <Text style={styles.progressCount}>
               <Text style={styles.progressDone}>{completed}</Text>
               <Text style={styles.progressTotal}> / {REWARD_THRESHOLD}</Text>
@@ -173,14 +175,16 @@ export default function ReferralScreen() {
 
           <Text style={styles.progressHint}>
             {completed >= REWARD_THRESHOLD
-              ? '🎉 Reward unlocked! Claim below.'
-              : `${REWARD_THRESHOLD - completed} more referral${REWARD_THRESHOLD - completed === 1 ? '' : 's'} to unlock your reward.`
+              ? t('referral.rewardUnlockedHint')
+              : REWARD_THRESHOLD - completed === 1
+              ? t('referral.oneMoreReferral')
+              : t('referral.moreReferrals', { value: REWARD_THRESHOLD - completed })
             }
           </Text>
 
           {pending > 0 ? (
             <Text style={styles.pendingText}>
-              {pending} referral{pending > 1 ? 's' : ''} pending — friend hasn&apos;t completed first session yet.
+              {pending === 1 ? t('referral.onePending') : t('referral.pending', { value: pending })}
             </Text>
           ) : null}
         </View>
@@ -188,16 +192,14 @@ export default function ReferralScreen() {
         {/* Claim Reward */}
         {hasUnlockedReward ? (
           <View style={[styles.card, styles.rewardCard]}>
-            <Text style={styles.rewardTitle}>🏆 Reward Unlocked!</Text>
-            <Text style={styles.rewardSubtitle}>
-              Contact us to claim your exclusive reward.
-            </Text>
+            <Text style={styles.rewardTitle}>{t('referral.rewardTitle')}</Text>
+            <Text style={styles.rewardSubtitle}>{t('referral.rewardSubtitle')}</Text>
             <TouchableOpacity
               style={styles.claimBtn}
               onPress={claimViaInstagram}
               activeOpacity={0.8}
             >
-              <Text style={styles.claimBtnText}>📸 Claim via Instagram</Text>
+              <Text style={styles.claimBtnText}>{t('referral.claimInstagram')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.claimBtn, styles.claimBtnEmail]}
@@ -205,7 +207,7 @@ export default function ReferralScreen() {
               activeOpacity={0.8}
             >
               <Text style={[styles.claimBtnText, styles.claimBtnEmailText]}>
-                ✉️ Claim via Email
+                {t('referral.claimEmail')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -213,13 +215,13 @@ export default function ReferralScreen() {
 
         {/* How it works */}
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>HOW IT WORKS</Text>
+          <Text style={styles.cardLabel}>{t('referral.howItWorks')}</Text>
           {[
-            { step: '1', text: 'Share your referral code with a friend.' },
-            { step: '2', text: 'Friend signs up using your code.' },
-            { step: '3', text: 'Friend completes their first focus session.' },
-            { step: '4', text: 'You get +25 XP. Friend gets +50 XP.' },
-            { step: '5', text: '5 successful referrals → Exclusive reward unlocked.' },
+            { step: '1', text: t('referral.step1') },
+            { step: '2', text: t('referral.step2') },
+            { step: '3', text: t('referral.step3') },
+            { step: '4', text: t('referral.step4') },
+            { step: '5', text: t('referral.step5') },
           ].map(item => (
             <View key={item.step} style={styles.stepRow}>
               <View style={styles.stepBadge}>
@@ -242,16 +244,14 @@ export default function ReferralScreen() {
         <Pressable style={styles.modalOverlay} onPress={() => setShowReward(false)}>
           <Pressable style={styles.modalCard} onPress={() => {}}>
             <Text style={styles.modalEmoji}>🏆</Text>
-            <Text style={styles.modalTitle}>Reward Unlocked!</Text>
-            <Text style={styles.modalSubtitle}>
-              You&apos;ve successfully referred 5 friends. Claim your exclusive reward now!
-            </Text>
+            <Text style={styles.modalTitle}>{t('referral.rewardTitle')}</Text>
+            <Text style={styles.modalSubtitle}>{t('referral.modalSubtitle')}</Text>
             <TouchableOpacity
               style={styles.modalInstagramBtn}
               onPress={() => { setShowReward(false); claimViaInstagram(); }}
               activeOpacity={0.8}
             >
-              <Text style={styles.modalBtnText}>📸 Claim via Instagram</Text>
+              <Text style={styles.modalBtnText}>{t('referral.claimInstagram')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.modalEmailBtn}
@@ -259,11 +259,11 @@ export default function ReferralScreen() {
               activeOpacity={0.8}
             >
               <Text style={[styles.modalBtnText, { color: colors.textSecondary }]}>
-                ✉️ Claim via Email
+                {t('referral.claimEmail')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowReward(false)}>
-              <Text style={styles.modalDismiss}>Claim later</Text>
+              <Text style={styles.modalDismiss}>{t('referral.claimLater')}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
