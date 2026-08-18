@@ -144,7 +144,12 @@ export default function FocusActiveScreen() {
       }
     } catch (error) {
       console.error('Silent Complete Error:', error);
-      currentRouter.replace('/focus/complete?xp=0&comeback=0');
+      if (isRecovery) {
+        setRecovery(false, 0);
+        currentRouter.replace(`/focus/broken?penalty=0&recovery=1&required=${STREAK_RECOVERY_MINUTES}`);
+      } else {
+        currentRouter.replace('/focus/complete?xp=0&comeback=0');
+      }
     }
   }, []);
 
@@ -270,6 +275,16 @@ export default function FocusActiveScreen() {
           const updated = payload.new;
 
           if (updated?.broken === false && updated?.ended_at) {
+            const currentSession = liveStateRef.current.activeSession;
+            const isRecovery = Boolean(currentSession?.isRecovery || liveStateRef.current.streakRecoveryPending);
+            const actualMins = Math.floor(elapsedRef.current / 60);
+            if (!isStreakRecoveryEligible(isRecovery, actualMins)) {
+              isCompletingRef.current = true;
+              if (intervalRef.current) clearInterval(intervalRef.current);
+              liveStateRef.current.setStreakRecoveryPending(false, 0);
+              currentRouter.replace(`/focus/broken?penalty=0&recovery=1&required=${STREAK_RECOVERY_MINUTES}`);
+              return;
+            }
             isCompletingRef.current = true;
             if (intervalRef.current) clearInterval(intervalRef.current);
             currentRouter.replace(`/focus/complete?xp=${updated.xp_earned ?? 0}`);

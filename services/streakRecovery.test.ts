@@ -6,6 +6,11 @@ test('recovery policy requires the full 30 minutes', () => {
   assert.equal(STREAK_RECOVERY_MINUTES, 30);
   assert.equal(isStreakRecoveryEligible(true, 1), false);
   assert.equal(isStreakRecoveryEligible(true, 29), false);
+  assert.equal(isStreakRecoveryEligible(true, 29.999), false);
+  assert.equal(isStreakRecoveryEligible(true, 0), false);
+  assert.equal(isStreakRecoveryEligible(true, -1), false);
+  assert.equal(isStreakRecoveryEligible(true, Number.NaN), false);
+  assert.equal(isStreakRecoveryEligible(true, Number.POSITIVE_INFINITY), false);
   assert.equal(isStreakRecoveryEligible(true, 30), true);
 });
 
