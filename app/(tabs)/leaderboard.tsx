@@ -146,63 +146,6 @@ function RankZoneBar({ rank, total }: { rank: number; total: number }) {
 }
 
 // ── Leaderboard row ───────────────────────────────────────────────────────────
-function TopThreePodium({ entries, currentUserId }: { entries: LeaderboardEntry[]; currentUserId?: string }) {
-  const { colors } = useTheme();
-  const { t } = useLanguage();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const medalMeta: Record<number, { label: string; color: string; icon: 'emoji-events' | 'military-tech' | 'workspace-premium' }> = {
-    1: { label: t('leaderboard.gold'), color: '#F5B700', icon: 'emoji-events' },
-    2: { label: t('leaderboard.silver'), color: '#AEB8C4', icon: 'military-tech' },
-    3: { label: t('leaderboard.bronze'), color: '#C77B30', icon: 'workspace-premium' },
-  };
-  const ordered = [2, 1, 3]
-    .map(rank => entries.find(entry => entry.rank === rank))
-    .filter((entry): entry is LeaderboardEntry => Boolean(entry));
-
-  return (
-    <View style={styles.podiumSection}>
-      <View style={styles.podiumHeadingRow}>
-        <View>
-          <Text style={styles.podiumEyebrow}>{t('leaderboard.topThree')}</Text>
-          <Text style={styles.podiumHeading}>{t('leaderboard.rankChange')}</Text>
-        </View>
-        <MaterialIcons name="emoji-events" size={24} color="#F5B700" />
-      </View>
-      <View style={styles.podiumCardsRow}>
-        {ordered.map(entry => {
-          const meta = medalMeta[entry.rank];
-          const isMe = entry.id === currentUserId;
-          return (
-            <View
-              key={entry.id}
-              accessibilityLabel={`${entry.name}, ${meta.label}, rank ${entry.rank}, ${entry.xp} XP`}
-              style={[
-                styles.podiumCard,
-                entry.rank === 1 && styles.podiumCardFirst,
-                isMe && styles.podiumCardMe,
-                { borderColor: meta.color, backgroundColor: `${meta.color}18` },
-              ]}
-            >
-              <View style={[styles.podiumMedal, { backgroundColor: `${meta.color}25`, borderColor: meta.color }]}>
-                <MaterialIcons name={meta.icon} size={24} color={meta.color} />
-              </View>
-              <Text style={[styles.podiumRank, { color: meta.color }]}>#{entry.rank}</Text>
-              <Text style={[styles.podiumMedalLabel, { color: meta.color }]}>{meta.label}</Text>
-              <Text style={[styles.podiumName, isMe && { color: colors.primary }]} numberOfLines={1}>
-                {entry.name}{isMe ? ` (${t('leaderboard.you')})` : ''}
-              </Text>
-              <View style={styles.podiumXpRow}>
-                <Text style={styles.podiumXp}>{entry.xp}</Text>
-                <Text style={styles.podiumXpLabel}>{t('leaderboard.xpEarned')}</Text>
-              </View>
-            </View>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
 function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
   const { colors } = useTheme();
   const { t } = useLanguage();
@@ -490,6 +433,13 @@ export default function LeaderboardScreen() {
             </View>
             <Text style={styles.sectionSubtitle}>{t('leaderboard.subtitle')}</Text>
 
+          {!loading && entries.length > 0 && getWeeklyZone(myRank, entries.length) !== 'promotion' ? (
+            <View style={styles.promotionHint}>
+              <MaterialIcons name="arrow-upward" size={22} color={colors.success} />
+              <Text style={styles.promotionHintText}>{t('leaderboard.rankHigherToPromoted')}</Text>
+            </View>
+          ) : null}
+
           {loading ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator size="large" color={colors.primary} />
@@ -501,14 +451,11 @@ export default function LeaderboardScreen() {
               <Text style={styles.emptyText}>{t('leaderboard.noRankings')}{'\n'}</Text>
             </View>
           ) : (
-            <>
-              <TopThreePodium entries={visibleEntries.filter(entry => entry.rank <= 3)} currentUserId={user?.id} />
-              <View style={styles.listContainer}>
-                {visibleEntries.filter(entry => entry.rank > 3).map(entry => (
-                  <BoardRow key={entry.id} entry={entry} isMe={entry.id === user?.id} />
-                ))}
-              </View>
-            </>
+            <View style={styles.listContainer}>
+              {visibleEntries.map(entry => (
+                <BoardRow key={entry.id} entry={entry} isMe={entry.id === user?.id} />
+              ))}
+            </View>
           )}
         </View>
       </ScrollView>
@@ -757,64 +704,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // ── Top-three podium ──────────────────────────────────────────────────────
-  podiumSection: {
-    backgroundColor: colors.surface,
-    borderRadius: Radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  podiumHeadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.md,
-  },
-  podiumEyebrow: {
-    color: '#F5B700',
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.extraBold,
-    letterSpacing: 1.5,
-  },
-  podiumHeading: { color: colors.textSecondary, fontSize: FontSize.xs, marginTop: 3 },
-  podiumCardsRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
-  podiumCard: {
-    flex: 1,
-    minHeight: 166,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingHorizontal: 5,
-    paddingVertical: 12,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-  },
-  podiumCardFirst: { minHeight: 198, paddingTop: 18 },
-  podiumCardMe: {
-    borderWidth: 2,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.24,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
-  },
-  podiumMedal: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    marginBottom: 8,
-  },
-  podiumRank: { fontSize: FontSize.lg, fontWeight: FontWeight.extraBold, includeFontPadding: false },
-  podiumMedalLabel: { fontSize: 9, fontWeight: FontWeight.extraBold, letterSpacing: 0.7, marginTop: 2 },
-  podiumName: { color: colors.textPrimary, fontSize: FontSize.sm, fontWeight: FontWeight.bold, marginTop: 8, maxWidth: '100%' },
-  podiumXpRow: { flexDirection: 'row', alignItems: 'baseline', gap: 3, marginTop: 6 },
-  podiumXp: { color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.extraBold },
-  podiumXpLabel: { color: colors.textTertiary, fontSize: 9 },
-
   // ── Section 3 List ─────────────────────────────────────────────────────────
   listSection: {
     paddingHorizontal: Spacing.md,
@@ -832,6 +721,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     textTransform: 'uppercase',
   },
   sectionSubtitle: { color: colors.textTertiary, fontSize: FontSize.xs, marginBottom: Spacing.sm },
+  promotionHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, marginBottom: 4 },
+  promotionHintText: { color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.bold },
   listContainer: { gap: 6, paddingBottom: Spacing.xl },
   boardRow: {
     flexDirection: 'row',
