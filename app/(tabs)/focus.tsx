@@ -150,7 +150,7 @@ export default function FocusScreen() {
         {/* XP preview */}
         <View style={styles.xpPreview}>
           <MaterialIcons name="bolt" size={18} color={colors.warning} />
-          <Text style={styles.xpPreviewText}>
+          <Text style={styles.xpPreviewText} numberOfLines={2} ellipsizeMode="tail">
             {t('focus.sessionXP')} <Text style={styles.xpPreviewBold}>+{expectedXP} XP</Text>
           </Text>
         </View>
@@ -294,7 +294,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     padding: Spacing.sm, marginBottom: Spacing.lg,
     borderWidth: 1, borderColor: colors.border,
   },
-  xpPreviewText: { fontSize: FontSize.base, color: colors.textSecondary },
+  xpPreviewText: { fontSize: FontSize.base, color: colors.textSecondary, flex: 1, flexShrink: 1, minWidth: 0, lineHeight: 20 },
   xpPreviewBold: { color: colors.warning, fontWeight: FontWeight.bold },
   customInputRow: {
     flexDirection: 'row',

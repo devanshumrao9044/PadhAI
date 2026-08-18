@@ -278,7 +278,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   backBtn: { width: 40, alignItems: 'flex-start' },
   backArrow: { color: colors.primary, fontSize: 22, fontWeight: '700' },
@@ -292,9 +292,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   heroSubtitle: { color: colors.textTertiary, fontSize: 14, textAlign: 'center', lineHeight: 20, maxWidth: 300 },
 
   card: {
-    backgroundColor: '#0F0F1A', borderRadius: 16,
+    backgroundColor: colors.surface, borderRadius: 16,
     padding: 20, borderWidth: 1,
-    borderColor: 'rgba(124, 92, 252, 0.12)',
+    borderColor: colors.border,
   },
   cardLabel: {
     color: colors.textTertiary, fontSize: 11, fontWeight: '700',
@@ -320,21 +320,21 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   progressDone: { color: colors.primary, fontWeight: '900', fontSize: 20 },
   progressTotal: { color: colors.textTertiary, fontWeight: '600' },
   progressTrack: {
-    height: 8, backgroundColor: 'rgba(255,255,255,0.06)',
+    height: 8, backgroundColor: colors.surfaceVariant,
     borderRadius: 4, overflow: 'hidden', marginVertical: 12,
   },
   progressFill: { height: '100%', backgroundColor: colors.primary, borderRadius: 4 },
   progressHint: { color: colors.textSecondary, fontSize: 13, lineHeight: 18 },
-  pendingText: { color: '#F59E0B', fontSize: 12, marginTop: 8 },
+  pendingText: { color: colors.warning, fontSize: 12, marginTop: 8 },
 
-  rewardCard: { borderColor: 'rgba(253, 224, 71, 0.25)', backgroundColor: 'rgba(253, 224, 71, 0.04)' },
-  rewardTitle: { color: '#FDE047', fontSize: 20, fontWeight: '800', marginBottom: 6 },
+  rewardCard: { borderColor: colors.warning + '66', backgroundColor: colors.warning + '12' },
+  rewardTitle: { color: colors.warning, fontSize: 20, fontWeight: '800', marginBottom: 6 },
   rewardSubtitle: { color: colors.textSecondary, fontSize: 13, marginBottom: 16 },
   claimBtn: {
     backgroundColor: colors.primary, borderRadius: 12,
     paddingVertical: 13, alignItems: 'center', marginBottom: 10,
   },
-  claimBtnEmail: { backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  claimBtnEmail: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.borderStrong },
   claimBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   claimBtnEmailText: { color: colors.textSecondary },
 
@@ -352,12 +352,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', padding: 24,
   },
   modalCard: {
-    backgroundColor: '#0F0F1A', borderRadius: 20,
+    backgroundColor: colors.surface, borderRadius: 20,
     padding: 28, width: '100%', alignItems: 'center',
-    borderWidth: 1, borderColor: 'rgba(253, 224, 71, 0.2)',
+    borderWidth: 1, borderColor: colors.warning + '55',
   },
   modalEmoji: { fontSize: 56, marginBottom: 16 },
-  modalTitle: { color: '#FDE047', fontSize: 24, fontWeight: '900', marginBottom: 8 },
+  modalTitle: { color: colors.warning, fontSize: 24, fontWeight: '900', marginBottom: 8 },
   modalSubtitle: { color: colors.textSecondary, fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
   modalInstagramBtn: {
     backgroundColor: colors.primary, borderRadius: 12,
@@ -365,9 +365,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   modalEmailBtn: {
     backgroundColor: 'transparent', borderRadius: 12, borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: colors.borderStrong,
     paddingVertical: 14, width: '100%', alignItems: 'center', marginBottom: 16,
   },
   modalBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-  modalDismiss: { color: '#4B5563', fontSize: 13 },
+  modalDismiss: { color: colors.textTertiary, fontSize: 13 },
 });

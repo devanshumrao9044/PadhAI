@@ -466,16 +466,26 @@ export default function ProfileScreen() {
         {recentSessions.length > 0 ? (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>{t('profile.recentSessions')}</Text>
-            {recentSessions.map(session => (
+            {recentSessions.map(session => {
+              const comebackBonus = Math.max(0, session.comebackBonus ?? 0);
+              const baseXP = Math.max(0, session.xpEarned - comebackBonus);
+              return (
               <View key={session.id} style={styles.sessionRow}>
                 <MaterialIcons name={session.completed ? 'check-circle' : 'cancel'} size={17} color={session.completed ? colors.success : colors.danger} />
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingLabel}>{session.sessionDate}</Text>
                   <Text style={styles.settingValue}>{t('profile.goalMinutes', { value: session.durationActualMins })} {session.completed ? t('profile.completed') : t('profile.broken')}</Text>
                 </View>
-                <Text style={[styles.xpAmount, { color: session.completed ? colors.success : colors.danger }]}>{session.completed ? `+${session.xpEarned}` : `-${session.xpDeducted}`} XP</Text>
+                <Text style={[styles.xpAmount, { color: session.completed ? colors.success : colors.danger }]}>
+                  {session.completed
+                    ? comebackBonus > 0
+                      ? `+${baseXP} XP + ${comebackBonus} ${t('focus.comebackBonus').toLowerCase()}`
+                      : `+${baseXP} XP`
+                    : `-${session.xpDeducted} XP`}
+                </Text>
               </View>
-            ))}
+              );
+            })}
           </View>
         ) : null}
 

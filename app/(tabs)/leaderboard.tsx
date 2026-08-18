@@ -104,6 +104,8 @@ function RankZoneBar({ rank, total }: { rank: number; total: number }) {
   // Rank 1 is best and belongs at the promotion end of the bar.
   // A one-player leaderboard is treated as fully promoted rather than demotion.
   const rankPct = safeTotal <= 1 ? 100 : ((safeTotal - safeRank) / (safeTotal - 1)) * 100;
+  // Keep the badge and indicator fully inside the rounded track at both edges.
+  const safeRankPct = Math.max(12, Math.min(88, rankPct));
   const zone = getWeeklyZone(safeRank, safeTotal);
 
   const zoneColor = zone === 'promotion' ? colors.success : zone === 'safety' ? colors.warning : colors.danger;
@@ -111,13 +113,13 @@ function RankZoneBar({ rank, total }: { rank: number; total: number }) {
   return (
     <View style={styles.zoneBarContainer}>
       <View style={styles.zoneLabels}>
-        <Text style={[styles.zoneLabel, { color: colors.danger }]}>{t('leaderboard.demotionZone')}</Text>
-        <Text style={[styles.zoneLabel, { color: colors.warning }]}>{t('leaderboard.safetyZone')}</Text>
-        <Text style={[styles.zoneLabel, { color: colors.success }]}>{t('leaderboard.promotionZone')}</Text>
+        <Text numberOfLines={1} ellipsizeMode="clip" style={[styles.zoneLabel, { color: colors.danger }]}>{t('leaderboard.demotionZone')}</Text>
+        <Text numberOfLines={1} ellipsizeMode="clip" style={[styles.zoneLabel, { color: colors.warning }]}>{t('leaderboard.safetyZone')}</Text>
+        <Text numberOfLines={1} ellipsizeMode="clip" style={[styles.zoneLabel, { color: colors.success }]}>{t('leaderboard.promotionZone')}</Text>
       </View>
 
       {/* Rank badge above bar */}
-      <View style={[styles.rankBadgeAbove, { left: `${rankPct}%` as any, borderColor: zoneColor }]}>
+      <View style={[styles.rankBadgeAbove, { left: `${safeRankPct}%` as any, borderColor: zoneColor }]}>
         <Text style={[styles.rankBadgeAboveText, { color: zoneColor }]}>Rank: {safeRank}</Text>
       </View>
 
@@ -127,7 +129,7 @@ function RankZoneBar({ rank, total }: { rank: number; total: number }) {
         <View style={[styles.zoneSegment, { flex: safetyPct, backgroundColor: colors.warning + '88' }]} />
         <View style={[styles.zoneSegment, { flex: promotionPct, backgroundColor: colors.success + '88' }]} />
         {/* Indicator dot */}
-        <View style={[styles.zoneDot, { left: `${rankPct}%` as any, backgroundColor: zoneColor }]} />
+        <View style={[styles.zoneDot, { left: `${safeRankPct}%` as any, backgroundColor: zoneColor }]} />
       </View>
 
       <View style={styles.zoneRankNums}>
@@ -716,7 +718,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
 
   // ── Zone Bar ───────────────────────────────────────────────────────────────
-  zoneBarContainer: { marginTop: Spacing.sm },
+  zoneBarContainer: { marginTop: Spacing.sm, overflow: 'hidden' },
   zoneLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -726,6 +728,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     fontSize: FontSize.xs,
     fontWeight: FontWeight.semiBold,
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     textAlign: 'center',
   },
   rankBadgeAbove: {
@@ -747,7 +751,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     flexDirection: 'row',
     height: 10,
     borderRadius: Radius.full,
-    overflow: 'visible',
+    overflow: 'hidden',
     marginBottom: 4,
     position: 'relative',
   },
