@@ -16,8 +16,9 @@ import { useApp } from '@/hooks/useApp';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors } from '@/constants/theme';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import StreakOverviewModal from '@/components/ui/StreakOverviewModal';
+import { loadUnreadNotificationCount } from '@/services/adminNotifications';
 
 export default function Dashboard() {
   const { colors } = useTheme();
@@ -26,6 +27,7 @@ export default function Dashboard() {
   const router = useRouter();
   const { user, isLoading, subjects, chapters, sessions, dailySummaries, chapterAnalytics, reload } = useApp();
   const [streakModalOpen, setStreakModalOpen] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const activeChapterIds = useMemo(() => {
     const activeSubjectIds = new Set(subjects.filter(subject => !subject.isDeleted).map(subject => subject.id));
     return new Set(chapters
@@ -38,6 +40,18 @@ export default function Dashboard() {
   const channelIdRef = useRef(0);
   const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userId = user?.id ?? null;
+
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    if (userId) {
+      void loadUnreadNotificationCount().then(count => {
+        if (active) setUnreadNotifications(count);
+      }).catch(() => { if (active) setUnreadNotifications(0); });
+    } else {
+      setUnreadNotifications(0);
+    }
+    return () => { active = false; };
+  }, [userId]));
 
   const stats = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -153,6 +167,10 @@ export default function Dashboard() {
           </View>
 
           <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.notificationHeaderButton} onPress={() => router.push('/notifications' as Parameters<typeof router.push>[0])} accessibilityLabel={t('notifications.title')}>
+              <MaterialIcons name="notifications" size={21} color={colors.primary} />
+              {unreadNotifications > 0 ? <View style={styles.notificationBadge}><Text style={styles.notificationBadgeText}>{unreadNotifications > 9 ? '9+' : unreadNotifications}</Text></View> : null}
+            </TouchableOpacity>
             <TouchableOpacity style={styles.headerStat} onPress={() => setStreakModalOpen(true)} accessibilityLabel={t('home.streakOverview')}>
               <MaterialIcons name="local-fire-department" size={17} color={colors.warning} />
               <Text style={[styles.headerStatText, { color: colors.warning }]}>{user.streakCurrent}</Text>
@@ -218,4 +236,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   headerStat: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6, paddingVertical: 7, borderRadius: 10, backgroundColor: colors.surfaceVariant },
   headerStatText: { fontSize: 12, fontWeight: '800', maxWidth: 52 },
   headerIconButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: colors.surfaceVariant },
+  notificationHeaderButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: colors.surfaceVariant, position: 'relative' },
+  notificationBadge: { position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.danger, borderWidth: 1, borderColor: colors.background },
+  notificationBadgeText: { color: colors.background, fontSize: 9, fontWeight: '800' },
 });

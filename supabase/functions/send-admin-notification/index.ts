@@ -8,6 +8,10 @@ type RequestBody = {
   targetType?: unknown;
   targetUserId?: unknown;
   targetLevel?: unknown;
+  attachmentPath?: unknown;
+  attachmentMimeType?: unknown;
+  attachmentSizeBytes?: unknown;
+  linkUrl?: unknown;
 };
 
 type Recipient = { id: string };
@@ -42,6 +46,17 @@ function cleanText(value: unknown, maxLength: number): string | null {
   if (typeof value !== 'string') return null;
   const text = value.trim();
   return text.length >= 1 && text.length <= maxLength ? text : null;
+}
+
+function cleanHttpsUrl(value: unknown): string | null {
+  const text = cleanText(value, 2048);
+  if (!text) return null;
+  try {
+    const url = new URL(text);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -112,6 +127,25 @@ async function handleRequest(request: Request) {
   if (targetType === 'user' && !targetUserId) return json({ error: 'A valid target user is required' }, 400);
   if (targetType === 'level' && (targetLevel === null || targetLevel < 1 || targetLevel > 10)) return json({ error: 'A valid target level is required' }, 400);
 
+  const attachmentPathValue = cleanText(payload.attachmentPath, 300);
+  const attachmentPath = attachmentPathValue || null;
+  const attachmentMimeTypeValue = cleanText(payload.attachmentMimeType, 40);
+  const attachmentMimeType = attachmentMimeTypeValue === 'image/jpeg' || attachmentMimeTypeValue === 'application/pdf'
+    ? attachmentMimeTypeValue
+    : null;
+  const attachmentSizeBytes = Number.isInteger(payload.attachmentSizeBytes) ? Number(payload.attachmentSizeBytes) : null;
+  const linkUrl = payload.linkUrl == null ? null : cleanHttpsUrl(payload.linkUrl);
+  if (payload.linkUrl != null && !linkUrl) return json({ error: 'Link must be a valid HTTP or HTTPS URL' }, 400);
+  if (attachmentPath) {
+    if (!attachmentPath.startsWith(`${senderId}/`) || attachmentPath.includes('..') || !attachmentMimeType || !attachmentSizeBytes || attachmentSizeBytes < 1 || attachmentSizeBytes > 5242880) {
+      return json({ error: 'Attachment metadata is invalid' }, 400);
+    }
+    const expectedExtension = attachmentMimeType === 'application/pdf' ? '.pdf' : '.jpg';
+    if (!attachmentPath.toLowerCase().endsWith(expectedExtension)) return json({ error: 'Attachment type does not match its file path' }, 400);
+  } else if (payload.attachmentMimeType != null || payload.attachmentSizeBytes != null) {
+    return json({ error: 'Attachment metadata is incomplete' }, 400);
+  }
+
   let recipients: Recipient[] = [];
   if (targetType === 'user') {
     const { data, error } = await adminClient.from('users').select('id').eq('id', targetUserId).limit(1);
@@ -138,6 +172,10 @@ async function handleRequest(request: Request) {
       target_level: targetLevel,
       title,
       body,
+      attachment_path: attachmentPath,
+      attachment_mime_type: attachmentMimeType,
+      attachment_size_bytes: attachmentSizeBytes,
+      link_url: linkUrl,
     })
     .select('id')
     .single();
@@ -148,6 +186,10 @@ async function handleRequest(request: Request) {
     user_id: recipient.id,
     title,
     body,
+    attachment_path: attachmentPath,
+    attachment_mime_type: attachmentMimeType,
+    attachment_size_bytes: attachmentSizeBytes,
+    link_url: linkUrl,
   }));
   for (const batch of chunk(rows, 500)) {
     const { error } = await adminClient.from('user_notifications').insert(batch);

@@ -404,6 +404,25 @@ export default function ProfileScreen() {
           ))}
         </View>
 
+        <View style={styles.notificationHeroCard}>
+          <View style={styles.notificationHeroIcon}><MaterialIcons name="notifications-active" size={24} color={colors.primary} /></View>
+          <View style={styles.notificationHeroInfo}>
+            <Text style={styles.notificationHeroTitle}>{t('notifications.title')}</Text>
+            <Text style={styles.notificationHeroText}>{t('notifications.inboxDescription')}</Text>
+          </View>
+          <TouchableOpacity style={styles.notificationHeroButton} onPress={() => router.push('/notifications' as Parameters<typeof router.push>[0])}>
+            <Text style={styles.notificationHeroButtonText}>{t('notifications.openInbox')}</Text>
+            <MaterialIcons name="chevron-right" size={18} color={colors.background} />
+          </TouchableOpacity>
+        </View>
+        {adminRole ? (
+          <TouchableOpacity style={styles.adminQuickLink} onPress={() => router.push('/admin/notifications' as Parameters<typeof router.push>[0])} activeOpacity={0.8}>
+            <MaterialIcons name="campaign" size={20} color={colors.primary} />
+            <View style={styles.notificationHeroInfo}><Text style={styles.adminQuickLinkTitle}>{t('notifications.adminTitle')}</Text><Text style={styles.notificationHeroText}>{t('notifications.adminDescription')}</Text></View>
+            <MaterialIcons name="chevron-right" size={20} color={colors.primary} />
+          </TouchableOpacity>
+        ) : null}
+
         {/* Level Roadmap */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{t('profile.levelRoadmap')}</Text>
@@ -466,131 +485,7 @@ export default function ProfileScreen() {
             <MaterialIcons name="chevron-right" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
 
-          <View style={styles.settingRow}>
-            <MaterialIcons name="notifications-active" size={20} color={colors.primary} />
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>{t('profile.notifications')}</Text>
-              <Text style={styles.settingValue}>{t('profile.notificationsDescription')}</Text>
-            </View>
-            <Switch
-              value={notificationSettings.enabled}
-              onValueChange={value => { void updateNotificationSettings({ enabled: value }); }}
-              disabled={notificationBusy}
-              trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }}
-              thumbColor={notificationSettings.enabled ? colors.primary : colors.textTertiary}
-            />
-          </View>
 
-          {notificationSettings.enabled ? (
-            <View style={styles.notificationOptions}>
-              <View style={styles.settingRow}>
-                <MaterialIcons name="school" size={19} color={colors.textSecondary} />
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingLabel}>{t('profile.studyReminder')}</Text>
-                  <Text style={styles.settingValue}>{t('profile.studyReminderDescription')}</Text>
-                </View>
-                <Switch
-                  value={notificationSettings.studyReminder}
-                  onValueChange={value => { void updateNotificationSettings({ studyReminder: value }); }}
-                  disabled={notificationBusy}
-                  trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }}
-                  thumbColor={notificationSettings.studyReminder ? colors.primary : colors.textTertiary}
-                />
-              </View>
-              <View style={styles.settingRow}>
-                <MaterialIcons name="checklist" size={19} color={colors.textSecondary} />
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingLabel}>{t('profile.todoReminder')}</Text>
-                  <Text style={styles.settingValue}>{t('profile.todoReminderDescription')}</Text>
-                </View>
-                <Switch
-                  value={notificationSettings.todoReminder}
-                  onValueChange={value => { void updateNotificationSettings({ todoReminder: value }); }}
-                  disabled={notificationBusy}
-                  trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }}
-                  thumbColor={notificationSettings.todoReminder ? colors.primary : colors.textTertiary}
-                />
-              </View>
-              <View style={styles.settingRow}>
-                <MaterialIcons name="local-fire-department" size={19} color={colors.textSecondary} />
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingLabel}>{t('profile.streakReminder')}</Text>
-                  <Text style={styles.settingValue}>{t('profile.streakReminderDescription')}</Text>
-                </View>
-                <Switch
-                  value={notificationSettings.streakReminder}
-                  onValueChange={value => { void updateNotificationSettings({ streakReminder: value }); }}
-                  disabled={notificationBusy}
-                  trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }}
-                  thumbColor={notificationSettings.streakReminder ? colors.primary : colors.textTertiary}
-                />
-              </View>
-            </View>
-          ) : null}
-
-          <TouchableOpacity
-            style={styles.settingRow}
-            onPress={() => router.push('/notifications' as Parameters<typeof router.push>[0])}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons name="notifications" size={20} color={colors.primary} />
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>{t('notifications.title')}</Text>
-              <Text style={styles.settingValue}>{t('notifications.inboxDescription')}</Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-
-          {adminRole ? (
-            <TouchableOpacity
-              style={styles.settingRow}
-              onPress={() => router.push('/admin/notifications' as Parameters<typeof router.push>[0])}
-              activeOpacity={0.7}
-            >
-              <MaterialIcons name="campaign" size={20} color={colors.primary} />
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingLabel}>{t('notifications.adminTitle')}</Text>
-                <Text style={styles.settingValue}>{t('notifications.adminDescription')}</Text>
-              </View>
-              <MaterialIcons name="chevron-right" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-          ) : null}
-
-          <View style={styles.settingRow}>
-            <MaterialIcons name="dark-mode" size={20} color={colors.primary} />
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>{t('profile.theme')}</Text>
-              <Text style={styles.settingValue}>{mode === 'dark' ? t('profile.darkMode') : t('profile.lightMode')}</Text>
-            </View>
-            <Switch
-              value={mode === 'light'}
-              onValueChange={() => { void toggleTheme(); }}
-              trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }}
-              thumbColor={mode === 'light' ? colors.primary : colors.textTertiary}
-            />
-          </View>
-
-          <View style={styles.settingRow}>
-            <MaterialIcons name="language" size={20} color={colors.primary} />
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>{t('profile.language')}</Text>
-              <Text style={styles.settingValue}>{t('settings.languageDescription')}</Text>
-            </View>
-            <View style={styles.languageOptions}>
-              {(['en', 'hi'] as const).map(option => (
-                <TouchableOpacity
-                  key={option}
-                  style={[styles.languageOption, language === option && styles.languageOptionActive]}
-                  onPress={() => { void setLanguage(option); }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.languageOptionText, language === option && styles.languageOptionTextActive]}>
-                    {option === 'en' ? t('profile.english') : t('profile.hindi')}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
 
           {(user as any).myReferralCode ? (
             <View style={styles.settingRow}>
@@ -739,6 +634,35 @@ export default function ProfileScreen() {
                 placeholderTextColor={colors.textTertiary}
               />
 
+              <View style={styles.modalPreferenceCard}>
+                <Text style={styles.modalPreferenceTitle}>{t('profile.editPreferences')}</Text>
+                <View style={styles.modalSettingRow}>
+                  <View style={styles.modalSettingInfo}><Text style={styles.modalSettingLabel}>{t('profile.theme')}</Text><Text style={styles.modalSettingValue}>{mode === 'dark' ? t('profile.darkMode') : t('profile.lightMode')}</Text></View>
+                  <Switch value={mode === 'light'} onValueChange={() => { void toggleTheme(); }} trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }} thumbColor={mode === 'light' ? colors.primary : colors.textTertiary} />
+                </View>
+                <View style={styles.modalSettingRow}>
+                  <View style={styles.modalSettingInfo}><Text style={styles.modalSettingLabel}>{t('profile.language')}</Text><Text style={styles.modalSettingValue}>{t('settings.languageDescription')}</Text></View>
+                  <View style={styles.languageOptions}>
+                    {(['en', 'hi'] as const).map(option => (
+                      <TouchableOpacity key={option} style={[styles.languageOption, language === option && styles.languageOptionActive]} onPress={() => { void setLanguage(option); }}>
+                        <Text style={[styles.languageOptionText, language === option && styles.languageOptionTextActive]}>{option === 'en' ? t('profile.english') : t('profile.hindi')}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+                <View style={styles.modalSettingRow}>
+                  <View style={styles.modalSettingInfo}><Text style={styles.modalSettingLabel}>{t('profile.notifications')}</Text><Text style={styles.modalSettingValue}>{t('profile.notificationsDescription')}</Text></View>
+                  <Switch value={notificationSettings.enabled} onValueChange={value => { void updateNotificationSettings({ enabled: value }); }} disabled={notificationBusy} trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }} thumbColor={notificationSettings.enabled ? colors.primary : colors.textTertiary} />
+                </View>
+                {notificationSettings.enabled ? (
+                  <View style={styles.modalReminderGroup}>
+                    <View style={styles.modalSettingRow}><View style={styles.modalSettingInfo}><Text style={styles.modalSettingLabel}>{t('profile.studyReminder')}</Text></View><Switch value={notificationSettings.studyReminder} onValueChange={value => { void updateNotificationSettings({ studyReminder: value }); }} disabled={notificationBusy} trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }} thumbColor={notificationSettings.studyReminder ? colors.primary : colors.textTertiary} /></View>
+                    <View style={styles.modalSettingRow}><View style={styles.modalSettingInfo}><Text style={styles.modalSettingLabel}>{t('profile.todoReminder')}</Text></View><Switch value={notificationSettings.todoReminder} onValueChange={value => { void updateNotificationSettings({ todoReminder: value }); }} disabled={notificationBusy} trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }} thumbColor={notificationSettings.todoReminder ? colors.primary : colors.textTertiary} /></View>
+                    <View style={styles.modalSettingRow}><View style={styles.modalSettingInfo}><Text style={styles.modalSettingLabel}>{t('profile.streakReminder')}</Text></View><Switch value={notificationSettings.streakReminder} onValueChange={value => { void updateNotificationSettings({ streakReminder: value }); }} disabled={notificationBusy} trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }} thumbColor={notificationSettings.streakReminder ? colors.primary : colors.textTertiary} /></View>
+                  </View>
+                ) : null}
+              </View>
+
               <View style={styles.modalBtns}>
                 <TouchableOpacity
                   style={styles.cancelBtn}
@@ -858,6 +782,15 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   statLabel: { fontSize: FontSize.xs, color: colors.textSecondary, textAlign: 'center' },
   card: { backgroundColor: colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.md, marginBottom: Spacing.md },
   cardTitle: { fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, color: colors.textTertiary, letterSpacing: 1.2, marginBottom: Spacing.sm, textTransform: 'uppercase' },
+  notificationHeroCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.primary + '55', backgroundColor: colors.primary + '12' },
+  notificationHeroIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  notificationHeroInfo: { flex: 1 },
+  notificationHeroTitle: { color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.bold },
+  notificationHeroText: { color: colors.textSecondary, fontSize: FontSize.xs, lineHeight: 17, marginTop: 2 },
+  notificationHeroButton: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: colors.primary, borderRadius: Radius.md, paddingHorizontal: 8, paddingVertical: 7 },
+  notificationHeroButtonText: { color: colors.background, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  adminQuickLink: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md, marginBottom: Spacing.md, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.primary + '55', backgroundColor: colors.surface },
+  adminQuickLinkTitle: { color: colors.textPrimary, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   levelRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, opacity: 0.4 },
   levelRowUnlocked: { opacity: 1 },
   levelDot: { width: 10, height: 10, borderRadius: 5 },
@@ -885,6 +818,13 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: colors.overlay },
   modalSheet: { backgroundColor: colors.surface, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.lg, paddingBottom: Spacing.xxl, marginTop: 'auto', borderWidth: 1, borderColor: colors.border },
   modalTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: colors.textPrimary, marginBottom: Spacing.lg, textAlign: 'center' },
+  modalPreferenceCard: { marginTop: Spacing.md, padding: Spacing.sm, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
+  modalPreferenceTitle: { color: colors.textPrimary, fontSize: FontSize.sm, fontWeight: FontWeight.bold, marginBottom: 2 },
+  modalSettingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  modalSettingInfo: { flex: 1 },
+  modalSettingLabel: { color: colors.textPrimary, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
+  modalSettingValue: { color: colors.textSecondary, fontSize: FontSize.xs, marginTop: 2 },
+  modalReminderGroup: { marginLeft: Spacing.sm, paddingLeft: Spacing.sm, borderLeftWidth: 2, borderLeftColor: colors.border },
   modalAvatarEdit: { alignSelf: 'center', marginBottom: 6, position: 'relative' },
   avatarError: { fontSize: FontSize.xs, color: colors.danger, textAlign: 'center', marginBottom: Spacing.sm },
   avatarImageSmall: { width: 64, height: 64, borderRadius: 32 },
