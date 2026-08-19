@@ -16,8 +16,16 @@ import { useAuthSession } from '@/auth/AuthSessionProvider';
 import { getLevelForUser, getXPProgressForUser, LEVELS } from '@/constants/levels';
 import XPBar from '@/components/ui/XPBar';
 import { getRecentSessions } from '@/services/sessionHistory';
+import { loadTodoItems } from '@/services/productivity';
 import { fetchReferralStats } from '@/services/referralService';
 import { getWeeklyZone } from '@/services/weeklyXp';
+import {
+  DEFAULT_NOTIFICATION_SETTINGS,
+  loadNotificationSettings,
+  saveNotificationSettings,
+  syncLocalNotifications,
+} from '@/services/localNotifications';
+import type { NotificationSettings } from '@/types/models';
 import {
   formatFileSize,
   getImageByteSize,
@@ -47,6 +55,8 @@ export default function ProfileScreen() {
   const [editGoal, setEditGoal] = useState('');
   const [editAvatarUrl, setEditAvatarUrl] = useState('');
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(DEFAULT_NOTIFICATION_SETTINGS);
+  const [notificationBusy, setNotificationBusy] = useState(false);
 
   const [alertConfig, setAlertConfig] = useState<{
     visible: boolean; title: string; message: string; isSignOut?: boolean;
@@ -79,6 +89,43 @@ export default function ProfileScreen() {
     }
     fetchRankInfo();
   }, [userId, colors]);
+
+  useEffect(() => {
+    if (!userId) {
+      setNotificationSettings(DEFAULT_NOTIFICATION_SETTINGS);
+      return;
+    }
+    let active = true;
+    void Promise.all([loadNotificationSettings(userId), loadTodoItems(userId)]).then(([settings, todoItems]) => {
+      if (!active) return;
+      setNotificationSettings(settings);
+      const hasPendingTodo = todoItems.some(item => !item.completed && item.date >= new Date().toISOString().slice(0, 10));
+      void syncLocalNotifications(settings, language, hasPendingTodo);
+    });
+    return () => { active = false; };
+  }, [userId, language]);
+
+  const updateNotificationSettings = async (patch: Partial<NotificationSettings>) => {
+    if (!userId || notificationBusy) return;
+    const next = { ...notificationSettings, ...patch };
+    setNotificationBusy(true);
+    try {
+      const todoItems = await loadTodoItems(userId);
+      const hasPendingTodo = todoItems.some(item => !item.completed && item.date >= new Date().toISOString().slice(0, 10));
+      const synced = await syncLocalNotifications(next, language, hasPendingTodo);
+      if (!synced && next.enabled) {
+        Alert.alert(
+          t('profile.notifications'),
+          Platform.OS === 'web' ? t('profile.notificationsWebUnavailable') : t('profile.notificationsPermissionDenied'),
+        );
+        return;
+      }
+      setNotificationSettings(next);
+      await saveNotificationSettings(userId, next);
+    } finally {
+      setNotificationBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!userId) {
@@ -415,6 +462,68 @@ export default function ProfileScreen() {
           </TouchableOpacity>
 
           <View style={styles.settingRow}>
+            <MaterialIcons name="notifications-active" size={20} color={colors.primary} />
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>{t('profile.notifications')}</Text>
+              <Text style={styles.settingValue}>{t('profile.notificationsDescription')}</Text>
+            </View>
+            <Switch
+              value={notificationSettings.enabled}
+              onValueChange={value => { void updateNotificationSettings({ enabled: value }); }}
+              disabled={notificationBusy}
+              trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }}
+              thumbColor={notificationSettings.enabled ? colors.primary : colors.textTertiary}
+            />
+          </View>
+
+          {notificationSettings.enabled ? (
+            <View style={styles.notificationOptions}>
+              <View style={styles.settingRow}>
+                <MaterialIcons name="school" size={19} color={colors.textSecondary} />
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingLabel}>{t('profile.studyReminder')}</Text>
+                  <Text style={styles.settingValue}>{t('profile.studyReminderDescription')}</Text>
+                </View>
+                <Switch
+                  value={notificationSettings.studyReminder}
+                  onValueChange={value => { void updateNotificationSettings({ studyReminder: value }); }}
+                  disabled={notificationBusy}
+                  trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }}
+                  thumbColor={notificationSettings.studyReminder ? colors.primary : colors.textTertiary}
+                />
+              </View>
+              <View style={styles.settingRow}>
+                <MaterialIcons name="checklist" size={19} color={colors.textSecondary} />
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingLabel}>{t('profile.todoReminder')}</Text>
+                  <Text style={styles.settingValue}>{t('profile.todoReminderDescription')}</Text>
+                </View>
+                <Switch
+                  value={notificationSettings.todoReminder}
+                  onValueChange={value => { void updateNotificationSettings({ todoReminder: value }); }}
+                  disabled={notificationBusy}
+                  trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }}
+                  thumbColor={notificationSettings.todoReminder ? colors.primary : colors.textTertiary}
+                />
+              </View>
+              <View style={styles.settingRow}>
+                <MaterialIcons name="local-fire-department" size={19} color={colors.textSecondary} />
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingLabel}>{t('profile.streakReminder')}</Text>
+                  <Text style={styles.settingValue}>{t('profile.streakReminderDescription')}</Text>
+                </View>
+                <Switch
+                  value={notificationSettings.streakReminder}
+                  onValueChange={value => { void updateNotificationSettings({ streakReminder: value }); }}
+                  disabled={notificationBusy}
+                  trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }}
+                  thumbColor={notificationSettings.streakReminder ? colors.primary : colors.textTertiary}
+                />
+              </View>
+            </View>
+          ) : null}
+
+          <View style={styles.settingRow}>
             <MaterialIcons name="dark-mode" size={20} color={colors.primary} />
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>{t('profile.theme')}</Text>
@@ -729,6 +838,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   languageOptionText: { color: colors.textSecondary, fontSize: 10, fontWeight: FontWeight.bold },
   languageOptionTextActive: { color: colors.background },
   settingInfo: { flex: 1 },
+  notificationOptions: { marginLeft: Spacing.md, borderLeftWidth: 2, borderLeftColor: colors.border, paddingLeft: Spacing.sm },
   settingLabel: { fontSize: FontSize.base, color: colors.textPrimary },
   settingValue: { fontSize: FontSize.sm, color: colors.textSecondary, marginTop: 2 },
   signOutRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: Spacing.sm, marginTop: 4 },

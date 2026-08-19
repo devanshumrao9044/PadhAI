@@ -148,3 +148,12 @@ export interface SubjectTimerState {
   elapsedSeconds: number;
   startedAt: number | null;
 }
+
+export interface NotificationSettings {
+  enabled: boolean;
+  studyReminder: boolean;
+  todoReminder: boolean;
+  streakReminder: boolean;
+  studyReminderTime: string;
+  streakReminderTime: string;
+}

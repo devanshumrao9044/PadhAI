@@ -10,6 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { loadTodoItems, saveTodoItems } from '@/services/productivity';
+import { loadNotificationSettings, syncLocalNotifications } from '@/services/localNotifications';
 import type { TodoItem } from '@/types/models';
 
 function dateKey(date: Date): string {
@@ -32,7 +33,7 @@ function getWeekDays(): Date[] {
 
 export default function TodoScreen() {
   const { colors } = useTheme();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { user, subjects } = useApp();
@@ -54,6 +55,17 @@ export default function TodoScreen() {
     });
     return () => { mounted = false; };
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let mounted = true;
+    void loadNotificationSettings(user.id).then(settings => {
+      if (!mounted) return;
+      const hasPendingTodo = items.some(item => !item.completed && item.date >= today);
+      void syncLocalNotifications(settings, language, hasPendingTodo);
+    });
+    return () => { mounted = false; };
+  }, [items, language, today, user?.id]);
 
   const persist = (next: TodoItem[]) => {
     setItems(next);
