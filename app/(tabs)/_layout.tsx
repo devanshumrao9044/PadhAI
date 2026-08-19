@@ -83,11 +83,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="leaderboard"
         options={{
-          title: 'Ranks',
-          tabBarButtonTestID: 'tab-ranks',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="leaderboard" size={size} color={color} />
-          ),
+          href: null,
         }}
       />
       <Tabs.Screen

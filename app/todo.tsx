@@ -44,6 +44,7 @@ export default function TodoScreen() {
   const [title, setTitle] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<TodoItem | null>(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -66,6 +67,12 @@ export default function TodoScreen() {
 
   const toggleItem = (id: string) => {
     persist(items.map(item => item.id === id ? { ...item, completed: !item.completed } : item));
+  };
+
+  const deleteItem = () => {
+    if (!deleteTarget) return;
+    persist(items.filter(item => item.id !== deleteTarget.id));
+    setDeleteTarget(null);
   };
 
   const addItem = async () => {
@@ -154,22 +161,54 @@ export default function TodoScreen() {
           renderItem={({ item }) => {
             const subject = subjects.find(value => value.id === item.subjectId);
             return (
-              <Pressable style={styles.taskCard} onPress={() => toggleItem(item.id)}>
-                <MaterialIcons
-                  name={item.completed ? 'check-circle' : 'radio-button-unchecked'}
-                  size={25}
-                  color={item.completed ? colors.success : colors.textTertiary}
-                />
-                <View style={styles.taskCopy}>
-                  <Text style={[styles.taskTitle, item.completed && styles.taskCompleted]}>{item.title}</Text>
-                  <Text style={styles.taskMeta}>{subject?.name ?? t('todo.general')}</Text>
-                </View>
-                <MaterialIcons name="drag-handle" size={20} color={colors.textTertiary} />
-              </Pressable>
+              <View style={styles.taskCard}>
+                <Pressable
+                  style={styles.taskToggleArea}
+                  onPress={() => toggleItem(item.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.completed ? t('todo.markIncomplete') : t('todo.markComplete')}: ${item.title}`}
+                >
+                  <MaterialIcons
+                    name={item.completed ? 'check-circle' : 'radio-button-unchecked'}
+                    size={25}
+                    color={item.completed ? colors.success : colors.textTertiary}
+                  />
+                  <View style={styles.taskCopy}>
+                    <Text style={[styles.taskTitle, item.completed && styles.taskCompleted]}>{item.title}</Text>
+                    <Text style={styles.taskMeta}>{subject?.name ?? t('todo.general')}</Text>
+                  </View>
+                </Pressable>
+                <TouchableOpacity
+                  onPress={() => setDeleteTarget(item)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={styles.deleteButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t('todo.deleteTask')}: ${item.title}`}
+                >
+                  <MaterialIcons name="delete-outline" size={21} color={colors.textTertiary} />
+                </TouchableOpacity>
+              </View>
             );
           }}
         />
       )}
+
+      <Modal visible={deleteTarget !== null} transparent animationType="fade" onRequestClose={() => setDeleteTarget(null)}>
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>{t('todo.deleteConfirmTitle')}</Text>
+            <Text style={styles.confirmText}>{t('todo.deleteConfirmText')}</Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity style={styles.cancelButton} onPress={() => setDeleteTarget(null)}>
+                <Text style={styles.cancelButtonText}>{t('todo.cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.deleteConfirmButton} onPress={deleteItem}>
+                <Text style={styles.deleteConfirmButtonText}>{t('todo.deleteTask')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
         <View style={styles.overlay}>
@@ -233,10 +272,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   countText: { color: colors.primary, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
   taskList: { padding: Spacing.md, gap: Spacing.sm, paddingBottom: 120 },
   taskCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: Spacing.md },
+  taskToggleArea: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12 },
   taskCopy: { flex: 1, minWidth: 0 },
   taskTitle: { color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
   taskCompleted: { textDecorationLine: 'line-through', color: colors.textTertiary },
   taskMeta: { color: colors.textSecondary, fontSize: FontSize.xs, marginTop: 4 },
+  deleteButton: { padding: 4 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl, gap: Spacing.sm },
   emptyTitle: { color: colors.textPrimary, fontSize: FontSize.lg, fontWeight: FontWeight.bold },
   emptyText: { color: colors.textSecondary, fontSize: FontSize.sm, textAlign: 'center' },
@@ -256,5 +297,14 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   saveButton: { backgroundColor: colors.primary, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center', marginTop: Spacing.xl },
   saveButtonText: { color: colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
   disabled: { opacity: 0.5 },
+  confirmOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
+  confirmCard: { width: '100%', backgroundColor: colors.surface, borderRadius: Radius.xl, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg },
+  confirmTitle: { color: colors.textPrimary, fontSize: FontSize.lg, fontWeight: FontWeight.bold, marginBottom: 6 },
+  confirmText: { color: colors.textSecondary, fontSize: FontSize.base, lineHeight: 21, marginBottom: Spacing.lg },
+  confirmActions: { flexDirection: 'row', gap: 10 },
+  cancelButton: { flex: 1, backgroundColor: colors.surfaceVariant, borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center' },
+  cancelButtonText: { color: colors.textSecondary, fontWeight: FontWeight.semiBold },
+  deleteConfirmButton: { flex: 1, backgroundColor: colors.danger, borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center' },
+  deleteConfirmButtonText: { color: colors.textPrimary, fontWeight: FontWeight.bold },
   close: { color: colors.textSecondary },
 });

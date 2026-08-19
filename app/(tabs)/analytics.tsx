@@ -395,9 +395,15 @@ export default function AnalyticsScreen() {
         </View>
 
         {/* ── Heatmap: 30-day Consistency ──────────────────────────────────── */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>{t('analytics.consistency30')}</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={[styles.card, styles.heatmapCard]}>
+          <View style={styles.heatmapHeader}>
+            <View style={styles.heatmapHeaderCopy}>
+              <Text style={styles.heatmapTitle}>{t('analytics.consistency30')}</Text>
+              <Text style={styles.heatmapSubtitle}>{t('analytics.last30Days')}</Text>
+            </View>
+            <MaterialIcons name="calendar-month" size={23} color={colors.primary} />
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.heatmapScroll}>
             <View style={styles.heatmap}>
               {Array.from({ length: 5 }, (_, weekIdx) => (
                 <View key={weekIdx} style={styles.heatCol}>
@@ -496,12 +502,18 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   focusFill: { height: '100%', backgroundColor: colors.primary, borderRadius: Radius.full },
 
   // Heatmap
-  heatmap: { flexDirection: 'row', gap: 3 },
-  heatCol: { gap: 3 },
-  heatCell: { width: 18, height: 18, borderRadius: 3 },
-  heatLegend: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: Spacing.sm },
-  heatLegendText: { fontSize: FontSize.xs, color: colors.textTertiary },
-  heatLegendDot: { width: 12, height: 12, borderRadius: 2 },
+  heatmapCard: { minHeight: 278, padding: Spacing.lg },
+  heatmapHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.lg },
+  heatmapHeaderCopy: { flex: 1, gap: 4 },
+  heatmapTitle: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: colors.textPrimary, letterSpacing: 0.4 },
+  heatmapSubtitle: { fontSize: FontSize.sm, color: colors.textSecondary },
+  heatmapScroll: { flexGrow: 1, justifyContent: 'center' },
+  heatmap: { flexDirection: 'row', gap: 5, alignSelf: 'center', paddingVertical: Spacing.sm },
+  heatCol: { gap: 5 },
+  heatCell: { width: 22, height: 22, borderRadius: 5 },
+  heatLegend: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.lg, paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
+  heatLegendText: { fontSize: FontSize.xs, color: colors.textSecondary },
+  heatLegendDot: { width: 14, height: 14, borderRadius: 4 },
 
   // Weak
   weakRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },

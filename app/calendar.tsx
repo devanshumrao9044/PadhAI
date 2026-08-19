@@ -43,6 +43,7 @@ export default function CalendarScreen() {
   const [title, setTitle] = useState('');
   const [isDayOff, setIsDayOff] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<CalendarEvent | null>(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -64,6 +65,12 @@ export default function CalendarScreen() {
 
   const shiftMonth = (delta: number) => {
     setMonth(current => new Date(current.getFullYear(), current.getMonth() + delta, 1, 12));
+  };
+
+  const deleteEvent = () => {
+    if (!deleteTarget) return;
+    persist(events.filter(event => event.id !== deleteTarget.id));
+    setDeleteTarget(null);
   };
 
   const addEvent = async () => {
@@ -153,14 +160,40 @@ export default function CalendarScreen() {
           {selectedEvents.map(event => (
             <View key={event.id} style={[styles.eventCard, event.isDayOff && styles.dayOffCard]}>
               <MaterialIcons name={event.isDayOff ? 'free-breakfast' : 'event'} size={23} color={event.isDayOff ? colors.warning : colors.primary} />
-              <View style={styles.eventCopy}>
-                <Text style={styles.eventTitle}>{event.title}</Text>
-                <Text style={styles.eventMeta}>{event.isDayOff ? t('calendar.dayOff') : t('calendar.studyEvent')}</Text>
+                <View style={styles.eventCopy}>
+                  <Text style={styles.eventTitle}>{event.title}</Text>
+                  <Text style={styles.eventMeta}>{event.isDayOff ? t('calendar.dayOff') : t('calendar.studyEvent')}</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setDeleteTarget(event)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={styles.deleteButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t('calendar.deleteEvent')}: ${event.title}`}
+                >
+                  <MaterialIcons name="delete-outline" size={21} color={colors.textTertiary} />
+                </TouchableOpacity>
               </View>
-            </View>
           ))}
         </View>
       )}
+
+      <Modal visible={deleteTarget !== null} transparent animationType="fade" onRequestClose={() => setDeleteTarget(null)}>
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>{t('calendar.deleteConfirmTitle')}</Text>
+            <Text style={styles.confirmText}>{t('calendar.deleteConfirmText')}</Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity style={styles.cancelButton} onPress={() => setDeleteTarget(null)}>
+                <Text style={styles.cancelButtonText}>{t('calendar.cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.deleteConfirmButton} onPress={deleteEvent}>
+                <Text style={styles.deleteConfirmButtonText}>{t('calendar.deleteEvent')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
         <View style={styles.overlay}>
@@ -228,7 +261,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   eventList: { paddingHorizontal: Spacing.md, gap: Spacing.sm },
   eventCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: Spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md },
   dayOffCard: { borderColor: colors.warning + '88', backgroundColor: colors.warning + '12' },
-  eventCopy: { flex: 1 },
+  eventCopy: { flex: 1, minWidth: 0 },
+  deleteButton: { padding: 4 },
   eventTitle: { color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
   eventMeta: { color: colors.textSecondary, fontSize: FontSize.xs, marginTop: 3 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl, gap: Spacing.sm },
@@ -246,5 +280,14 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   switchHint: { color: colors.textSecondary, fontSize: FontSize.xs, marginTop: 3 },
   saveButton: { backgroundColor: colors.primary, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center' },
   saveButtonText: { color: colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
+  confirmOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
+  confirmCard: { width: '100%', backgroundColor: colors.surface, borderRadius: Radius.xl, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg },
+  confirmTitle: { color: colors.textPrimary, fontSize: FontSize.lg, fontWeight: FontWeight.bold, marginBottom: 6 },
+  confirmText: { color: colors.textSecondary, fontSize: FontSize.base, lineHeight: 21, marginBottom: Spacing.lg },
+  confirmActions: { flexDirection: 'row', gap: 10 },
+  cancelButton: { flex: 1, backgroundColor: colors.surfaceVariant, borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center' },
+  cancelButtonText: { color: colors.textSecondary, fontWeight: FontWeight.semiBold },
+  deleteConfirmButton: { flex: 1, backgroundColor: colors.danger, borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center' },
+  deleteConfirmButtonText: { color: colors.textPrimary, fontWeight: FontWeight.bold },
   disabled: { opacity: 0.5 },
 });
