@@ -33,9 +33,9 @@ export default function QuickShortcuts() {
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  heading: { color: colors.textPrimary, fontSize: 18, fontWeight: '700', marginBottom: 12 },
+  heading: { color: colors.textPrimary, fontSize: 18, lineHeight: 24, fontWeight: '700', marginBottom: 12 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
-  card: { width: '47%', borderRadius: 16, padding: 20, alignItems: 'center' },
+  card: { width: '47%', minWidth: 0, borderRadius: 16, padding: 20, alignItems: 'center' },
   emoji: { fontSize: 32, marginBottom: 8 },
-  label: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  label: { color: '#FFFFFF', fontSize: 15, lineHeight: 20, fontWeight: '700', textAlign: 'center', flexShrink: 1 },
 });

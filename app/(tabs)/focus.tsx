@@ -177,9 +177,9 @@ export default function FocusScreen() {
                     onPress={() => { setSelectedSubjectId(s.id); setSelectedChapterId(null); }}
                   >
                     <View style={[styles.subjectDot, { backgroundColor: s.colorHex }]} />
-                    <Text style={[styles.subjectChipText, selectedSubjectId === s.id ? styles.subjectChipTextActive : null]}>
-                      {s.name}
-                    </Text>
+                      <Text numberOfLines={2} ellipsizeMode="tail" style={[styles.subjectChipText, selectedSubjectId === s.id ? styles.subjectChipTextActive : null]}>
+                        {s.name}
+                      </Text>
                   </Pressable>
                 ))}
               </View>
@@ -207,9 +207,9 @@ export default function FocusScreen() {
                     onPress={() => setSelectedChapterId(chapter.id)}
                   >
                     <MaterialIcons name="menu-book" size={14} color={selectedChapterId === chapter.id ? colors.primary : colors.textSecondary} />
-                    <Text style={[styles.subjectChipText, selectedChapterId === chapter.id ? styles.subjectChipTextActive : null]} numberOfLines={1}>
-                      {chapter.name}
-                    </Text>
+                      <Text style={[styles.subjectChipText, selectedChapterId === chapter.id ? styles.subjectChipTextActive : null]} numberOfLines={2} ellipsizeMode="tail">
+                        {chapter.name}
+                      </Text>
                   </Pressable>
                 ))}
               </View>
@@ -340,13 +340,13 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   subjectRow: { flexDirection: 'row', gap: 8, paddingVertical: 4 },
   subjectChip: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 14, paddingVertical: 8,
+    maxWidth: 190, paddingHorizontal: 14, paddingVertical: 8,
     backgroundColor: colors.surface, borderRadius: Radius.full,
     borderWidth: 1, borderColor: colors.border,
   },
   subjectChipActive: { borderColor: colors.primary, backgroundColor: colors.primary + '22' },
   subjectDot: { width: 8, height: 8, borderRadius: 4 },
-  subjectChipText: { fontSize: FontSize.sm, color: colors.textSecondary, fontWeight: FontWeight.medium },
+  subjectChipText: { maxWidth: 150, fontSize: FontSize.sm, lineHeight: 18, color: colors.textSecondary, fontWeight: FontWeight.medium, flexShrink: 1 },
   subjectChipTextActive: { color: colors.textPrimary },
   trackerHint: { fontSize: FontSize.sm, color: colors.textSecondary, marginBottom: Spacing.lg, lineHeight: 20 },
   rulesCard: {
@@ -356,12 +356,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   rulesTitle: { fontSize: FontSize.base, fontWeight: FontWeight.semiBold, color: colors.textPrimary, marginBottom: 4 },
   ruleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  ruleText: { fontSize: FontSize.sm, color: colors.textSecondary, flex: 1 },
+  ruleText: { fontSize: FontSize.sm, lineHeight: 19, color: colors.textSecondary, flex: 1, minWidth: 0, flexShrink: 1 },
   lockInBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: colors.primary, borderRadius: Radius.md,
     paddingVertical: 18, gap: 10,
   },
   lockInBtnDisabled: { opacity: 0.6 },
-  lockInText: { color: colors.background, fontSize: FontSize.lg, fontWeight: FontWeight.extraBold, letterSpacing: 2 },
+  lockInText: { color: colors.background, fontSize: FontSize.lg, lineHeight: 24, fontWeight: FontWeight.extraBold, letterSpacing: 0.5, textAlign: 'center', flexShrink: 1 },
 });

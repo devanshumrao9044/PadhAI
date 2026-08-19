@@ -245,7 +245,7 @@ export default function AnalyticsScreen() {
         {/* ── Today Goal Progress ──────────────────────────────────────── */}
         <View style={styles.goalCard}>
           <View style={styles.goalHeader}>
-            <View>
+            <View style={styles.goalHeaderCopy}>
               <Text style={styles.goalLabel}>{t('analytics.todaysGoal')}</Text>
               <Text style={styles.goalFraction}>
                 <Text style={[styles.goalCurrent, goalMet && { color: colors.success }]}>
@@ -455,8 +455,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   scrollView: { flex: 1 },
   scroll: { padding: Spacing.md, paddingBottom: 110 },
   title: {
-    fontSize: FontSize.xxl, fontWeight: FontWeight.bold,
-    color: colors.textPrimary, marginBottom: Spacing.md, includeFontPadding: false,
+    fontSize: FontSize.xxl, lineHeight: 34, fontWeight: FontWeight.bold,
+    color: colors.textPrimary, marginBottom: Spacing.md, includeFontPadding: false, flexShrink: 1,
   },
 
   // Stats Grid
@@ -467,8 +467,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderWidth: 1, borderColor: colors.border,
     padding: Spacing.md, alignItems: 'center', gap: 4,
   },
-  statVal: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: colors.textPrimary, includeFontPadding: false },
-  statLabel: { fontSize: FontSize.xs, color: colors.textSecondary, textAlign: 'center' },
+  statVal: { fontSize: FontSize.lg, lineHeight: 24, fontWeight: FontWeight.bold, color: colors.textPrimary, includeFontPadding: false, textAlign: 'center', flexShrink: 1 },
+  statLabel: { fontSize: FontSize.xs, lineHeight: 16, color: colors.textSecondary, textAlign: 'center', flexShrink: 1 },
 
   // Card
   card: {
@@ -476,12 +476,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderWidth: 1, borderColor: colors.border,
     padding: Spacing.md, marginBottom: Spacing.md, overflow: 'hidden',
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 12 },
   cardTitle: {
-    fontSize: FontSize.xs, fontWeight: FontWeight.semiBold,
-    color: colors.textTertiary, letterSpacing: 1.2, textTransform: 'uppercase',
+    flex: 1, minWidth: 0, fontSize: FontSize.xs, lineHeight: 16, fontWeight: FontWeight.semiBold,
+    color: colors.textSecondary, letterSpacing: 0.8, textTransform: 'uppercase', flexShrink: 1,
   },
-  cardSubtitle: { fontSize: FontSize.xs, color: colors.textTertiary },
+  cardSubtitle: { maxWidth: '42%', fontSize: FontSize.xs, lineHeight: 16, color: colors.textTertiary, textAlign: 'right', flexShrink: 1 },
 
   // Chart
   chart: { marginLeft: -Spacing.md, borderRadius: Radius.md },
@@ -489,13 +489,13 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   // Legend
   legendRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendText: { fontSize: FontSize.xs, color: colors.textSecondary },
+  legendText: { flex: 1, minWidth: 0, fontSize: FontSize.xs, lineHeight: 16, color: colors.textSecondary, flexShrink: 1 },
 
   // Focus Score
-  focusScoreRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.sm },
-  focusScoreVal: { fontSize: 44, fontWeight: FontWeight.extraBold, color: colors.primary, includeFontPadding: false },
-  focusScoreDetails: { gap: 4 },
-  focusScoreDetail: { fontSize: FontSize.sm, color: colors.textSecondary },
+  focusScoreRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md, marginBottom: Spacing.sm },
+  focusScoreVal: { fontSize: 40, lineHeight: 46, fontWeight: FontWeight.extraBold, color: colors.primary, includeFontPadding: false, flexShrink: 0 },
+  focusScoreDetails: { flex: 1, minWidth: 0, gap: 4, paddingTop: 4 },
+  focusScoreDetail: { fontSize: FontSize.sm, lineHeight: 18, color: colors.textSecondary, flexShrink: 1 },
   focusScoreGreen: { color: colors.success, fontWeight: FontWeight.semiBold },
   focusScoreRed: { color: colors.danger, fontWeight: FontWeight.semiBold },
   focusBar: { height: 8, backgroundColor: colors.surfaceVariant, borderRadius: Radius.full, overflow: 'hidden' },
@@ -505,19 +505,19 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   heatmapCard: { minHeight: 278, padding: Spacing.lg },
   heatmapHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.lg },
   heatmapHeaderCopy: { flex: 1, gap: 4 },
-  heatmapTitle: { fontSize: FontSize.base, fontWeight: FontWeight.bold, color: colors.textPrimary, letterSpacing: 0.4 },
-  heatmapSubtitle: { fontSize: FontSize.sm, color: colors.textSecondary },
+  heatmapTitle: { fontSize: FontSize.base, lineHeight: 20, fontWeight: FontWeight.bold, color: colors.textPrimary, letterSpacing: 0.4, flexShrink: 1 },
+  heatmapSubtitle: { fontSize: FontSize.sm, lineHeight: 18, color: colors.textSecondary, flexShrink: 1 },
   heatmapScroll: { flexGrow: 1, justifyContent: 'center' },
   heatmap: { flexDirection: 'row', gap: 5, alignSelf: 'center', paddingVertical: Spacing.sm },
   heatCol: { gap: 5 },
   heatCell: { width: 22, height: 22, borderRadius: 5 },
-  heatLegend: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.lg, paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
-  heatLegendText: { fontSize: FontSize.xs, color: colors.textSecondary },
+  heatLegend: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.lg, paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: colors.border, flexWrap: 'wrap' },
+  heatLegendText: { fontSize: FontSize.xs, lineHeight: 16, color: colors.textSecondary, flexShrink: 1 },
   heatLegendDot: { width: 14, height: 14, borderRadius: 4 },
 
   // Weak
   weakRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
-  weakText: { fontSize: FontSize.base, color: colors.warning, flex: 1 },
+  weakText: { flex: 1, minWidth: 0, fontSize: FontSize.base, lineHeight: 20, color: colors.warning, flexShrink: 1 },
 
   // Today Goal Progress Card
   goalCard: {
@@ -525,21 +525,22 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderWidth: 1, borderColor: colors.border,
     padding: Spacing.md, marginBottom: Spacing.md,
   },
-  goalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12 },
+  goalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 12 },
+  goalHeaderCopy: { flex: 1, minWidth: 0 },
   goalLabel: {
-    fontSize: FontSize.xs, fontWeight: FontWeight.semiBold,
-    color: colors.textTertiary, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4,
+    fontSize: FontSize.xs, lineHeight: 16, fontWeight: FontWeight.semiBold,
+    color: colors.textSecondary, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 4, flexShrink: 1,
   },
   goalFraction: { flexDirection: 'row', alignItems: 'baseline' } as any,
   goalCurrent: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: colors.primary, includeFontPadding: false },
   goalSeparator: { fontSize: FontSize.base, color: colors.textTertiary },
   goalTotal: { fontSize: FontSize.base, color: colors.textSecondary, fontWeight: FontWeight.medium },
   goalBadge: {
-    paddingHorizontal: 12, paddingVertical: 5, borderRadius: Radius.full,
+    flexShrink: 0, paddingHorizontal: 12, paddingVertical: 5, borderRadius: Radius.full,
     backgroundColor: colors.surfaceVariant, borderWidth: 1, borderColor: colors.border,
   },
   goalBadgeMet: { backgroundColor: colors.success + '22', borderColor: colors.success + '55' },
-  goalBadgeText: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, color: colors.textSecondary },
+  goalBadgeText: { fontSize: FontSize.sm, lineHeight: 18, fontWeight: FontWeight.semiBold, color: colors.textSecondary, textAlign: 'center' },
   goalBadgeTextMet: { color: colors.success },
   goalBarBg: {
     height: 10, backgroundColor: colors.surfaceVariant, borderRadius: Radius.full,

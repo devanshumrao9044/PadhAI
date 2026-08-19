@@ -32,7 +32,7 @@ export default function ChapterAnalyticsCard({ analytics, activeChapterIds }: Pr
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerCopy}>
           <Text style={styles.title}>{t('home.chapterFocus')}</Text>
           <Text style={styles.subtitle}>{t('home.timeSpentByChapter')}</Text>
         </View>
@@ -64,7 +64,7 @@ export default function ChapterAnalyticsCard({ analytics, activeChapterIds }: Pr
             );
           })}
           {studiedAnalytics.length > visibleRows.length ? (
-            <Text style={styles.more}>+{studiedAnalytics.length - visibleRows.length} more studied chapters</Text>
+            <Text style={styles.more}>{t('home.moreStudiedChapters', { value: studiedAnalytics.length - visibleRows.length })}</Text>
           ) : null}
         </>
       )}
@@ -83,26 +83,30 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    gap: Spacing.sm,
     marginBottom: Spacing.sm,
   },
+  headerCopy: { flex: 1, minWidth: 0 },
   title: {
-    color: colors.textTertiary,
+    color: colors.textSecondary,
     fontSize: FontSize.xs,
+    lineHeight: 16,
     fontWeight: FontWeight.semiBold,
-    letterSpacing: 1.1,
+    letterSpacing: 0.8,
+    flexShrink: 1,
   },
-  subtitle: { color: colors.textSecondary, fontSize: FontSize.xs, marginTop: 3 },
+  subtitle: { color: colors.textSecondary, fontSize: FontSize.xs, lineHeight: 17, marginTop: 3, flexShrink: 1 },
   row: { marginTop: Spacing.sm },
-  rowHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm },
-  nameWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7 },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
-  name: { flex: 1, color: colors.textPrimary, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
-  minutes: { color: colors.textPrimary, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
+  rowHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: Spacing.sm },
+  nameWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'flex-start', gap: 7 },
+  statusDot: { width: 8, height: 8, borderRadius: 4, marginTop: 5 },
+  name: { flex: 1, minWidth: 0, color: colors.textPrimary, fontSize: FontSize.sm, lineHeight: 18, fontWeight: FontWeight.semiBold, flexShrink: 1 },
+  minutes: { maxWidth: '30%', color: colors.textPrimary, fontSize: FontSize.sm, lineHeight: 18, fontWeight: FontWeight.bold, textAlign: 'right', flexShrink: 1 },
   barBackground: { height: 7, marginTop: 7, backgroundColor: colors.surfaceVariant, borderRadius: Radius.full, overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: Radius.full },
-  meta: { color: colors.textTertiary, fontSize: FontSize.xs, marginTop: 4 },
-  empty: { color: colors.textSecondary, fontSize: FontSize.sm, paddingVertical: Spacing.sm },
-  more: { color: colors.primary, fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, marginTop: Spacing.md },
+  meta: { color: colors.textTertiary, fontSize: FontSize.xs, lineHeight: 17, marginTop: 4, flexShrink: 1 },
+  empty: { color: colors.textSecondary, fontSize: FontSize.sm, lineHeight: 19, paddingVertical: Spacing.sm, flexShrink: 1 },
+  more: { color: colors.primary, fontSize: FontSize.xs, lineHeight: 17, fontWeight: FontWeight.semiBold, marginTop: Spacing.md, flexShrink: 1 },
 });
