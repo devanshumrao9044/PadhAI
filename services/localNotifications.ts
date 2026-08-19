@@ -19,6 +19,7 @@ const CHANNEL_IDS = {
   study: 'padhai-study-reminders',
   todo: 'padhai-todo-reminders',
   streak: 'padhai-streak-reminders',
+  admin: 'padhai-admin-announcements',
 } as const;
 
 const COPY = {
@@ -96,6 +97,12 @@ async function ensurePermission(): Promise<boolean> {
       name: 'Streak reminders',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 300, 200, 300],
+      sound: 'default',
+    });
+    await Notifications.setNotificationChannelAsync(CHANNEL_IDS.admin, {
+      name: 'Admin announcements',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
       sound: 'default',
     });
   }

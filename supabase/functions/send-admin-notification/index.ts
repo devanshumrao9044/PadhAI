@@ -21,6 +21,7 @@ type ExpoPushMessage = {
   title: string;
   body: string;
   sound: 'default';
+  channelId: 'padhai-admin-announcements';
   data: { notificationId: string };
 };
 
@@ -208,6 +209,7 @@ async function handleRequest(request: Request) {
     title,
     body,
     sound: 'default',
+    channelId: 'padhai-admin-announcements',
     data: { notificationId: message.id },
   }));
 
