@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
@@ -35,16 +36,15 @@ type LeaderboardCacheData = {
   entries: LeaderboardEntry[];
 };
 
-// ── Hero Badge: single level badge for carousel ──────────────────────────────
+// ── Hero Badge: reference-style winged shield for the level carousel ───────────
 function LevelBadge({
   levelDef, isCurrent, size,
 }: { levelDef: typeof LEVELS[0]; isCurrent: boolean; size: 'sm' | 'lg' }) {
   const { colors } = useTheme();
   const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const scale = useRef(new Animated.Value(isCurrent ? 0.8 : 0.7)).current;
+  const scale = useRef(new Animated.Value(isCurrent ? 0.86 : 0.76)).current;
 
-  // `scale` is a stable ref and this entrance animation intentionally runs once.
   useEffect(() => {
     Animated.spring(scale, {
       toValue: 1,
@@ -54,33 +54,24 @@ function LevelBadge({
     }).start();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const badgeSize = size === 'lg' ? 80 : 54;
-  const fontSize = size === 'lg' ? 32 : 20;
+  const badgeSize = size === 'lg' ? 92 : 56;
+  const fontSize = size === 'lg' ? 30 : 18;
+  const wingHeight = size === 'lg' ? 28 : 19;
 
   return (
-    <Animated.View style={[styles.badgeWrap, { transform: [{ scale }] }]}>
-      <View
-        style={[
-          styles.badgeCircle,
-          {
-            width: badgeSize,
-            height: badgeSize,
-            borderRadius: badgeSize / 2,
-            borderColor: levelDef.color,
-            backgroundColor: levelDef.color + (isCurrent ? '33' : '18'),
-            borderWidth: isCurrent ? 3 : 1.5,
-          },
-        ]}
-      >
-        <Text style={[styles.badgeNum, { fontSize, color: isCurrent ? levelDef.color : levelDef.color + 'AA' }]}>
-          {levelDef.rank}
-        </Text>
-        {isCurrent ? (
-          <MaterialIcons name="star" size={12} color={levelDef.color} style={{ marginTop: -2 }} />
-        ) : null}
+    <Animated.View style={[styles.badgeWrap, isCurrent && styles.currentBadgeWrap, { transform: [{ scale }] }]}>
+      <View style={[styles.badgeAssembly, { width: badgeSize + 48, height: badgeSize + 30 }]}>
+        <View style={[styles.badgeWing, { width: badgeSize * 0.48, height: wingHeight, backgroundColor: levelDef.color + '88', left: 0, transform: [{ rotate: '-18deg' }] }]} />
+        <View style={[styles.badgeWing, { width: badgeSize * 0.48, height: wingHeight, backgroundColor: levelDef.color + '88', right: 0, transform: [{ rotate: '18deg' }] }]} />
+        <View style={[styles.badgeShield, { width: badgeSize, height: badgeSize, borderRadius: badgeSize * 0.24, backgroundColor: levelDef.color, borderColor: isCurrent ? '#FFFFFF' : levelDef.color + 'DD', borderWidth: isCurrent ? 3 : 2, transform: [{ rotate: '30deg' }] }]}>
+          <View style={[styles.badgeShieldInner, { borderColor: '#FFFFFF88' }]}>
+            <Text style={[styles.badgeNum, { fontSize, color: '#FFFFFF', transform: [{ rotate: '-30deg' }] }]}>{levelDef.rank}</Text>
+          </View>
+        </View>
+        <View style={[styles.badgeRibbon, { backgroundColor: isCurrent ? '#F7C948' : '#D9A441', bottom: 0, width: badgeSize * 0.46, height: size === 'lg' ? 18 : 12 }]} />
       </View>
       {isCurrent ? (
-        <Text style={[styles.badgeLabelCurrent, { color: levelDef.color }]}>
+        <Text style={[styles.badgeLabelCurrent, { color: colors.textPrimary }]}>
           {(levelDef.rank === 1 ? t('profile.levelBeginner')
             : levelDef.rank === 2 ? t('profile.levelGrinder')
             : levelDef.rank === 3 ? t('profile.levelConsistent')
@@ -125,8 +116,9 @@ function RankZoneBar({ rank, total }: { rank: number; total: number }) {
       </View>
 
       {/* Rank badge above bar */}
-      <View style={[styles.rankBadgeAbove, { left: `${safeRankPct}%` as any, borderColor: zoneColor }]}>
-        <Text style={[styles.rankBadgeAboveText, { color: zoneColor }]}>Rank: {safeRank}</Text>
+      <View style={[styles.rankBadgeAbove, { left: `${safeRankPct}%` as any, borderColor: colors.primary, backgroundColor: colors.surfaceVariant }]}>
+        <Text style={[styles.rankBadgeAboveText, { color: colors.textPrimary }]}>{t('leaderboard.rank')}: {safeRank}</Text>
+        <View style={[styles.rankPointerTail, { borderTopColor: colors.primary }]} />
       </View>
 
       {/* The bar */}
@@ -159,7 +151,7 @@ function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
   const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const levelDef = LEVELS.find(l => l.rank === entry.level) ?? LEVELS[0];
-  const rankColors: Record<number, string> = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32' };
+  const rankColors: Record<number, string> = { 1: '#F2B600', 2: '#2D8FCE', 3: '#4CA878' };
   const rankBg = rankColors[entry.rank] ?? levelDef.color;
   const medalIcons: Record<number, 'emoji-events' | 'military-tech' | 'workspace-premium'> = {
     1: 'emoji-events',
@@ -173,10 +165,18 @@ function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
     : entry.rank === 2
     ? t('leaderboard.silverMedal')
     : t('leaderboard.bronzeMedal');
+  const rowColors: [string, string] = isMe
+    ? [colors.primary + '2A', colors.primary + '08']
+    : isTopThree
+    ? [rankBg + '24', colors.surface]
+    : [colors.surfaceVariant, colors.surface];
 
   return (
-    <View
+    <LinearGradient
       accessibilityLabel={isTopThree ? `${entry.name}, ${medalLabel}, ${t('leaderboard.rank')} ${entry.rank}, ${entry.xp} ${t('common.xp')}` : `${entry.name}, ${t('leaderboard.rank')} ${entry.rank}, ${entry.xp} ${t('common.xp')}`}
+      colors={rowColors}
+      start={{ x: 0, y: 0.5 }}
+      end={{ x: 1, y: 0.5 }}
       style={[
         styles.boardRow,
         isMe && styles.boardRowMe,
@@ -186,20 +186,22 @@ function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
         entry.rank === 3 && styles.thirdPlaceRow,
       ]}
     >
-      <View style={[styles.boardRankBadge, isTopThree && styles.medalBadge, { backgroundColor: rankBg + '33', borderColor: rankBg }]}>
-        {medalIcon ? <MaterialIcons name={medalIcon} size={16} color={rankBg} /> : null}
-        <Text style={[styles.boardRankText, { color: rankBg }]}>{entry.rank}</Text>
+      <View style={[styles.boardRankBadge, isTopThree && styles.medalBadge, { backgroundColor: rankBg + '32', borderColor: rankBg }]}>
+        {medalIcon ? <MaterialIcons name={medalIcon} size={17} color={rankBg} /> : null}
+        <Text style={[styles.boardRankText, { color: colors.textPrimary }]}>{entry.rank}</Text>
       </View>
       <Text style={[styles.boardName, isMe && styles.boardNameMe]} numberOfLines={1}>
         {entry.name}{isMe ? ` (${t('leaderboard.you')})` : ''}
       </Text>
       <View style={styles.boardXPBadge}>
         <Text style={styles.boardXPText}>{entry.xp}</Text>
-        <View style={styles.xpMiniTag}>
-          <Text style={styles.xpMiniText}>{t('common.xp')}</Text>
+        <View style={styles.xpShield}>
+          <View style={styles.xpShieldInner}>
+            <Text style={styles.xpMiniText}>{t('common.xp')}</Text>
+          </View>
         </View>
       </View>
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -413,7 +415,12 @@ export default function LeaderboardScreen() {
         </View>
 
         {/* ── Section 1: Hero Level Carousel ────────────────────────────── */}
-        <View style={styles.heroSection}>
+        <LinearGradient
+          colors={[colors.background, colors.surfaceVariant]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.heroSection}
+        >
           {/* Spotlight glow behind current level */}
           <View style={[styles.spotlight, { backgroundColor: currentLevel.color + '20' }]} />
 
@@ -429,48 +436,29 @@ export default function LeaderboardScreen() {
             ))}
           </View>
 
-          {/* Podium label */}
-          <View style={[styles.podiumLabel, { backgroundColor: currentLevel.color + '22', borderColor: currentLevel.color + '55' }]}>
-            <Text style={[styles.podiumText, { color: currentLevel.color }]}>
-              {t('leaderboard.level', { value: currentLevel.rank })} — {currentLevelTitle}
+          {/* Center title and glowing podium */}
+          <View style={styles.podiumLabel}>
+            <Text style={styles.podiumText}>
+              {t('leaderboard.level', { value: currentLevel.rank })}
             </Text>
+            <Text style={[styles.podiumSubtitle, { color: currentLevel.color }]}>{currentLevelTitle}</Text>
           </View>
 
-          {/* Podium base */}
           <View style={styles.podiumBase}>
-            <View style={[styles.podiumPlatform, { borderColor: currentLevel.color + '55', backgroundColor: currentLevel.color + '18' }]} />
+            <View style={[styles.podiumPlatform, { borderColor: currentLevel.color + '66' }]}>
+              <View style={styles.podiumGlow} />
+            </View>
           </View>
-        </View>
+        </LinearGradient>
 
         {/* ── Section 2: Rank Status Card ───────────────────────────────── */}
         <View style={styles.rankCard}>
           <View style={styles.weeklyUpdateCard}>
-            <Text style={styles.weeklyUpdateText}>{t('leaderboard.updatesIn', { value: `${daysUntilReset} ${t('leaderboard.days')}` })}</Text>
-            <MaterialIcons name="info-outline" size={21} color={colors.textSecondary} />
-          </View>
-
-          {/* Top info row */}
-          <View style={styles.rankCardTop}>
-            {/* Left: level badge + title */}
-            <View style={styles.rankCardLeft}>
-              <View style={[styles.miniLevelBadge, { borderColor: currentLevel.color, backgroundColor: currentLevel.color + '22' }]}>
-                <Text style={[styles.miniLevelNum, { color: currentLevel.color }]}>{currentLevel.rank}</Text>
-              </View>
-              <Text style={[styles.miniLevelLabel, { color: currentLevel.color }]}>{t('leaderboard.level', { value: currentLevel.rank })}</Text>
+            <View style={styles.weeklyUpdateCopy}>
+              <Text style={styles.weeklyUpdateLabel}>{t('leaderboard.updatesInLabel')}</Text>
+              <Text style={styles.weeklyUpdateValue}>{t('leaderboard.daysValue', { value: daysUntilReset })}</Text>
             </View>
-            {/* Right: rank + XP pills */}
-            <View style={styles.rankCardRight}>
-              <View style={styles.infoPill}>
-                <Text style={styles.infoPillLabel}>Rank: </Text>
-                <Text style={styles.infoPillVal}>{myRank}</Text>
-              </View>
-              <View style={[styles.infoPill, { backgroundColor: colors.warning + '22', borderColor: colors.warning + '55' }]}>
-                <Text style={[styles.infoPillVal, { color: colors.warning }]}>{user?.xpTotal ?? 0}</Text>
-                <View style={styles.xpMiniTag}>
-                  <Text style={styles.xpMiniText}>{t('common.xp')}</Text>
-                </View>
-              </View>
-            </View>
+            <MaterialIcons name="info-outline" size={23} color={colors.textPrimary} />
           </View>
 
           {/* Zone bar */}
@@ -592,34 +580,70 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   // ── Section 1 Hero ────────────────────────────────────────────────────────
   heroSection: {
     alignItems: 'center',
-    paddingTop: 18,
-    paddingBottom: 20,
-    backgroundColor: '#E8F0FE',
+    minHeight: 330,
+    paddingTop: 28,
+    paddingBottom: 28,
     overflow: 'hidden',
   },
   spotlight: {
     position: 'absolute',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    top: -40,
+    width: 150,
+    height: 230,
+    borderRadius: 76,
+    top: 18,
+    opacity: 0.78,
   },
   badgesRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.md,
+    gap: 4,
+    minHeight: 180,
+    marginBottom: 2,
     zIndex: 2,
   },
   badgeWrap: {
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
+    minWidth: 62,
   },
-  badgeCircle: {
+  currentBadgeWrap: {
+    minWidth: 128,
+    paddingTop: 8,
+  },
+  badgeAssembly: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 0,
+    position: 'relative',
+  },
+  badgeWing: {
+    position: 'absolute',
+    top: '44%',
+    borderRadius: 8,
+  },
+  badgeShield: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#00000055',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  badgeShieldInner: {
+    width: '76%',
+    height: '76%',
+    borderRadius: 10,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeRibbon: {
+    position: 'absolute',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#FFFFFF88',
   },
   badgeNum: {
     fontWeight: FontWeight.extraBold,
@@ -627,32 +651,53 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     lineHeight: undefined,
   },
   badgeLabelCurrent: {
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.bold,
-    marginTop: 2,
+    fontSize: FontSize.xl,
+    lineHeight: 28,
+    fontWeight: FontWeight.extraBold,
+    marginTop: -4,
   },
   podiumLabel: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: 8,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    marginBottom: Spacing.sm,
+    alignItems: 'center',
+    marginTop: -2,
+    marginBottom: 12,
     zIndex: 2,
   },
   podiumText: {
-    fontSize: FontSize.base,
+    fontSize: 34,
+    lineHeight: 40,
+    fontWeight: FontWeight.extraBold,
+    color: colors.textPrimary,
+  },
+  podiumSubtitle: {
+    fontSize: FontSize.sm,
+    lineHeight: 20,
     fontWeight: FontWeight.bold,
+    marginTop: -2,
   },
   podiumBase: {
     alignItems: 'center',
-    width: '60%',
+    width: 190,
     zIndex: 2,
   },
   podiumPlatform: {
     width: '100%',
-    height: 12,
+    height: 30,
     borderRadius: Radius.full,
-    borderWidth: 1,
+    borderWidth: 2,
+    backgroundColor: '#2A405B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#24364D',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  podiumGlow: {
+    width: '68%',
+    height: 10,
+    borderRadius: Radius.full,
+    backgroundColor: '#F7D35B',
   },
 
   // ── Section 2 Rank Card ────────────────────────────────────────────────────
@@ -660,28 +705,46 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: 18,
     marginHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
-    borderWidth: 1,
+    marginTop: -2,
+    marginBottom: Spacing.lg,
+    borderWidth: 1.5,
     borderColor: colors.border,
     padding: 14,
+    shadowColor: '#1C2D44',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
   weeklyUpdateCard: {
-    minHeight: 74,
+    minHeight: 112,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
     paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
     borderRadius: 12,
-    backgroundColor: '#EEF3FF',
+    backgroundColor: colors.surfaceVariant,
     borderWidth: 1,
-    borderColor: '#D6E1FB',
+    borderColor: colors.border,
   },
-  weeklyUpdateText: {
+  weeklyUpdateCopy: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  weeklyUpdateLabel: {
     color: colors.textPrimary,
-    fontSize: FontSize.lg,
+    fontSize: 22,
+    lineHeight: 28,
     fontWeight: FontWeight.semiBold,
+    textAlign: 'center',
+  },
+  weeklyUpdateValue: {
+    color: colors.textPrimary,
+    fontSize: 34,
+    lineHeight: 40,
+    fontWeight: FontWeight.extraBold,
     textAlign: 'center',
   },
   rankCardTop: {
@@ -739,14 +802,15 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
 
   // ── Zone Bar ───────────────────────────────────────────────────────────────
-  zoneBarContainer: { marginTop: Spacing.sm, overflow: 'hidden' },
+  zoneBarContainer: { marginTop: Spacing.sm, overflow: 'hidden', paddingTop: 28 },
   zoneLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   zoneLabel: {
-    fontSize: FontSize.xs,
+    fontSize: FontSize.lg,
+    lineHeight: 24,
     fontWeight: FontWeight.semiBold,
     flex: 1,
     flexShrink: 1,
@@ -756,24 +820,37 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   rankBadgeAbove: {
     position: 'absolute',
     top: 20,
-    marginLeft: -32,
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderRadius: Radius.sm,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    marginLeft: -50,
+    minWidth: 100,
+    alignItems: 'center',
+    borderWidth: 3,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     zIndex: 3,
   },
   rankBadgeAboveText: {
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.bold,
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: FontWeight.extraBold,
+  },
+  rankPointerTail: {
+    position: 'absolute',
+    bottom: -13,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 10,
+    borderRightWidth: 10,
+    borderTopWidth: 13,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
   },
   zoneBarTrack: {
     flexDirection: 'row',
-    height: 10,
+    height: 16,
     borderRadius: Radius.full,
     overflow: 'hidden',
-    marginBottom: 4,
+    marginBottom: 5,
     position: 'relative',
   },
   zoneSegment: {
@@ -781,12 +858,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   zoneDot: {
     position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    top: -3,
-    marginLeft: -8,
-    borderWidth: 2,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    top: -7,
+    marginLeft: -15,
+    borderWidth: 3,
     borderColor: colors.surface,
   },
   zoneRankNums: {
@@ -814,60 +891,53 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   listSection: {
     paddingHorizontal: Spacing.md,
   },
-  sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 },
+  sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginBottom: 2 },
   livePill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.success + '18', borderRadius: Radius.full, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: colors.success + '55' },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success },
   liveText: { color: colors.success, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8 },
-  sectionTitle: {
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.extraBold,
-    color: colors.textTertiary,
-    letterSpacing: 1.5,
-    marginBottom: Spacing.sm,
-    textTransform: 'uppercase',
-  },
-  sectionSubtitle: { color: colors.textTertiary, fontSize: FontSize.xs, marginBottom: Spacing.sm },
+  sectionTitle: { display: 'none' },
+  sectionSubtitle: { display: 'none' },
   promotionHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, marginBottom: 4 },
   promotionHintText: { color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.bold },
-  listContainer: { gap: 8, paddingBottom: Spacing.xl },
+  listContainer: { gap: 12, paddingBottom: Spacing.xl },
   boardRow: {
-    minHeight: 78,
+    minHeight: 92,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.surface,
+    gap: 14,
     borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1.5,
     borderColor: colors.border,
+    overflow: 'hidden',
   },
-  topThreeRow: { paddingVertical: Spacing.md + 2 },
-  firstPlaceRow: { borderColor: '#FFD700', backgroundColor: '#FFD70012', shadowColor: '#FFD700', shadowOpacity: 0.18, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
-  secondPlaceRow: { borderColor: '#C0C0C0', backgroundColor: '#C0C0C012' },
-  thirdPlaceRow: { borderColor: '#CD7F32', backgroundColor: '#CD7F3212' },
+  topThreeRow: { minHeight: 96, paddingVertical: 16 },
+  firstPlaceRow: { borderColor: '#F2B60088', shadowColor: '#F2B600', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
+  secondPlaceRow: { borderColor: '#2D8FCE66' },
+  thirdPlaceRow: { borderColor: '#4CA87866' },
   boardRowMe: {
     borderColor: colors.primary,
-    backgroundColor: colors.primary + '12',
+    borderWidth: 2,
   },
   boardRankBadge: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderRadius: 11,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  medalBadge: { width: 48, height: 48, borderRadius: 13, gap: 1 },
+  medalBadge: { width: 50, height: 50, borderRadius: 13, gap: 1 },
   boardRankText: {
-    fontSize: FontSize.base,
+    fontSize: FontSize.xl,
     fontWeight: FontWeight.extraBold,
     includeFontPadding: false,
   },
   boardName: {
     flex: 1,
-    fontSize: FontSize.lg,
-    lineHeight: 25,
+    fontSize: FontSize.xl,
+    lineHeight: 28,
     fontWeight: FontWeight.semiBold,
     color: colors.textPrimary,
   },
@@ -878,14 +948,30 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   boardXPBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   boardXPText: {
-    fontSize: 24,
-    lineHeight: 28,
+    fontSize: 26,
+    lineHeight: 32,
     fontWeight: FontWeight.extraBold,
     color: colors.textPrimary,
     includeFontPadding: false,
+  },
+  xpShield: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#DCEAF9',
+    borderWidth: 1.5,
+    borderColor: '#AFC8E3',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '30deg' }],
+  },
+  xpShieldInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-30deg' }],
   },
   xpMiniTag: {
     backgroundColor: colors.surfaceVariant,
@@ -896,10 +982,10 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderColor: colors.border,
   },
   xpMiniText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: FontWeight.bold,
-    color: colors.textTertiary,
-    letterSpacing: 0.5,
+    color: '#39526F',
+    letterSpacing: 0.2,
   },
   separator: {
     alignItems: 'center',
