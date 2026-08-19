@@ -398,7 +398,7 @@ export default function LeaderboardScreen() {
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel={t('rewards.title')}
-              onPress={() => router.push('/rewards')}
+              onPress={() => router.push('/rewards' as Parameters<typeof router.push>[0])}
               style={styles.headerIconButton}
             >
               <MaterialIcons name="emoji-events" size={30} color={colors.warning} />

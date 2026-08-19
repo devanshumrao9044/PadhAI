@@ -175,7 +175,7 @@ export default function Dashboard() {
               <MaterialIcons name="local-fire-department" size={17} color={colors.warning} />
               <Text style={[styles.headerStatText, { color: colors.warning }]}>{user.streakCurrent}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.headerIconButton} onPress={() => router.push('/rewards')} accessibilityLabel={t('rewards.title')}>
+            <TouchableOpacity style={styles.headerIconButton} onPress={() => router.push('/rewards' as Parameters<typeof router.push>[0])} accessibilityLabel={t('rewards.title')}>
               <MaterialIcons name="card-giftcard" size={21} color={colors.primary} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.headerStat} onPress={() => router.push('/(tabs)/leaderboard')} accessibilityLabel={t('home.leaderboard')}>
