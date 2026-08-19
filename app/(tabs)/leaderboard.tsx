@@ -106,40 +106,35 @@ function RankZoneBar({ rank, total }: { rank: number; total: number }) {
   const zone = getWeeklyZone(safeRank, safeTotal);
 
   const zoneColor = zone === 'promotion' ? colors.success : zone === 'safety' ? colors.warning : colors.danger;
+  const zoneLabel = zone === 'promotion' ? t('leaderboard.promotionZone') : zone === 'safety' ? t('leaderboard.safetyZone') : t('leaderboard.demotionZone');
 
   return (
     <View style={styles.zoneBarContainer}>
+      <View style={styles.zoneStatusRow}>
+        <View style={[styles.zoneStatusPill, { backgroundColor: zoneColor + '18', borderColor: zoneColor + '66' }]}>
+          <View style={[styles.zoneStatusDot, { backgroundColor: zoneColor }]} />
+          <Text style={[styles.zoneStatusText, { color: zoneColor }]}>{t('leaderboard.rank')} {safeRank} · {zoneLabel}</Text>
+        </View>
+        <Text style={styles.zoneTotalText}>{safeTotal} {t('leaderboard.students')}</Text>
+      </View>
+
       <View style={styles.zoneLabels}>
-        <Text numberOfLines={1} ellipsizeMode="clip" style={[styles.zoneLabel, { color: colors.danger }]}>{t('leaderboard.demotionZone')}</Text>
-        <Text numberOfLines={1} ellipsizeMode="clip" style={[styles.zoneLabel, { color: colors.warning }]}>{t('leaderboard.safetyZone')}</Text>
-        <Text numberOfLines={1} ellipsizeMode="clip" style={[styles.zoneLabel, { color: colors.success }]}>{t('leaderboard.promotionZone')}</Text>
+        <Text numberOfLines={2} style={[styles.zoneLabel, { color: colors.danger }]}>{t('leaderboard.demotionZone')}</Text>
+        <Text numberOfLines={2} style={[styles.zoneLabel, { color: colors.warning }]}>{t('leaderboard.safetyZone')}</Text>
+        <Text numberOfLines={2} style={[styles.zoneLabel, { color: colors.success }]}>{t('leaderboard.promotionZone')}</Text>
       </View>
 
-      {/* Rank badge above bar */}
-      <View style={[styles.rankBadgeAbove, { left: `${safeRankPct}%` as any, borderColor: colors.primary, backgroundColor: colors.surfaceVariant }]}>
-        <Text style={[styles.rankBadgeAboveText, { color: colors.textPrimary }]}>{t('leaderboard.rank')}: {safeRank}</Text>
-        <View style={[styles.rankPointerTail, { borderTopColor: colors.primary }]} />
+      <View style={styles.zoneBarTrack} accessibilityLabel={`${t('leaderboard.rank')} ${safeRank} ${zoneLabel}`}>
+        <View style={[styles.zoneSegment, { flex: demotionPct, backgroundColor: colors.danger + 'AA' }]} />
+        <View style={[styles.zoneSegment, { flex: safetyPct, backgroundColor: colors.warning + 'AA' }]} />
+        <View style={[styles.zoneSegment, { flex: promotionPct, backgroundColor: colors.success + 'AA' }]} />
+        <View style={[styles.zoneIndicatorLine, { left: `${safeRankPct}%` as any, backgroundColor: zoneColor }]} />
       </View>
 
-      {/* The bar */}
-      <View style={styles.zoneBarTrack}>
-        <View style={[styles.zoneSegment, { flex: demotionPct, backgroundColor: colors.danger + '88' }]} />
-        <View style={[styles.zoneSegment, { flex: safetyPct, backgroundColor: colors.warning + '88' }]} />
-        <View style={[styles.zoneSegment, { flex: promotionPct, backgroundColor: colors.success + '88' }]} />
-        {/* Indicator dot */}
-        <View style={[styles.zoneDot, { left: `${safeRankPct}%` as any, backgroundColor: zoneColor }]} />
-      </View>
-
-      <View style={styles.zoneRankNums}>
-        <Text style={styles.zoneRankNum}>{safeTotal}</Text>
-        <Text style={styles.zoneRankNum}>{safeTotal - demotionCount}</Text>
-        <Text style={styles.zoneRankNum}>{promotionCount}</Text>
-        <Text style={styles.zoneRankNum}>1</Text>
-      </View>
-      <View style={styles.zoneRankLabels}>
-        <Text style={styles.zoneRankLabel}>{t('leaderboard.rank')}</Text>
-        <Text style={styles.zoneRankLabel}>{t('leaderboard.rank')}</Text>
-        <Text style={styles.zoneRankLabel}>{t('leaderboard.rank')}</Text>
+      <View style={styles.zoneScaleRow}>
+        <Text style={styles.zoneScaleText}>{safeTotal}</Text>
+        <Text style={styles.zoneScaleText}>{promotionCount}</Text>
+        <Text style={styles.zoneScaleText}>1</Text>
       </View>
     </View>
   );
@@ -153,18 +148,7 @@ function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
   const levelDef = LEVELS.find(l => l.rank === entry.level) ?? LEVELS[0];
   const rankColors: Record<number, string> = { 1: '#F2B600', 2: '#2D8FCE', 3: '#4CA878' };
   const rankBg = rankColors[entry.rank] ?? levelDef.color;
-  const medalIcons: Record<number, 'emoji-events' | 'military-tech' | 'workspace-premium'> = {
-    1: 'emoji-events',
-    2: 'military-tech',
-    3: 'workspace-premium',
-  };
   const isTopThree = entry.rank <= 3;
-  const medalIcon = medalIcons[entry.rank];
-  const medalLabel = entry.rank === 1
-    ? t('leaderboard.goldMedal')
-    : entry.rank === 2
-    ? t('leaderboard.silverMedal')
-    : t('leaderboard.bronzeMedal');
   const rowColors: [string, string] = isMe
     ? [colors.primary + '2A', colors.primary + '08']
     : isTopThree
@@ -173,7 +157,7 @@ function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
 
   return (
     <LinearGradient
-      accessibilityLabel={isTopThree ? `${entry.name}, ${medalLabel}, ${t('leaderboard.rank')} ${entry.rank}, ${entry.xp} ${t('common.xp')}` : `${entry.name}, ${t('leaderboard.rank')} ${entry.rank}, ${entry.xp} ${t('common.xp')}`}
+      accessibilityLabel={`${entry.name}, ${t('leaderboard.rank')} ${entry.rank}, ${entry.xp} ${t('common.xp')}`}
       colors={rowColors}
       start={{ x: 0, y: 0.5 }}
       end={{ x: 1, y: 0.5 }}
@@ -187,7 +171,6 @@ function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
       ]}
     >
       <View style={[styles.boardRankBadge, isTopThree && styles.medalBadge, { backgroundColor: rankBg + '32', borderColor: rankBg }]}>
-        {medalIcon ? <MaterialIcons name={medalIcon} size={17} color={rankBg} /> : null}
         <Text style={[styles.boardRankText, { color: colors.textPrimary }]}>{entry.rank}</Text>
       </View>
       <Text style={[styles.boardName, isMe && styles.boardNameMe]} numberOfLines={2} ellipsizeMode="tail">
@@ -195,11 +178,7 @@ function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
       </Text>
       <View style={styles.boardXPBadge}>
         <Text style={styles.boardXPText}>{entry.xp}</Text>
-        <View style={styles.xpShield}>
-          <View style={styles.xpShieldInner}>
-            <Text style={styles.xpMiniText}>{t('common.xp')}</Text>
-          </View>
-        </View>
+        <Text style={styles.boardXPLabel}>{t('common.xp')}</Text>
       </View>
     </LinearGradient>
   );
@@ -586,7 +565,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     height: 230,
     borderRadius: 76,
     top: 18,
-    opacity: 0.78,
+    opacity: 0.28,
   },
   badgesRow: {
     flexDirection: 'row',
@@ -653,21 +632,25 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   levelLabel: {
     alignItems: 'center',
+    alignSelf: 'center',
+    width: '100%',
     marginTop: -2,
     marginBottom: 12,
     zIndex: 2,
   },
   levelLabelText: {
-    fontSize: 34,
-    lineHeight: 40,
+    fontSize: 32,
+    lineHeight: 38,
     fontWeight: FontWeight.extraBold,
     color: colors.textPrimary,
+    textAlign: 'center',
   },
   levelSubtitle: {
     fontSize: FontSize.sm,
     lineHeight: 20,
     fontWeight: FontWeight.bold,
     marginTop: -2,
+    textAlign: 'center',
   },
 
   // ── Section 2 Rank Card ────────────────────────────────────────────────────
@@ -772,117 +755,78 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
 
   // ── Zone Bar ───────────────────────────────────────────────────────────────
-  zoneBarContainer: { marginTop: Spacing.sm, overflow: 'hidden', paddingTop: 28 },
+  zoneBarContainer: { marginTop: Spacing.sm, overflow: 'hidden', paddingTop: 2 },
+  zoneStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 14 },
+  zoneStatusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '78%', borderWidth: 1, borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 6 },
+  zoneStatusDot: { width: 8, height: 8, borderRadius: 4 },
+  zoneStatusText: { fontSize: FontSize.xs, lineHeight: 16, fontWeight: FontWeight.bold, flexShrink: 1 },
+  zoneTotalText: { color: colors.textTertiary, fontSize: FontSize.xs, lineHeight: 16, fontWeight: FontWeight.semiBold, flexShrink: 1, textAlign: 'right' },
   zoneLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    gap: 6,
+    marginBottom: 8,
   },
   zoneLabel: {
-    fontSize: FontSize.sm,
-    lineHeight: 18,
-    fontWeight: FontWeight.semiBold,
+    fontSize: FontSize.xs,
+    lineHeight: 16,
+    fontWeight: FontWeight.bold,
     flex: 1,
     flexShrink: 1,
     minWidth: 0,
     textAlign: 'center',
   },
-  rankBadgeAbove: {
-    position: 'absolute',
-    top: 20,
-    marginLeft: -50,
-    minWidth: 100,
-    alignItems: 'center',
-    borderWidth: 3,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    zIndex: 3,
-  },
-  rankBadgeAboveText: {
-    fontSize: 20,
-    lineHeight: 26,
-    fontWeight: FontWeight.extraBold,
-  },
-  rankPointerTail: {
-    position: 'absolute',
-    bottom: -13,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 10,
-    borderRightWidth: 10,
-    borderTopWidth: 13,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-  },
   zoneBarTrack: {
     flexDirection: 'row',
-    height: 16,
+    height: 14,
     borderRadius: Radius.full,
     overflow: 'hidden',
-    marginBottom: 5,
+    marginBottom: 8,
     position: 'relative',
+    backgroundColor: colors.surfaceVariant,
   },
   zoneSegment: {
     height: '100%',
   },
-  zoneDot: {
+  zoneIndicatorLine: {
     position: 'absolute',
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    top: -7,
-    marginLeft: -15,
-    borderWidth: 3,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    marginLeft: -2,
+    borderRadius: 2,
+    borderWidth: 1,
     borderColor: colors.surface,
   },
-  zoneRankNums: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  zoneRankNum: {
-    fontSize: FontSize.xs,
-    color: colors.textSecondary,
-    fontWeight: FontWeight.semiBold,
-  },
-  zoneRankLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  zoneRankLabel: {
-    fontSize: 9,
-    color: colors.textTertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
+  zoneScaleRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 },
+  zoneScaleText: { fontSize: FontSize.xs, lineHeight: 16, color: colors.textTertiary, fontWeight: FontWeight.semiBold },
 
   // ── Section 3 List ─────────────────────────────────────────────────────────
   listSection: {
     paddingHorizontal: Spacing.md,
   },
-  sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginBottom: 2 },
-  livePill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.success + '18', borderRadius: Radius.full, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: colors.success + '55' },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success },
-  liveText: { color: colors.success, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8 },
-  sectionTitle: { display: 'none' },
-  sectionSubtitle: { display: 'none' },
+  sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 },
+  livePill: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.success + '18', borderRadius: 4, paddingHorizontal: 9, paddingVertical: 5, borderWidth: 1, borderColor: colors.success + '66' },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.success },
+  liveText: { color: colors.success, fontSize: 10, lineHeight: 14, fontWeight: FontWeight.bold, letterSpacing: 0.6 },
+  sectionTitle: { flex: 1, minWidth: 0, color: colors.textPrimary, fontSize: FontSize.lg, lineHeight: 24, fontWeight: FontWeight.bold, flexShrink: 1 },
+  sectionSubtitle: { color: colors.textSecondary, fontSize: FontSize.sm, lineHeight: 18, marginBottom: 10, flexShrink: 1 },
   promotionHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, marginBottom: 4 },
   promotionHintText: { color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.bold },
-  listContainer: { gap: 12, paddingBottom: Spacing.xl },
+  listContainer: { gap: 10, paddingBottom: Spacing.xl },
   boardRow: {
-    minHeight: 92,
+    minHeight: 88,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 12,
     borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderWidth: 1.5,
     borderColor: colors.border,
     overflow: 'hidden',
   },
-  topThreeRow: { minHeight: 96, paddingVertical: 16 },
+  topThreeRow: { minHeight: 92, paddingVertical: 12 },
   firstPlaceRow: { borderColor: '#F2B60088', shadowColor: '#F2B600', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   secondPlaceRow: { borderColor: '#2D8FCE66' },
   thirdPlaceRow: { borderColor: '#4CA87866' },
@@ -917,9 +861,16 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     fontWeight: FontWeight.bold,
   },
   boardXPBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    flexShrink: 0,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    minWidth: 60,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: Radius.md,
+    backgroundColor: colors.surfaceVariant,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   boardXPText: {
     fontSize: FontSize.lg,
@@ -928,6 +879,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.textPrimary,
     includeFontPadding: false,
   },
+  boardXPLabel: { color: colors.textSecondary, fontSize: FontSize.xs, lineHeight: 15, fontWeight: FontWeight.bold },
   xpShield: {
     width: 36,
     height: 36,

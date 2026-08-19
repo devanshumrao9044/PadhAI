@@ -22,9 +22,9 @@ function formatMins(mins: number): string {
 
 function getHeatColor(mins: number, colors: ThemeColors): string {
   if (mins === 0) return colors.surfaceVariant;
-  if (mins < 30) return colors.primaryDim + '88';
-  if (mins < 60) return colors.primary + '66';
-  if (mins < 120) return colors.primary + 'AA';
+  if (mins < 30) return colors.primary + '66';
+  if (mins < 60) return colors.primary + '99';
+  if (mins < 120) return colors.primary + 'CC';
   return colors.primary;
 }
 
@@ -38,8 +38,8 @@ function createChartConfig(colors: ThemeColors) {
     labelColor: () => colors.textSecondary,
     style: { borderRadius: Radius.md },
     propsForBackgroundLines: { stroke: colors.border, strokeDasharray: '4' },
-    propsForLabels: { fontSize: 11 },
-    barPercentage: 0.6,
+    propsForLabels: { fontSize: 10 },
+    barPercentage: 0.9,
   };
 }
 
@@ -321,8 +321,9 @@ export default function AnalyticsScreen() {
             showValuesOnTopOfBars
             fromZero
             withInnerLines
+            withHorizontalLabels={false}
             yAxisLabel={""}
-            yAxisSuffix={"m"}
+            yAxisSuffix={""}
             verticalLabelRotation={0}
           />
         </View>
@@ -370,6 +371,7 @@ export default function AnalyticsScreen() {
             showValuesOnTopOfBars
             fromZero
             withInnerLines
+            withHorizontalLabels={false}
             yAxisLabel={""}
             yAxisSuffix={""}
           />
@@ -508,12 +510,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   heatmapTitle: { fontSize: FontSize.base, lineHeight: 20, fontWeight: FontWeight.bold, color: colors.textPrimary, letterSpacing: 0.4, flexShrink: 1 },
   heatmapSubtitle: { fontSize: FontSize.sm, lineHeight: 18, color: colors.textSecondary, flexShrink: 1 },
   heatmapScroll: { flexGrow: 1, justifyContent: 'center' },
-  heatmap: { flexDirection: 'row', gap: 5, alignSelf: 'center', paddingVertical: Spacing.sm },
-  heatCol: { gap: 5 },
-  heatCell: { width: 22, height: 22, borderRadius: 5 },
+  heatmap: { flexDirection: 'row', gap: 6, alignSelf: 'center', paddingVertical: Spacing.sm },
+  heatCol: { gap: 6 },
+  heatCell: { width: 25, height: 25, borderRadius: 6, borderWidth: 1, borderColor: colors.border },
   heatLegend: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.lg, paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: colors.border, flexWrap: 'wrap' },
   heatLegendText: { fontSize: FontSize.xs, lineHeight: 16, color: colors.textSecondary, flexShrink: 1 },
-  heatLegendDot: { width: 14, height: 14, borderRadius: 4 },
+  heatLegendDot: { width: 15, height: 15, borderRadius: 5, borderWidth: 1, borderColor: colors.border },
 
   // Weak
   weakRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },

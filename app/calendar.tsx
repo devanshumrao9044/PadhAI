@@ -144,7 +144,13 @@ export default function CalendarScreen() {
           <Text style={styles.sectionTitle}>{t('calendar.eventsFor')}</Text>
           <Text style={styles.dateText}>{new Date(`${selectedDate}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'long' })}</Text>
         </View>
-        <TouchableOpacity onPress={() => setModalVisible(true)}>
+        <TouchableOpacity
+          style={styles.addEventButton}
+          onPress={() => setModalVisible(true)}
+          accessibilityRole="button"
+          accessibilityLabel={t('calendar.addEvent')}
+        >
+          <MaterialIcons name="add" size={17} color={colors.background} />
           <Text style={styles.addText}>{t('calendar.addEvent')}</Text>
         </TouchableOpacity>
       </View>
@@ -258,7 +264,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   eventsHeaderCopy: { flex: 1, minWidth: 0 },
   sectionTitle: { color: colors.textPrimary, fontSize: FontSize.lg, lineHeight: 24, fontWeight: FontWeight.bold, flexShrink: 1 },
   dateText: { color: colors.textSecondary, fontSize: FontSize.sm, lineHeight: 18, marginTop: 3, flexShrink: 1 },
-  addText: { maxWidth: '42%', color: colors.primary, fontSize: FontSize.sm, lineHeight: 18, fontWeight: FontWeight.bold, textAlign: 'right', flexShrink: 1 },
+  addEventButton: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.primary, borderRadius: Radius.full, paddingHorizontal: 11, paddingVertical: 7 },
+  addText: { color: colors.background, fontSize: FontSize.sm, lineHeight: 18, fontWeight: FontWeight.bold, textAlign: 'center', flexShrink: 1 },
   eventList: { paddingHorizontal: Spacing.md, gap: Spacing.sm },
   eventCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: Spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md },
   dayOffCard: { borderColor: colors.warning + '88', backgroundColor: colors.warning + '12' },
