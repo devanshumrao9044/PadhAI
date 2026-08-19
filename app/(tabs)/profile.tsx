@@ -225,7 +225,7 @@ export default function ProfileScreen() {
       try {
         const sourceBytes = await getImageByteSize(asset);
         if (sourceBytes > MAX_AVATAR_SOURCE_BYTES) {
-          setAvatarError(`Photo ${formatFileSize(sourceBytes)} की है। अधिकतम ${formatFileSize(MAX_AVATAR_SOURCE_BYTES)} की photo चुनें।`);
+          setAvatarError(t('profile.avatarTooLarge', { size: formatFileSize(sourceBytes), max: formatFileSize(MAX_AVATAR_SOURCE_BYTES) }));
           return;
         }
         setAvatarError(null);
@@ -374,7 +374,7 @@ export default function ProfileScreen() {
         {/* Level + XP */}
         <View style={styles.levelCard}>
           <View style={styles.levelHeader}>
-            <View>
+            <View style={styles.levelHeaderCopy}>
               <Text style={[styles.levelTitle, { color: level.color }]}>
                 {currentLevelCopy.title}
               </Text>
@@ -569,7 +569,7 @@ export default function ProfileScreen() {
         <View style={styles.modalOverlay}>
           <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}>
             <View style={styles.modalSheet}>
-              <Text style={styles.modalTitle}>Edit Profile</Text>
+              <Text style={styles.modalTitle}>{t('profile.editProfile')}</Text>
 
               <TouchableOpacity style={styles.modalAvatarEdit} onPress={pickImage}>
                 {editAvatarUrl ? (
@@ -716,7 +716,7 @@ export default function ProfileScreen() {
             <Text style={styles.alertTitle}>{alertConfig.title}</Text>
             <Text style={styles.alertMsg}>{alertConfig.message}</Text>
             {alertConfig.isSignOut ? (
-              <Text style={styles.alertHint}>Your study progress will remain safely saved.</Text>
+              <Text style={styles.alertHint}>{t('profile.signOutHint')}</Text>
             ) : null}
             <View style={styles.alertActions}>
               {alertConfig.isSignOut ? (
@@ -763,7 +763,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   avatarInitials: { width: 90, height: 90, borderRadius: 45, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.border },
   avatarText: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, includeFontPadding: false },
   profileInfo: { alignItems: 'center', marginBottom: Spacing.md },
-  profileName: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, color: colors.textPrimary },
+  profileName: { maxWidth: '100%', fontSize: FontSize.xxl, lineHeight: 34, fontWeight: FontWeight.bold, color: colors.textPrimary, textAlign: 'center', flexShrink: 1 },
   profileSub: { fontSize: FontSize.sm, color: colors.textSecondary, marginTop: 2 },
   badgesRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' },
   examBadge: { backgroundColor: colors.primary + '22', borderRadius: Radius.full, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary + '55' },
@@ -773,11 +773,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   editProfileBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.full },
   editProfileBtnText: { color: colors.background, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   levelCard: { backgroundColor: colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.md, marginBottom: Spacing.md },
-  levelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.sm },
+  levelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: Spacing.sm, marginBottom: Spacing.sm },
+  levelHeaderCopy: { flex: 1, minWidth: 0 },
   levelTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, includeFontPadding: false },
   levelExam: { fontSize: FontSize.sm, color: colors.textSecondary },
-  xpBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.warning + '22', borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 4 },
-  xpBadgeText: { fontSize: FontSize.base, color: colors.warning, fontWeight: FontWeight.semiBold },
+  xpBadge: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.warning + '22', borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 4 },
+  xpBadgeText: { fontSize: FontSize.sm, lineHeight: 18, color: colors.warning, fontWeight: FontWeight.semiBold },
   xpNeeded: { fontSize: FontSize.xs, color: colors.textTertiary, marginTop: 6 },
   statsGrid: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.md, marginBottom: Spacing.md },
   statItem: { alignItems: 'center', flex: 1, gap: 4 },
@@ -787,52 +788,52 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   cardTitle: { fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, color: colors.textTertiary, letterSpacing: 1.2, marginBottom: Spacing.sm, textTransform: 'uppercase' },
   notificationHeroCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.primary + '55', backgroundColor: colors.primary + '12' },
   notificationHeroIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
-  notificationHeroInfo: { flex: 1 },
-  notificationHeroTitle: { color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.bold },
-  notificationHeroText: { color: colors.textSecondary, fontSize: FontSize.xs, lineHeight: 17, marginTop: 2 },
-  notificationHeroButton: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: colors.primary, borderRadius: Radius.md, paddingHorizontal: 8, paddingVertical: 7 },
+  notificationHeroInfo: { flex: 1, minWidth: 0 },
+  notificationHeroTitle: { color: colors.textPrimary, fontSize: FontSize.base, lineHeight: 20, fontWeight: FontWeight.bold, flexShrink: 1 },
+  notificationHeroText: { color: colors.textSecondary, fontSize: FontSize.xs, lineHeight: 17, marginTop: 2, flexShrink: 1 },
+  notificationHeroButton: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: colors.primary, borderRadius: Radius.md, paddingHorizontal: 8, paddingVertical: 7 },
   notificationHeroButtonText: { color: colors.background, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
   adminQuickLink: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md, marginBottom: Spacing.md, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.primary + '55', backgroundColor: colors.surface },
   adminQuickLinkTitle: { color: colors.textPrimary, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   levelRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, opacity: 0.4 },
   levelRowUnlocked: { opacity: 1 },
   levelDot: { width: 10, height: 10, borderRadius: 5 },
-  levelRowInfo: { flex: 1 },
-  levelRowTitle: { fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
-  levelRowSub: { fontSize: FontSize.xs, color: colors.textTertiary },
-  settingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  levelRowInfo: { flex: 1, minWidth: 0 },
+  levelRowTitle: { fontSize: FontSize.base, lineHeight: 20, fontWeight: FontWeight.semiBold, flexShrink: 1 },
+  levelRowSub: { fontSize: FontSize.xs, lineHeight: 17, color: colors.textTertiary, flexShrink: 1 },
+  settingRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
   languageOptions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   languageOption: { borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 7, paddingVertical: 5 },
   languageOptionActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   languageOptionText: { color: colors.textSecondary, fontSize: 10, fontWeight: FontWeight.bold },
   languageOptionTextActive: { color: colors.background },
-  settingInfo: { flex: 1 },
+  settingInfo: { flex: 1, minWidth: 0 },
   notificationOptions: { marginLeft: Spacing.md, borderLeftWidth: 2, borderLeftColor: colors.border, paddingLeft: Spacing.sm },
-  settingLabel: { fontSize: FontSize.base, color: colors.textPrimary },
-  settingValue: { fontSize: FontSize.sm, color: colors.textSecondary, marginTop: 2 },
-  signOutRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: Spacing.sm, marginTop: 4 },
+  settingLabel: { fontSize: FontSize.base, lineHeight: 20, color: colors.textPrimary, flexShrink: 1 },
+  settingValue: { fontSize: FontSize.sm, lineHeight: 18, color: colors.textSecondary, marginTop: 2, flexShrink: 1 },
+  signOutRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: Spacing.sm, marginTop: 4 },
   signOutLabel: { fontSize: FontSize.base, color: colors.danger, fontWeight: FontWeight.semiBold },
-  xpRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
-  sessionRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.border },
-  xpReason: { flex: 1, fontSize: FontSize.sm, color: colors.textSecondary, textTransform: 'capitalize' },
-  xpAmount: { fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
+  xpRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingVertical: 6 },
+  sessionRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.border },
+  xpReason: { flex: 1, minWidth: 0, fontSize: FontSize.sm, lineHeight: 18, color: colors.textSecondary, textTransform: 'capitalize', flexShrink: 1 },
+  xpAmount: { maxWidth: '45%', flexShrink: 1, fontSize: FontSize.sm, lineHeight: 18, fontWeight: FontWeight.semiBold, textAlign: 'right' },
   referralStatus: { fontSize: FontSize.xs, color: colors.textSecondary, marginTop: 6 },
   referralCode: { fontSize: FontSize.xs, color: colors.primary, fontWeight: FontWeight.bold, marginTop: 8 },
   modalOverlay: { flex: 1, backgroundColor: colors.overlay },
   modalSheet: { backgroundColor: colors.surface, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.lg, paddingBottom: Spacing.xxl, marginTop: 'auto', borderWidth: 1, borderColor: colors.border },
-  modalTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: colors.textPrimary, marginBottom: Spacing.lg, textAlign: 'center' },
+  modalTitle: { fontSize: FontSize.xl, lineHeight: 28, fontWeight: FontWeight.bold, color: colors.textPrimary, marginBottom: Spacing.lg, textAlign: 'center', flexShrink: 1 },
   modalPreferenceCard: { marginTop: Spacing.md, padding: Spacing.sm, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
   modalPreferenceTitle: { color: colors.textPrimary, fontSize: FontSize.sm, fontWeight: FontWeight.bold, marginBottom: 2 },
-  modalSettingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
-  modalSettingInfo: { flex: 1 },
-  modalSettingLabel: { color: colors.textPrimary, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
-  modalSettingValue: { color: colors.textSecondary, fontSize: FontSize.xs, marginTop: 2 },
+  modalSettingRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  modalSettingInfo: { flex: 1, minWidth: 0 },
+  modalSettingLabel: { color: colors.textPrimary, fontSize: FontSize.sm, lineHeight: 20, fontWeight: FontWeight.semiBold, flexShrink: 1 },
+  modalSettingValue: { color: colors.textSecondary, fontSize: FontSize.xs, lineHeight: 17, marginTop: 2, flexShrink: 1 },
   modalReminderGroup: { marginLeft: Spacing.sm, paddingLeft: Spacing.sm, borderLeftWidth: 2, borderLeftColor: colors.border },
   modalAvatarEdit: { alignSelf: 'center', marginBottom: 6, position: 'relative' },
   avatarError: { fontSize: FontSize.xs, color: colors.danger, textAlign: 'center', marginBottom: Spacing.sm },
   avatarImageSmall: { width: 64, height: 64, borderRadius: 32 },
   cameraIconBadge: { position: 'absolute', bottom: 0, right: -4, backgroundColor: colors.primary, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface },
-  inputLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, color: colors.textTertiary, marginBottom: 6, marginTop: 10 },
+  inputLabel: { fontSize: FontSize.xs, lineHeight: 16, fontWeight: FontWeight.bold, color: colors.textSecondary, marginBottom: 6, marginTop: 10 },
   input: { backgroundColor: colors.surfaceVariant, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: Spacing.md, paddingVertical: 12, color: colors.textPrimary, fontSize: FontSize.md, marginBottom: 8 },
   chipRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   chip: { flex: 1, backgroundColor: colors.surfaceVariant, paddingVertical: 10, borderRadius: Radius.md, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
@@ -850,9 +851,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   alertIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   signOutAlertIcon: { backgroundColor: colors.danger + '18' },
   alertEyebrow: { fontSize: FontSize.xs, color: colors.danger, fontWeight: FontWeight.bold, letterSpacing: 1.2, marginBottom: 6 },
-  alertTitle: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: colors.textPrimary, marginBottom: 8, textAlign: 'center' },
-  alertMsg: { fontSize: FontSize.base, color: colors.textSecondary, marginBottom: 8, textAlign: 'center', lineHeight: 21 },
-  alertHint: { fontSize: FontSize.sm, color: colors.textTertiary, textAlign: 'center', marginBottom: Spacing.lg },
+  alertTitle: { fontSize: FontSize.xl, lineHeight: 28, fontWeight: FontWeight.bold, color: colors.textPrimary, marginBottom: 8, textAlign: 'center', flexShrink: 1 },
+  alertMsg: { fontSize: FontSize.base, color: colors.textSecondary, marginBottom: 8, textAlign: 'center', lineHeight: 21, flexShrink: 1 },
+  alertHint: { fontSize: FontSize.sm, lineHeight: 19, color: colors.textTertiary, textAlign: 'center', marginBottom: Spacing.lg, flexShrink: 1 },
   alertActions: { flexDirection: 'row', gap: 10, width: '100%', marginTop: Spacing.sm },
   alertBtn: { flex: 1, minHeight: 46, borderRadius: Radius.md, paddingVertical: 12, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
   alertBtnSecondary: { backgroundColor: colors.surfaceVariant, borderWidth: 1, borderColor: colors.border },
@@ -869,7 +870,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   signOutOverlayText: {
     color: colors.textSecondary,
     fontSize: FontSize.base,
+    lineHeight: 20,
     fontWeight: FontWeight.medium,
+    textAlign: 'center',
   },
 });
 
