@@ -25,6 +25,7 @@ import {
   saveNotificationSettings,
   syncLocalNotifications,
 } from '@/services/localNotifications';
+import { isNotificationAdmin, registerNotificationDevice } from '@/services/adminNotifications';
 import type { NotificationSettings } from '@/types/models';
 import {
   formatFileSize,
@@ -57,6 +58,7 @@ export default function ProfileScreen() {
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(DEFAULT_NOTIFICATION_SETTINGS);
   const [notificationBusy, setNotificationBusy] = useState(false);
+  const [adminRole, setAdminRole] = useState<'owner' | 'admin' | null>(null);
 
   const [alertConfig, setAlertConfig] = useState<{
     visible: boolean; title: string; message: string; isSignOut?: boolean;
@@ -93,12 +95,14 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (!userId) {
       setNotificationSettings(DEFAULT_NOTIFICATION_SETTINGS);
+      setAdminRole(null);
       return;
     }
     let active = true;
-    void Promise.all([loadNotificationSettings(userId), loadTodoItems(userId)]).then(([settings, todoItems]) => {
+    void Promise.all([loadNotificationSettings(userId), loadTodoItems(userId), isNotificationAdmin(userId)]).then(([settings, todoItems, role]) => {
       if (!active) return;
       setNotificationSettings(settings);
+      setAdminRole(role.allowed ? role.role : null);
       const hasPendingTodo = todoItems.some(item => !item.completed && item.date >= new Date().toISOString().slice(0, 10));
       void syncLocalNotifications(settings, language, hasPendingTodo);
     });
@@ -113,6 +117,7 @@ export default function ProfileScreen() {
       const todoItems = await loadTodoItems(userId);
       const hasPendingTodo = todoItems.some(item => !item.completed && item.date >= new Date().toISOString().slice(0, 10));
       const synced = await syncLocalNotifications(next, language, hasPendingTodo);
+      if (next.enabled) void registerNotificationDevice(userId);
       if (!synced && next.enabled) {
         Alert.alert(
           t('profile.notifications'),
@@ -521,6 +526,34 @@ export default function ProfileScreen() {
                 />
               </View>
             </View>
+          ) : null}
+
+          <TouchableOpacity
+            style={styles.settingRow}
+            onPress={() => router.push('/notifications' as Parameters<typeof router.push>[0])}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="notifications" size={20} color={colors.primary} />
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>{t('notifications.title')}</Text>
+              <Text style={styles.settingValue}>{t('notifications.inboxDescription')}</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          {adminRole ? (
+            <TouchableOpacity
+              style={styles.settingRow}
+              onPress={() => router.push('/admin/notifications' as Parameters<typeof router.push>[0])}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons name="campaign" size={20} color={colors.primary} />
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>{t('notifications.adminTitle')}</Text>
+                <Text style={styles.settingValue}>{t('notifications.adminDescription')}</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
           ) : null}
 
           <View style={styles.settingRow}>

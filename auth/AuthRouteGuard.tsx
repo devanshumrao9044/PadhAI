@@ -31,6 +31,8 @@ export default function AuthRouteGuard() {
     routeSegments[0] === 'referral' ||
     routeSegments[0] === 'todo' ||
     routeSegments[0] === 'calendar' ||
+    routeSegments[0] === 'notifications' ||
+    routeSegments[0] === 'admin' ||
     routeSegments[0] === 'first-time-help';
   const isSessionAllowedPublicRoute =
     routeSegments[0] === 'privacy-policy' ||

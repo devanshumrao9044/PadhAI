@@ -9,14 +9,25 @@ import AuthRouteGuard from '@/auth/AuthRouteGuard';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { LanguageProvider, useLanguage } from '@/contexts/LanguageContext';
 import { useApp } from '@/hooks/useApp';
+import { loadNotificationSettings } from '@/services/localNotifications';
+import { registerNotificationDevice } from '@/services/adminNotifications';
 
 void SplashScreen.preventAutoHideAsync();
 
 function AppNavigation() {
   const { mode, colors } = useTheme();
   const { ready: authReady } = useAuthSession();
-  const { isLoading: appLoading } = useApp();
+  const { isLoading: appLoading, user } = useApp();
   const { ready: languageReady } = useLanguage();
+
+  useEffect(() => {
+    if (!authReady || appLoading || !user?.id) return;
+    let active = true;
+    void loadNotificationSettings(user.id).then(settings => {
+      if (active && settings.enabled) void registerNotificationDevice(user.id);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [appLoading, authReady, user?.id]);
 
   useEffect(() => {
     if (!authReady || appLoading || !languageReady) return;
@@ -38,6 +49,8 @@ function AppNavigation() {
         <Stack.Screen name="referral" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="todo" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="calendar" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="admin/notifications" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="tracker/[subjectId]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="tracker/chapters/[chapterId]" options={{ animation: 'slide_from_right' }} />
       </Stack>
