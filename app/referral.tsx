@@ -227,7 +227,7 @@ export default function ReferralScreen() {
               <View style={styles.stepBadge}>
                 <Text style={styles.stepNumber}>{item.step}</Text>
               </View>
-              <Text style={styles.stepText}>{item.text}</Text>
+              <Text style={styles.stepText} allowFontScaling>{item.text}</Text>
             </View>
           ))}
         </View>
@@ -297,15 +297,16 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderColor: colors.border,
   },
   cardLabel: {
-    color: colors.textTertiary, fontSize: 11, fontWeight: '700',
-    letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 14,
+    color: colors.textSecondary, fontSize: 12, lineHeight: 16, fontWeight: '800',
+    letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 14,
   },
-  codeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  codeText: { color: colors.textPrimary, fontSize: 26, fontWeight: '900', letterSpacing: 3 },
+  codeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
+  codeText: { flex: 1, minWidth: 0, color: colors.textPrimary, fontSize: 22, lineHeight: 28, fontWeight: '900', letterSpacing: 2, includeFontPadding: false },
   copyBtn: {
     backgroundColor: 'rgba(124, 92, 252, 0.15)', borderRadius: 8,
-    paddingHorizontal: 14, paddingVertical: 8,
+    minWidth: 72, paddingHorizontal: 12, paddingVertical: 9,
     borderWidth: 1, borderColor: 'rgba(124, 92, 252, 0.3)',
+    alignItems: 'center',
   },
   copyBtnDone: { backgroundColor: 'rgba(46, 213, 115, 0.15)', borderColor: 'rgba(46, 213, 115, 0.3)' },
   copyBtnText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
@@ -338,14 +339,14 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   claimBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   claimBtnEmailText: { color: colors.textSecondary },
 
-  stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
+  stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 14, minWidth: 0 },
   stepBadge: {
     width: 26, height: 26, borderRadius: 13,
     backgroundColor: 'rgba(124, 92, 252, 0.2)',
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   stepNumber: { color: colors.primary, fontSize: 12, fontWeight: '800' },
-  stepText: { color: colors.textSecondary, fontSize: 13, lineHeight: 20, flex: 1 },
+  stepText: { flex: 1, minWidth: 0, color: colors.textSecondary, fontSize: 14, lineHeight: 21 },
 
   modalOverlay: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.75)',
@@ -357,8 +358,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderWidth: 1, borderColor: colors.warning + '55',
   },
   modalEmoji: { fontSize: 56, marginBottom: 16 },
-  modalTitle: { color: colors.warning, fontSize: 24, fontWeight: '900', marginBottom: 8 },
-  modalSubtitle: { color: colors.textSecondary, fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+  modalTitle: { color: colors.warning, fontSize: 22, lineHeight: 28, fontWeight: '900', textAlign: 'center', marginBottom: 8 },
+  modalSubtitle: { color: colors.textSecondary, fontSize: 14, textAlign: 'center', lineHeight: 21, marginBottom: 24 },
   modalInstagramBtn: {
     backgroundColor: colors.primary, borderRadius: 12,
     paddingVertical: 14, width: '100%', alignItems: 'center', marginBottom: 10,

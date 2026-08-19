@@ -38,7 +38,7 @@ export default function RewardsScreen() {
       <View style={styles.tabs}>
         {(['coupons', 'howItWorks', 'faqs'] as const).map(item => (
           <TouchableOpacity key={item} style={styles.tab} onPress={() => setTab(item)} activeOpacity={0.8}>
-            <Text style={[styles.tabText, tab === item && styles.tabTextActive]}>{t(`rewards.${item}`)}</Text>
+            <Text numberOfLines={2} style={[styles.tabText, tab === item && styles.tabTextActive]}>{t(`rewards.${item}`)}</Text>
             {tab === item ? <View style={styles.tabUnderline} /> : null}
           </TouchableOpacity>
         ))}
@@ -114,28 +114,28 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   headerButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: colors.textPrimary, fontSize: FontSize.xl, fontWeight: FontWeight.extraBold },
-  tabs: { flexDirection: 'row', backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border, paddingHorizontal: Spacing.sm },
-  tab: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 58, position: 'relative' },
-  tabText: { color: colors.textSecondary, fontSize: FontSize.base, fontWeight: FontWeight.medium },
+  tabs: { flexDirection: 'row', backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border, paddingHorizontal: Spacing.xs },
+  tab: { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center', minHeight: 64, paddingHorizontal: 4, position: 'relative' },
+  tabText: { color: colors.textSecondary, fontSize: FontSize.sm, lineHeight: 18, fontWeight: FontWeight.medium, textAlign: 'center' },
   tabTextActive: { color: colors.primary, fontWeight: FontWeight.bold },
   tabUnderline: { position: 'absolute', left: 12, right: 12, bottom: -1, height: 3, borderRadius: Radius.full, backgroundColor: colors.primary },
   content: { padding: Spacing.md, paddingBottom: 100 },
-  sectionHeading: { color: colors.textPrimary, fontSize: FontSize.xxl, fontWeight: FontWeight.extraBold, marginBottom: Spacing.md },
+  sectionHeading: { color: colors.textPrimary, fontSize: FontSize.xxl, lineHeight: 34, fontWeight: FontWeight.extraBold, marginBottom: Spacing.md, flexShrink: 1 },
   emptyState: { alignItems: 'center', paddingTop: 56, paddingHorizontal: Spacing.xl },
   emptyIcon: { width: 74, height: 74, borderRadius: 37, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary + '18', borderWidth: 1, borderColor: colors.primary + '44', marginBottom: Spacing.md },
   bodyText: { color: colors.textSecondary, fontSize: FontSize.base, lineHeight: 22 },
   featureCard: { backgroundColor: colors.warning + '0C', borderRadius: Radius.xl, borderWidth: 1, borderColor: colors.warning + '44', overflow: 'hidden' },
   featureRow: { flexDirection: 'row', gap: Spacing.md, padding: Spacing.md, alignItems: 'flex-start' },
   featureIcon: { width: 58, height: 58, borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center' },
-  featureCopy: { flex: 1 },
-  featureTitle: { color: colors.textPrimary, fontSize: FontSize.lg, fontWeight: FontWeight.bold, marginBottom: 5 },
-  featureBody: { color: colors.textSecondary, fontSize: FontSize.base, lineHeight: 21 },
+  featureCopy: { flex: 1, minWidth: 0 },
+  featureTitle: { color: colors.textPrimary, fontSize: FontSize.lg, lineHeight: 24, fontWeight: FontWeight.bold, marginBottom: 5, flexShrink: 1 },
+  featureBody: { color: colors.textSecondary, fontSize: FontSize.base, lineHeight: 21, flexShrink: 1 },
   featureDivider: { height: 1, backgroundColor: colors.warning + '2A', marginHorizontal: Spacing.md },
-  milestoneCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.md, padding: Spacing.md, borderRadius: Radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  milestoneCard: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, marginTop: Spacing.md, padding: Spacing.md, borderRadius: Radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   milestoneTitle: { color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.bold, marginBottom: 3 },
   faqCard: { backgroundColor: colors.surfaceVariant, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.sm, borderWidth: 1, borderColor: colors.border },
   faqCardOpen: { backgroundColor: colors.surface, borderColor: colors.primary + '66' },
-  faqHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  faqQuestion: { flex: 1, color: colors.textPrimary, fontSize: FontSize.md, lineHeight: 24, fontWeight: FontWeight.semiBold },
+  faqHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
+  faqQuestion: { flex: 1, minWidth: 0, color: colors.textPrimary, fontSize: FontSize.md, lineHeight: 24, fontWeight: FontWeight.semiBold },
   faqAnswer: { color: colors.textSecondary, fontSize: FontSize.base, lineHeight: 21, marginTop: Spacing.sm, paddingRight: Spacing.xl },
 });
