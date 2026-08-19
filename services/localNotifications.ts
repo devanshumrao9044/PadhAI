@@ -42,7 +42,7 @@ const COPY = {
 
 let handlerConfigured = false;
 
-function configureHandler() {
+export function configureNotificationHandler() {
   if (handlerConfigured || Platform.OS === 'web') return;
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -78,7 +78,7 @@ function parseTime(value: string, fallback: string): { hour: number; minute: num
 
 async function ensurePermission(): Promise<boolean> {
   if (Platform.OS === 'web') return false;
-  configureHandler();
+  configureNotificationHandler();
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync(CHANNEL_IDS.study, {
       name: 'Study reminders',

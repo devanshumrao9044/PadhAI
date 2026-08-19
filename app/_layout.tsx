@@ -9,7 +9,7 @@ import AuthRouteGuard from '@/auth/AuthRouteGuard';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { LanguageProvider, useLanguage } from '@/contexts/LanguageContext';
 import { useApp } from '@/hooks/useApp';
-import { loadNotificationSettings } from '@/services/localNotifications';
+import { configureNotificationHandler, loadNotificationSettings } from '@/services/localNotifications';
 import { registerNotificationDevice } from '@/services/adminNotifications';
 
 void SplashScreen.preventAutoHideAsync();
@@ -21,6 +21,7 @@ function AppNavigation() {
   const { ready: languageReady } = useLanguage();
 
   useEffect(() => {
+    configureNotificationHandler();
     if (!authReady || appLoading || !user?.id) return;
     let active = true;
     void loadNotificationSettings(user.id).then(settings => {

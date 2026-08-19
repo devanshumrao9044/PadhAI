@@ -25,7 +25,7 @@ import {
   saveNotificationSettings,
   syncLocalNotifications,
 } from '@/services/localNotifications';
-import { isNotificationAdmin, registerNotificationDevice } from '@/services/adminNotifications';
+import { disableNotificationDevice, isNotificationAdmin, registerNotificationDevice } from '@/services/adminNotifications';
 import type { NotificationSettings } from '@/types/models';
 import {
   formatFileSize,
@@ -117,16 +117,19 @@ export default function ProfileScreen() {
       const todoItems = await loadTodoItems(userId);
       const hasPendingTodo = todoItems.some(item => !item.completed && item.date >= new Date().toISOString().slice(0, 10));
       const synced = await syncLocalNotifications(next, language, hasPendingTodo);
-      if (next.enabled) void registerNotificationDevice(userId);
+      const deviceReady = next.enabled ? await registerNotificationDevice(userId) : await disableNotificationDevice(userId);
       if (!synced && next.enabled) {
         Alert.alert(
           t('profile.notifications'),
           Platform.OS === 'web' ? t('profile.notificationsWebUnavailable') : t('profile.notificationsPermissionDenied'),
-        );
+          );
         return;
       }
       setNotificationSettings(next);
       await saveNotificationSettings(userId, next);
+      if (next.enabled && Platform.OS !== 'web' && !deviceReady) {
+        Alert.alert(t('profile.notifications'), t('profile.notificationsDeviceSetupFailed'));
+      }
     } finally {
       setNotificationBusy(false);
     }
@@ -651,7 +654,7 @@ export default function ProfileScreen() {
                   </View>
                 </View>
                 <View style={styles.modalSettingRow}>
-                  <View style={styles.modalSettingInfo}><Text style={styles.modalSettingLabel}>{t('profile.notifications')}</Text><Text style={styles.modalSettingValue}>{t('profile.notificationsDescription')}</Text></View>
+                  <View style={styles.modalSettingInfo}><Text style={styles.modalSettingLabel}>{t('profile.notificationsDevice')}</Text><Text style={styles.modalSettingValue}>{t('profile.notificationsDescription')}</Text></View>
                   <Switch value={notificationSettings.enabled} onValueChange={value => { void updateNotificationSettings({ enabled: value }); }} disabled={notificationBusy} trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }} thumbColor={notificationSettings.enabled ? colors.primary : colors.textTertiary} />
                 </View>
                 {notificationSettings.enabled ? (

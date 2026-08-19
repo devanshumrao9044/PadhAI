@@ -150,19 +150,21 @@ export async function deleteNotificationAttachment(path: string): Promise<void> 
   signedUrlCache.delete(path);
 }
 
-export async function openNotificationAttachment(path: string): Promise<void> {
+export async function getNotificationAttachmentUrl(path: string): Promise<string> {
   const now = Date.now();
   const cached = signedUrlCache.get(path);
-  if (cached && cached.expiresAt > now + 120_000) {
-    await Linking.openURL(cached.url);
-    return;
-  }
+  if (cached && cached.expiresAt > now + 120_000) return cached.url;
+
   const { data, error } = await supabase.storage
     .from('notification-attachments')
     .createSignedUrl(path, 3600);
   if (error || !data?.signedUrl) throw error ?? new Error('Attachment link could not be created.');
   signedUrlCache.set(path, { url: data.signedUrl, expiresAt: now + 3600_000 });
-  await Linking.openURL(data.signedUrl);
+  return data.signedUrl;
+}
+
+export async function openNotificationAttachment(path: string): Promise<void> {
+  await Linking.openURL(await getNotificationAttachmentUrl(path));
 }
 
 export async function openNotificationLink(url: string): Promise<void> {
@@ -171,25 +173,40 @@ export async function openNotificationLink(url: string): Promise<void> {
 
 export async function registerNotificationDevice(userId: string): Promise<boolean> {
   if (Platform.OS === 'web') return false;
-  const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? (Constants as any).easConfig?.projectId;
-  if (!projectId) return false;
+  try {
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId
+      ?? (Constants as any).easConfig?.projectId
+      ?? process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
+    const current = await Notifications.getPermissionsAsync();
+    const permission = current.granted
+      ? current
+      : await Notifications.requestPermissionsAsync({
+          ios: { allowAlert: true, allowBadge: false, allowSound: true },
+        });
+    if (!permission.granted && permission.ios?.status !== Notifications.IosAuthorizationStatus.PROVISIONAL) return false;
 
-  const current = await Notifications.getPermissionsAsync();
-  const permission = current.granted
-    ? current
-    : await Notifications.requestPermissionsAsync({
-        ios: { allowAlert: true, allowBadge: false, allowSound: true },
-      });
-  if (!permission.granted && permission.ios?.status !== Notifications.IosAuthorizationStatus.PROVISIONAL) return false;
+    const token = projectId
+      ? await Notifications.getExpoPushTokenAsync({ projectId })
+      : await Notifications.getExpoPushTokenAsync();
+    const platform = Platform.OS === 'ios' ? 'ios' : 'android';
+    const { error } = await supabase.from('notification_devices').upsert({
+      user_id: userId,
+      expo_push_token: token.data,
+      platform,
+      enabled: true,
+      last_seen_at: new Date().toISOString(),
+    }, { onConflict: 'expo_push_token' });
+    return !error;
+  } catch (error) {
+    console.warn('Notification device registration failed', error);
+    return false;
+  }
+}
 
-  const token = await Notifications.getExpoPushTokenAsync({ projectId });
-  const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-  const { error } = await supabase.from('notification_devices').upsert({
-    user_id: userId,
-    expo_push_token: token.data,
-    platform,
-    enabled: true,
-    last_seen_at: new Date().toISOString(),
-  }, { onConflict: 'expo_push_token' });
+export async function disableNotificationDevice(userId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('notification_devices')
+    .update({ enabled: false, last_seen_at: new Date().toISOString() })
+    .eq('user_id', userId);
   return !error;
 }

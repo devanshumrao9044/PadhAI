@@ -436,19 +436,14 @@ export default function LeaderboardScreen() {
             ))}
           </View>
 
-          {/* Center title and glowing podium */}
-          <View style={styles.podiumLabel}>
-            <Text style={styles.podiumText}>
+          {/* Center level title */}
+          <View style={styles.levelLabel}>
+            <Text style={styles.levelLabelText}>
               {t('leaderboard.level', { value: currentLevel.rank })}
             </Text>
-            <Text style={[styles.podiumSubtitle, { color: currentLevel.color }]}>{currentLevelTitle}</Text>
+            <Text style={[styles.levelSubtitle, { color: currentLevel.color }]}>{currentLevelTitle}</Text>
           </View>
 
-          <View style={styles.podiumBase}>
-            <View style={[styles.podiumPlatform, { borderColor: currentLevel.color + '66' }]}>
-              <View style={styles.podiumGlow} />
-            </View>
-          </View>
         </LinearGradient>
 
         {/* ── Section 2: Rank Status Card ───────────────────────────────── */}
@@ -580,7 +575,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   // ── Section 1 Hero ────────────────────────────────────────────────────────
   heroSection: {
     alignItems: 'center',
-    minHeight: 330,
+    minHeight: 270,
     paddingTop: 28,
     paddingBottom: 28,
     overflow: 'hidden',
@@ -656,48 +651,23 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     fontWeight: FontWeight.extraBold,
     marginTop: -4,
   },
-  podiumLabel: {
+  levelLabel: {
     alignItems: 'center',
     marginTop: -2,
     marginBottom: 12,
     zIndex: 2,
   },
-  podiumText: {
+  levelLabelText: {
     fontSize: 34,
     lineHeight: 40,
     fontWeight: FontWeight.extraBold,
     color: colors.textPrimary,
   },
-  podiumSubtitle: {
+  levelSubtitle: {
     fontSize: FontSize.sm,
     lineHeight: 20,
     fontWeight: FontWeight.bold,
     marginTop: -2,
-  },
-  podiumBase: {
-    alignItems: 'center',
-    width: 190,
-    zIndex: 2,
-  },
-  podiumPlatform: {
-    width: '100%',
-    height: 30,
-    borderRadius: Radius.full,
-    borderWidth: 2,
-    backgroundColor: '#2A405B',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#24364D',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  podiumGlow: {
-    width: '68%',
-    height: 10,
-    borderRadius: Radius.full,
-    backgroundColor: '#F7D35B',
   },
 
   // ── Section 2 Rank Card ────────────────────────────────────────────────────

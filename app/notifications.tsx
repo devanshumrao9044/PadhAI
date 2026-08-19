@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -9,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,10 +19,9 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import {
   deleteUserNotification,
+  getNotificationAttachmentUrl,
   loadUserNotifications,
   markUserNotificationRead,
-  openNotificationAttachment,
-  openNotificationLink,
   type UserNotification,
 } from '@/services/adminNotifications';
 
@@ -36,6 +37,7 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [items, setItems] = useState<UserNotification[]>([]);
+  const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -43,7 +45,9 @@ export default function NotificationsScreen() {
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
-      setItems(await loadUserNotifications());
+      const nextItems = await loadUserNotifications();
+      setItems(nextItems);
+      setAttachmentUrls({});
     } catch (error: any) {
       Alert.alert(t('notifications.title'), error?.message ?? t('notifications.loadFailed'));
     } finally {
@@ -52,6 +56,24 @@ export default function NotificationsScreen() {
   }, [t]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    let active = true;
+    const withAttachments = items.filter(item => item.attachmentPath && !attachmentUrls[item.id]);
+    if (withAttachments.length === 0) return () => { active = false; };
+    void Promise.allSettled(withAttachments.map(async item => {
+      const url = await getNotificationAttachmentUrl(item.attachmentPath as string);
+      return [item.id, url] as const;
+    })).then(results => {
+      if (!active) return;
+      const nextUrls: Record<string, string> = {};
+      for (const result of results) {
+        if (result.status === 'fulfilled') nextUrls[result.value[0]] = result.value[1];
+      }
+      if (Object.keys(nextUrls).length > 0) setAttachmentUrls(current => ({ ...current, ...nextUrls }));
+    });
+    return () => { active = false; };
+  }, [attachmentUrls, items]);
 
   const markRead = async (item: UserNotification) => {
     if (item.readAt || busyId) return;
@@ -78,6 +100,11 @@ export default function NotificationsScreen() {
             try {
               await deleteUserNotification(item.id);
               setItems(current => current.filter(entry => entry.id !== item.id));
+              setAttachmentUrls(current => {
+                const next = { ...current };
+                delete next[item.id];
+                return next;
+              });
             } catch (error: any) {
               Alert.alert(t('notifications.title'), error?.message ?? t('notifications.deleteFailed'));
             } finally {
@@ -87,27 +114,6 @@ export default function NotificationsScreen() {
         },
       ],
     );
-  };
-
-  const openAttachment = async (item: UserNotification) => {
-    if (!item.attachmentPath) return;
-    setBusyId(item.id);
-    try {
-      await openNotificationAttachment(item.attachmentPath);
-    } catch (error: any) {
-      Alert.alert(t('notifications.title'), error?.message ?? t('notifications.attachmentFailed'));
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const openLink = async (item: UserNotification) => {
-    if (!item.linkUrl) return;
-    try {
-      await openNotificationLink(item.linkUrl);
-    } catch (error: any) {
-      Alert.alert(t('notifications.title'), error?.message ?? t('notifications.linkFailed'));
-    }
   };
 
   return (
@@ -139,6 +145,7 @@ export default function NotificationsScreen() {
             </View>
           ) : items.map(item => {
             const attachmentLabel = item.attachmentMimeType === 'application/pdf' ? t('notifications.pdfAttachment') : t('notifications.imageAttachment');
+            const attachmentUrl = attachmentUrls[item.id];
             return (
               <View key={item.id} style={[styles.notificationCard, !item.readAt && styles.unreadCard]}>
                 <TouchableOpacity style={styles.cardMain} onPress={() => void markRead(item)} activeOpacity={0.8}>
@@ -155,22 +162,30 @@ export default function NotificationsScreen() {
                     {!item.readAt ? <Text style={styles.markRead}>{t('notifications.markRead')}</Text> : null}
                   </View>
                 </TouchableOpacity>
-                {(item.attachmentPath || item.linkUrl) ? (
-                  <View style={styles.actionsRow}>
-                    {item.attachmentPath ? (
-                      <TouchableOpacity style={styles.actionButton} onPress={() => void openAttachment(item)} disabled={busyId === item.id}>
-                        <MaterialIcons name={item.attachmentMimeType === 'application/pdf' ? 'picture-as-pdf' : 'image'} size={17} color={colors.primary} />
-                        <Text style={styles.actionText}>{attachmentLabel} · {formatAttachmentSize(item.attachmentSizeBytes)}</Text>
-                      </TouchableOpacity>
+
+                {item.linkUrl ? (
+                  <View style={styles.linkInfo}>
+                    <MaterialIcons name="link" size={17} color={colors.textSecondary} />
+                    <Text style={styles.linkText}>{t('notifications.linkAttached')}</Text>
+                  </View>
+                ) : null}
+
+                {item.attachmentPath ? (
+                  <View style={styles.attachmentSection}>
+                    <View style={styles.attachmentHeader}>
+                      <MaterialIcons name={item.attachmentMimeType === 'application/pdf' ? 'picture-as-pdf' : 'image'} size={18} color={colors.primary} />
+                      <Text style={styles.attachmentTitle}>{attachmentLabel} · {formatAttachmentSize(item.attachmentSizeBytes)}</Text>
+                    </View>
+                    {!attachmentUrl ? <ActivityIndicator size="small" color={colors.primary} /> : null}
+                    {attachmentUrl && item.attachmentMimeType === 'image/jpeg' ? (
+                      <Image source={{ uri: attachmentUrl }} style={styles.imagePreview} resizeMode="contain" accessibilityLabel={attachmentLabel} />
                     ) : null}
-                    {item.linkUrl ? (
-                      <TouchableOpacity style={styles.actionButton} onPress={() => void openLink(item)}>
-                        <MaterialIcons name="open-in-new" size={17} color={colors.primary} />
-                        <Text style={styles.actionText}>{t('notifications.openLink')}</Text>
-                      </TouchableOpacity>
+                    {attachmentUrl && item.attachmentMimeType === 'application/pdf' ? (
+                      <WebView source={{ uri: attachmentUrl }} style={styles.pdfPreview} originWhitelist={['*']} startInLoadingState />
                     ) : null}
                   </View>
                 ) : null}
+
                 <TouchableOpacity style={styles.deleteButton} onPress={() => remove(item)} disabled={busyId === item.id} accessibilityLabel={t('notifications.deleteAction')}>
                   {busyId === item.id ? <ActivityIndicator size="small" color={colors.danger} /> : <MaterialIcons name="delete-outline" size={20} color={colors.danger} />}
                 </TouchableOpacity>
@@ -206,8 +221,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   itemMessage: { color: colors.textSecondary, fontSize: FontSize.sm, lineHeight: 20, marginTop: 4 },
   itemDate: { color: colors.textTertiary, fontSize: FontSize.xs, marginTop: 8 },
   markRead: { color: colors.primary, fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, marginTop: 5 },
-  actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs, marginTop: Spacing.sm, paddingLeft: 44 },
-  actionButton: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.primary + '55', paddingHorizontal: Spacing.sm, paddingVertical: 6 },
-  actionText: { color: colors.primary, fontSize: FontSize.xs, fontWeight: FontWeight.semiBold },
+  linkInfo: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: Spacing.sm, paddingLeft: 44 },
+  linkText: { color: colors.textSecondary, fontSize: FontSize.xs },
+  attachmentSection: { marginTop: Spacing.sm, paddingLeft: 44, gap: Spacing.xs },
+  attachmentHeader: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  attachmentTitle: { color: colors.primary, fontSize: FontSize.xs, fontWeight: FontWeight.semiBold },
+  imagePreview: { width: '100%', height: 210, borderRadius: Radius.md, backgroundColor: colors.background },
+  pdfPreview: { width: '100%', height: 300, borderRadius: Radius.md, backgroundColor: colors.background },
   deleteButton: { position: 'absolute', top: Spacing.sm, right: Spacing.sm, width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
 });
