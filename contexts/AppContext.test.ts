@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { normalizeChapterAnalyticsRows } from '../services/chapterAnalytics.ts';
+import { normalizeChapterAnalyticsRows } from '../features/analytics/services/chapterAnalytics.ts';
 
 const rpcRow = (overrides: Record<string, unknown> = {}) => ({
   chapter_id: 'chapter-1',

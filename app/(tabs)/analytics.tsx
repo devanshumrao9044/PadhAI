@@ -9,7 +9,7 @@ import { BarChart, LineChart } from 'react-native-chart-kit';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
-import { supabase } from '@/services/supabase';
+import { supabase } from '@/features/core/services/supabase';
 import { useApp } from '@/hooks/useApp';
 
 function formatMins(mins: number): string {

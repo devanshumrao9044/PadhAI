@@ -10,8 +10,8 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { supabase } from '@/services/supabase';
-import { fetchReferralStats } from '@/services/referralService';
+import { supabase } from '@/features/core/services/supabase';
+import { fetchReferralStats } from '@/features/referrals/services/referralService';
 
 const REWARD_THRESHOLD = 5;
 const INSTAGRAM_URL = 'https://www.instagram.com/materialhubx';

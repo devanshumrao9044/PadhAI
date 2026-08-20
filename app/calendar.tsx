@@ -10,7 +10,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
-import { loadCalendarEvents, saveCalendarEvents } from '@/services/productivity';
+import { loadCalendarEvents, saveCalendarEvents } from '@/features/productivity/services/productivity';
 import type { CalendarEvent } from '@/types/models';
 
 function dateKey(date: Date): string {

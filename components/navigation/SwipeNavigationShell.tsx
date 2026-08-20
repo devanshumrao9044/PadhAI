@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { PanResponder, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
-import { haptics } from '@/services/haptics';
+import { haptics } from '@/features/core/services/haptics';
 
 const TAB_ROUTES = ['/(tabs)', '/(tabs)/focus', '/(tabs)/tracker', '/(tabs)/analytics', '/(tabs)/profile'] as const;
 const TAB_SEGMENTS = ['index', 'focus', 'tracker', 'analytics', 'profile'] as const;

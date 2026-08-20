@@ -1,7 +1,7 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import { useRouter, useSegments } from 'expo-router';
 import { AppContext } from '@/contexts/AppContext';
-import { supabase } from '@/services/supabase';
+import { supabase } from '@/features/core/services/supabase';
 import { useAuthSession } from './AuthSessionProvider';
 
 export default function AuthRouteGuard() {

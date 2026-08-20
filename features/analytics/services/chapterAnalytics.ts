@@ -1,4 +1,4 @@
-import type { ChapterAnalytics } from '../types/models';
+import type { ChapterAnalytics } from '@/types/models';
 
 export type ChapterAnalyticsRpcRow = {
   chapter_id?: string | null;

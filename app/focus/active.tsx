@@ -9,9 +9,9 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
-import { supabase } from '@/services/supabase';
-import { isStreakRecoveryEligible, STREAK_RECOVERY_MINUTES } from '@/services/streakRecovery';
-import { haptics } from '@/services/haptics';
+import { supabase } from '@/features/core/services/supabase';
+import { isStreakRecoveryEligible, STREAK_RECOVERY_MINUTES } from '@/features/focus/services/streakRecovery';
+import { haptics } from '@/features/core/services/haptics';
 
 function formatTime(secs: number): string {
   const m = Math.floor(secs / 60);

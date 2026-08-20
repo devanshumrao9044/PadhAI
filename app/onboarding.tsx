@@ -9,7 +9,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors } from '@/constants/theme';
 import { router } from 'expo-router';
-import { supabase } from '../services/supabase';
+import { supabase } from '@/features/core/services/supabase';
 import StepName from '../components/onboarding/StepName';
 import StepExam from '../components/onboarding/StepExam';
 import StepGoal from '../components/onboarding/StepGoal';

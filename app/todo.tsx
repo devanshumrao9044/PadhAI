@@ -9,8 +9,8 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
-import { loadTodoItems, saveTodoItems } from '@/services/productivity';
-import { loadNotificationSettings, syncLocalNotifications } from '@/services/localNotifications';
+import { loadTodoItems, saveTodoItems } from '@/features/productivity/services/productivity';
+import { loadNotificationSettings, syncLocalNotifications } from '@/features/notifications/services/localNotifications';
 import type { TodoItem } from '@/types/models';
 
 function dateKey(date: Date): string {

@@ -4,7 +4,7 @@ import {
   buildChapterAnalyticsViewModel,
   filterChapterAnalyticsByActiveChapterIds,
   formatChapterAnalyticsMinutes,
-} from '../../services/chapterAnalytics.ts';
+} from '../../features/analytics/services/chapterAnalytics.ts';
 import type { ChapterAnalytics } from '../../types/models.ts';
 
 const makeAnalytics = (overrides: Partial<ChapterAnalytics> = {}): ChapterAnalytics => ({

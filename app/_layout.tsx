@@ -9,8 +9,8 @@ import AuthRouteGuard from '@/auth/AuthRouteGuard';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { LanguageProvider, useLanguage } from '@/contexts/LanguageContext';
 import { useApp } from '@/hooks/useApp';
-import { configureNotificationHandler, loadNotificationSettings } from '@/services/localNotifications';
-import { registerNotificationDevice } from '@/services/adminNotifications';
+import { configureNotificationHandler, loadNotificationSettings } from '@/features/notifications/services/localNotifications';
+import { registerNotificationDevice } from '@/features/notifications/services/adminNotifications';
 import SwipeNavigationShell from '@/components/navigation/SwipeNavigationShell';
 
 void SplashScreen.preventAutoHideAsync();

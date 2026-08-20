@@ -13,11 +13,11 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { DarkColors, ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { LEVELS, getLevelForUser } from '@/constants/levels';
 import { useApp } from '@/hooks/useApp';
-import { supabase } from '@/services/supabase';
-import { getWeeklyZone } from '@/services/weeklyXp';
-import { getItem, setItem } from '@/services/storage';
-import { readUserCache, writeUserCache } from '@/services/cache';
-import { applyTopThreeRankUpdate, type TopThreeCelebrationState } from '@/services/leaderboardCelebration';
+import { supabase } from '@/features/core/services/supabase';
+import { getWeeklyZone } from '@/features/progression/services/weeklyXp';
+import { getItem, setItem } from '@/features/core/services/storage';
+import { readUserCache, writeUserCache } from '@/features/core/services/cache';
+import { applyTopThreeRankUpdate, type TopThreeCelebrationState } from '@/features/leaderboard/services/leaderboardCelebration';
 import LeaderboardGuideSheet from '@/components/ui/LeaderboardGuideSheet';
 
 const TOP_THREE_CELEBRATION_KEY_PREFIX = 'padhai_top_three_celebration_v1_';

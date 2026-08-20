@@ -26,12 +26,12 @@ import {
   uploadNotificationAttachment,
   type AdminNotificationTarget,
   type NotificationRecipient,
-} from '@/services/adminNotifications';
+} from '@/features/notifications/services/adminNotifications';
 import {
   prepareNotificationImage,
   prepareNotificationPdf,
   type PreparedNotificationAttachment,
-} from '@/services/notificationAttachments';
+} from '@/features/notifications/services/notificationAttachments';
 
 export default function AdminNotificationsScreen() {
   const { colors } = useTheme();

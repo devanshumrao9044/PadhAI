@@ -1,4 +1,4 @@
-import { readUserCache, writeUserCache } from '@/services/cache';
+import { readUserCache, writeUserCache } from '@/features/core/services/cache';
 import type { CalendarEvent, SubjectTimerState, TodoItem } from '@/types/models';
 
 export async function loadTodoItems(userId: string): Promise<TodoItem[]> {

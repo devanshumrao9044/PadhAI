@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { SchedulableTriggerInputTypes } from 'expo-notifications';
-import { readUserCache, writeUserCache } from '@/services/cache';
+import { readUserCache, writeUserCache } from '@/features/core/services/cache';
 import type { NotificationSettings } from '@/types/models';
 
 export type NotificationLanguage = 'en' | 'hi';

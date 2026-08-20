@@ -1,8 +1,8 @@
 import { Linking, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
-import { supabase } from '@/services/supabase';
-import type { PreparedNotificationAttachment } from '@/services/notificationAttachments';
+import { supabase } from '@/features/core/services/supabase';
+import type { PreparedNotificationAttachment } from '@/features/notifications/services/notificationAttachments';
 
 export type NotificationRecipient = {
   id: string;

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { reconcileTrackerState } from './trackerState.ts';
-import type { Chapter, Subject, Topic } from '../types/models.ts';
+import type { Chapter, Subject, Topic } from '@/types/models.ts';
 
 const subject = (id: string, isDeleted = false): Subject => ({
   id,

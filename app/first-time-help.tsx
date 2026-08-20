@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeColors, FontSize, FontWeight, Radius, Spacing } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
-import { getItem, setItem } from '@/services/storage';
+import { getItem, setItem } from '@/features/core/services/storage';
 
 const helpKey = (userId: string) => `padhai:first-time-help-seen:${userId}`;
 

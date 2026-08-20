@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet
 } from 'react-native';
 import { router } from 'expo-router';
-import { supabase } from '@/services/supabase';
+import { supabase } from '@/features/core/services/supabase';
 import AuthInput from './AuthInput';
 import AuthButton from './AuthButton';
 import { getPasswordProviderError, validatePassword } from '@/auth/passwordPolicy';

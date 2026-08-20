@@ -23,7 +23,7 @@ import {
   loadUserNotifications,
   markUserNotificationRead,
   type UserNotification,
-} from '@/services/adminNotifications';
+} from '@/features/notifications/services/adminNotifications';
 
 function formatAttachmentSize(bytes: number | null): string {
   if (!bytes || bytes < 1) return '';

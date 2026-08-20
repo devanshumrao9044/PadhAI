@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '@/services/supabase';
+import { supabase } from '@/features/core/services/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
@@ -15,18 +15,18 @@ import { useApp } from '@/hooks/useApp';
 import { useAuthSession } from '@/auth/AuthSessionProvider';
 import { getLevelForUser, getXPProgressForUser, LEVELS } from '@/constants/levels';
 import XPBar from '@/components/ui/XPBar';
-import { getRecentSessions } from '@/services/sessionHistory';
-import { loadTodoItems } from '@/services/productivity';
-import { fetchReferralStats } from '@/services/referralService';
-import { getWeeklyZone } from '@/services/weeklyXp';
+import { getRecentSessions } from '@/features/profile/services/sessionHistory';
+import { loadTodoItems } from '@/features/productivity/services/productivity';
+import { fetchReferralStats } from '@/features/referrals/services/referralService';
+import { getWeeklyZone } from '@/features/progression/services/weeklyXp';
 import { STUDY_GOALS, PROFILE_LEARNER_TYPES } from '@/constants/studyGoals';
 import {
   DEFAULT_NOTIFICATION_SETTINGS,
   loadNotificationSettings,
   saveNotificationSettings,
   syncLocalNotifications,
-} from '@/services/localNotifications';
-import { disableNotificationDevice, isNotificationAdmin, registerNotificationDevice } from '@/services/adminNotifications';
+} from '@/features/notifications/services/localNotifications';
+import { disableNotificationDevice, isNotificationAdmin, registerNotificationDevice } from '@/features/notifications/services/adminNotifications';
 import type { NotificationSettings } from '@/types/models';
 import {
   formatFileSize,
@@ -34,7 +34,7 @@ import {
   MAX_AVATAR_OUTPUT_BYTES,
   MAX_AVATAR_SOURCE_BYTES,
   prepareAvatarImage,
-} from '@/services/avatarImage';
+} from '@/features/profile/services/avatarImage';
 
 export default function ProfileScreen() {
   const { colors, mode, toggleTheme } = useTheme();

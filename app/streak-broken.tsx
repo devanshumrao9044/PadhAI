@@ -7,7 +7,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { STREAK_RECOVERY_MINUTES } from '@/services/streakRecovery';
+import { STREAK_RECOVERY_MINUTES } from '@/features/focus/services/streakRecovery';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { STREAK_BROKEN_MESSAGES } from '@/constants/messages';
 import { useApp } from '@/hooks/useApp';

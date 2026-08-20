@@ -1,5 +1,5 @@
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { getItem, setItem, StorageKeys } from '@/services/storage';
+import { getItem, setItem, StorageKeys } from '@/features/core/services/storage';
 import { Language, translate, TranslationKey, TranslationParams } from '@/constants/translations';
 
 type LanguageContextValue = {

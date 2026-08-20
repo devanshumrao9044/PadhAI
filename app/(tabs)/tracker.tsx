@@ -10,7 +10,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
-import { loadSubjectTimers, saveSubjectTimers } from '@/services/productivity';
+import { loadSubjectTimers, saveSubjectTimers } from '@/features/productivity/services/productivity';
 import type { SubjectTimerState } from '@/types/models';
 
 const COLOR_OPTIONS = ['#6B21A8', '#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#EC4899'];

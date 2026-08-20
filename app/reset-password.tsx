@@ -15,7 +15,7 @@ import {
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { supabase } from '@/services/supabase';
+import { supabase } from '@/features/core/services/supabase';
 import { useAuthSession } from '@/auth/AuthSessionProvider';
 
 export default function ResetPasswordScreen() {

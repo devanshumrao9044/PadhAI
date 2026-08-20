@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { supabase } from '../../services/supabase';
+import { supabase } from '@/features/core/services/supabase';
 import GreetingCard from '../../components/dashboard/GreetingCard';
 import StatsRow from '../../components/dashboard/StatsRow';
 import QuickShortcuts from '../../components/dashboard/QuickShortcuts';
@@ -18,7 +18,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors } from '@/constants/theme';
 import { useFocusEffect, useRouter } from 'expo-router';
 import StreakOverviewModal from '@/components/ui/StreakOverviewModal';
-import { loadUnreadNotificationCount } from '@/services/adminNotifications';
+import { loadUnreadNotificationCount } from '@/features/notifications/services/adminNotifications';
 
 export default function Dashboard() {
   const { colors } = useTheme();

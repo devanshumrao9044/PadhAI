@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { supabase } from '../../services/supabase';
+import { supabase } from '@/features/core/services/supabase';
 import GreetingCard from '../../components/dashboard/GreetingCard';
 import StatsRow from '../../components/dashboard/StatsRow';
 import QuickShortcuts from '../../components/dashboard/QuickShortcuts';

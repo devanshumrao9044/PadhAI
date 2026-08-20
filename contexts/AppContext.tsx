@@ -11,19 +11,19 @@ function uuidv4(): string {
     return v.toString(16);
   });
 }
-import { getItem, setItem, removeItem, StorageKeys } from '@/services/storage';
-import { readUserCache, removeUserCache, writeUserCache } from '@/services/cache';
-import { supabase } from '@/services/supabase';
+import { getItem, setItem, removeItem, StorageKeys } from '@/features/core/services/storage';
+import { readUserCache, removeUserCache, writeUserCache } from '@/features/core/services/cache';
+import { supabase } from '@/features/core/services/supabase';
 import {
   UserProfile, Subject, Chapter, Topic,
   FocusSession, ChapterAnalytics, DailySummary, XPTransaction, ActiveSession
 } from '@/types/models';
 import { calculateSessionXP, XP_REWARDS, getLevelForUser } from '@/constants/levels';
-import { processReferralOnFirstSession } from '@/services/referralService';
-import { normalizeChapterAnalyticsRows } from '@/services/chapterAnalytics';
-import { reconcileTrackerState } from '@/services/trackerState';
-import { getRecoveredStreak, isStreakRecoveryEligible } from '@/services/streakRecovery';
-import { haptics } from '@/services/haptics';
+import { processReferralOnFirstSession } from '@/features/referrals/services/referralService';
+import { normalizeChapterAnalyticsRows } from '@/features/analytics/services/chapterAnalytics';
+import { reconcileTrackerState } from '@/features/tracker/services/trackerState';
+import { getRecoveredStreak, isStreakRecoveryEligible } from '@/features/focus/services/streakRecovery';
+import { haptics } from '@/features/core/services/haptics';
 import {
   buildBaselineMarker,
   buildWeeklySettlement,
@@ -32,7 +32,7 @@ import {
   getLatestWeeklyMarker,
   getWeekStart,
   type WeeklySettlementResult,
-} from '@/services/weeklyXp';
+} from '@/features/progression/services/weeklyXp';
 
 export type AppContextType = {
   comebackPending: boolean;

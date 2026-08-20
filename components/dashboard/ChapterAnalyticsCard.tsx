@@ -5,7 +5,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { FontSize, FontWeight, Radius, Spacing, ThemeColors } from '@/constants/theme';
 import { ChapterAnalytics } from '@/types/models';
-import { buildChapterAnalyticsViewModel, filterChapterAnalyticsByActiveChapterIds } from '@/services/chapterAnalytics';
+import { buildChapterAnalyticsViewModel, filterChapterAnalyticsByActiveChapterIds } from '@/features/analytics/services/chapterAnalytics';
 
 type Props = {
   analytics: ChapterAnalytics[];

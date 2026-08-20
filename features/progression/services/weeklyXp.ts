@@ -1,5 +1,5 @@
-import type { XPTransaction, UserProfile } from '../types/models.ts';
-import { LEVELS } from '../constants/levels.ts';
+import type { XPTransaction, UserProfile } from '../../../types/models.ts';
+import { LEVELS } from '../../../constants/levels.ts';
 
 export type WeeklyZone = 'promotion' | 'safety' | 'demotion';
 export type WeeklyMarkerKind = 'baseline' | 'settlement';

@@ -1,5 +1,5 @@
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { getItem, setItem } from '@/services/storage';
+import { getItem, setItem } from '@/features/core/services/storage';
 import { DarkColors, LightColors, ThemeColors } from '@/constants/theme';
 
 export type ThemeMode = 'dark' | 'light';

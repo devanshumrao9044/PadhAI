@@ -9,7 +9,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
-import { supabase } from '@/services/supabase';
+import { supabase } from '@/features/core/services/supabase';
 
 // ── Validation ────────────────────────────────────────────────────────────────
 function getLoginErrors(email: string, password: string) {

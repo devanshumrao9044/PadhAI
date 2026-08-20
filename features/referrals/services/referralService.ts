@@ -1,4 +1,4 @@
-import { supabase } from '@/services/supabase';
+import { supabase } from '@/features/core/services/supabase';
 
 const XP_REFEREE = 50;
 const XP_REFERRER = 25;

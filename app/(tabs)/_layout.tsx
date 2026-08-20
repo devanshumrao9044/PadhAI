@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
-import { haptics } from '@/services/haptics';
+import { haptics } from '@/features/core/services/haptics';
 
 export default function TabLayout() {
   const { colors } = useTheme();
