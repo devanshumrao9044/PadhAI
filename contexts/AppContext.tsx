@@ -23,6 +23,7 @@ import { processReferralOnFirstSession } from '@/services/referralService';
 import { normalizeChapterAnalyticsRows } from '@/services/chapterAnalytics';
 import { reconcileTrackerState } from '@/services/trackerState';
 import { getRecoveredStreak, isStreakRecoveryEligible } from '@/services/streakRecovery';
+import { haptics } from '@/services/haptics';
 import {
   buildBaselineMarker,
   buildWeeklySettlement,
@@ -903,6 +904,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ── XP ────────────────────────────────────────────────────────────────────
   const awardXP = async (amount: number, reason: string) => {
     if (!user) return;
+    if (amount > 0) void haptics.xpGain();
     const txPayload = { id: uuidv4(), user_id: user.id, amount, reason, created_at: new Date().toISOString() };
     const newXPLog = [mapXP(txPayload), ...xpLog];
     setXpLog(newXPLog);
@@ -951,6 +953,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const COMEBACK_BONUS_XP = 50;
+  const isStreakMilestone = (value: number) => value >= 3 && (value % 7 === 0 || [30, 60, 100].includes(value));
 
   const completeSession = async (sessionId: string, actualMins: number): Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number; referralXpAwarded?: number }) | null> => {
     const isRecoverySession = Boolean(activeSession?.isRecovery || streakRecoveryPending);
@@ -1141,6 +1144,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       
       const newXPTotal = Math.max(0, activeUser.xpTotal + finalXP);
+      if (finalXP > 0) void haptics.xpGain();
+      if (isCompleted && newStreak > activeUser.streakCurrent && isStreakMilestone(newStreak)) {
+        void haptics.streakMilestone();
+      }
       await setUser({
         ...activeUser,
         xpTotal: newXPTotal,

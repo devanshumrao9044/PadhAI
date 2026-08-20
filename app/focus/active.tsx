@@ -11,6 +11,7 @@ import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/
 import { useApp } from '@/hooks/useApp';
 import { supabase } from '@/services/supabase';
 import { isStreakRecoveryEligible, STREAK_RECOVERY_MINUTES } from '@/services/streakRecovery';
+import { haptics } from '@/services/haptics';
 
 function formatTime(secs: number): string {
   const m = Math.floor(secs / 60);
@@ -108,6 +109,7 @@ export default function FocusActiveScreen() {
       const recoveryEligible = isStreakRecoveryEligible(Boolean(isRecovery), actualMins);
       if (!recoveryEligible) {
         const brokenSession = await breakCurrent(sessionToComplete.sessionId, actualMins);
+        void haptics.focusBroken();
         setRecovery(false, 0);
         currentRouter.replace(`/focus/broken?penalty=${brokenSession?.xpDeducted ?? 0}&recovery=1&required=${STREAK_RECOVERY_MINUTES}`);
         return;
@@ -117,6 +119,7 @@ export default function FocusActiveScreen() {
       if (!session) {
         if (isRecovery) {
           const brokenSession = await breakCurrent(sessionToComplete.sessionId, actualMins);
+          void haptics.focusBroken();
           setRecovery(false, 0);
           currentRouter.replace(`/focus/broken?penalty=${brokenSession?.xpDeducted ?? 0}&recovery=1&required=${STREAK_RECOVERY_MINUTES}`);
           return;
@@ -125,6 +128,7 @@ export default function FocusActiveScreen() {
         return;
       }
 
+      void haptics.focusComplete();
       const comebackParam = (session as any)?.comebackBonus > 0 ? '1' : '0';
         const xpEarned = session?.xpEarned ?? 0;
         const referralXpAwarded = session?.referralXpAwarded ?? 0;
@@ -163,6 +167,7 @@ export default function FocusActiveScreen() {
     try {
       const actualMins = Math.max(0, Math.floor(elapsedRef.current / 60));
       const session = await breakSession(activeSession.sessionId, actualMins);
+      void haptics.focusBroken();
       router.replace(`/focus/broken?penalty=${session?.xpDeducted || 0}`);
     } catch (error) {
       console.error("Silent Break Error:", error);
@@ -282,11 +287,13 @@ export default function FocusActiveScreen() {
               isCompletingRef.current = true;
               if (intervalRef.current) clearInterval(intervalRef.current);
               liveStateRef.current.setStreakRecoveryPending(false, 0);
+              void haptics.focusBroken();
               currentRouter.replace(`/focus/broken?penalty=0&recovery=1&required=${STREAK_RECOVERY_MINUTES}`);
               return;
             }
             isCompletingRef.current = true;
             if (intervalRef.current) clearInterval(intervalRef.current);
+            void haptics.focusComplete();
             currentRouter.replace(`/focus/complete?xp=${updated.xp_earned ?? 0}`);
             return;
           }
@@ -294,6 +301,7 @@ export default function FocusActiveScreen() {
           if (updated?.broken === true) {
             isCompletingRef.current = true;
             if (intervalRef.current) clearInterval(intervalRef.current);
+            void haptics.focusBroken();
             currentRouter.replace(`/focus/broken?penalty=${updated.xp_deducted ?? 0}`);
             return;
           }
