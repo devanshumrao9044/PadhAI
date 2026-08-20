@@ -1,7 +1,6 @@
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { useMemo } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors } from '@/constants/theme';
 
 interface Props {
@@ -11,16 +10,17 @@ interface Props {
 
 export default function StepName({ value, onChange }: Props) {
   const { colors } = useTheme();
-  const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.container}>
       <Text style={styles.emoji}>👋</Text>
-      <Text style={styles.heading}>{t('onboarding.nameTitle')}</Text>
-      <Text style={styles.subtext}>{t('onboarding.nameSubtitle')}</Text>
+      <Text style={styles.heading}>Name</Text>
+      <Text style={styles.subtext}>
+        only be asked once
+      </Text>
       <TextInput
         style={styles.input}
-        placeholder={t('onboarding.namePlaceholder')}
+        placeholder="Eg- Devansh "
         placeholderTextColor={colors.textTertiary}
         value={value}
         onChangeText={onChange}
