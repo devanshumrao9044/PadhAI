@@ -111,6 +111,7 @@ export interface ActiveSession {
   plannedMins: number;
   subjectId: string | null;
   chapterId: string | null;
+  studyGroupId?: string | null;
   isRecovery?: boolean;
   recoveryLostStreak?: number;
 }

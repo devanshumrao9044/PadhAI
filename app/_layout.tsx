@@ -53,7 +53,14 @@ function AppNavigation() {
         <Stack.Screen name="todo" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="calendar" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="study-groups/index" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="study-groups/create" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="study-groups/join" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="study-groups/[groupId]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="raise-ticket" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="review-tickets" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="admin/notifications" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="admin/study-groups" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="tracker/[subjectId]" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="tracker/chapters/[chapterId]" options={{ animation: 'slide_from_right' }} />
         </Stack>

@@ -19,7 +19,8 @@ export type CacheKind =
   | 'todo'
   | 'calendar'
   | 'subjectTimers'
-  | 'notificationSettings';
+  | 'notificationSettings'
+  | 'studyGroups';
 
 export const CACHE_TTL_MS: Record<CacheKind, number> = {
   user: 5 * 60 * 1000,
@@ -36,6 +37,7 @@ export const CACHE_TTL_MS: Record<CacheKind, number> = {
   calendar: 60 * 1000,
   subjectTimers: 5 * 1000,
   notificationSettings: 30 * 24 * 60 * 60 * 1000,
+  studyGroups: 60 * 1000,
 };
 
 type CacheEnvelope<T> = {

@@ -25,6 +25,7 @@ const MENU_ITEMS = [
   { icon: 'menu-book' as const, key: 'tracker' as const, route: '/(tabs)/tracker' },
   { icon: 'bar-chart' as const, key: 'analytics' as const, route: '/(tabs)/analytics' },
   { icon: 'leaderboard' as const, key: 'leaderboard' as const, route: '/(tabs)/leaderboard' },
+  { icon: 'groups' as const, key: 'groups' as const, route: '/study-groups' },
   { icon: 'person' as const, key: 'profile' as const, route: '/(tabs)/profile' },
 ];
 
@@ -143,7 +144,7 @@ export default function SideDrawer({ visible, onClose }: Props) {
               <View style={styles.menuIconWrap}>
                 <MaterialIcons name={item.icon} size={20} color={colors.textSecondary} />
               </View>
-              <Text style={styles.menuLabel}>{item.key === 'tracker' ? t('tracker.title') : item.key === 'leaderboard' ? t('home.leaderboard') : t(`home.${item.key}`)}</Text>
+              <Text style={styles.menuLabel}>{item.key === 'tracker' ? t('tracker.title') : item.key === 'leaderboard' ? t('home.leaderboard') : item.key === 'groups' ? t('groups.title') : t(`home.${item.key}` as any)}</Text>
               <MaterialIcons name="chevron-right" size={18} color={colors.textTertiary} />
             </TouchableOpacity>
           ))}
@@ -166,6 +167,18 @@ export default function SideDrawer({ visible, onClose }: Props) {
             <View style={styles.referBadge}>
               <Text style={styles.referBadgeText}>{t('home.new')}</Text>
             </View>
+          </TouchableOpacity>
+
+          <View style={styles.divider} />
+          <TouchableOpacity style={styles.supportItem} onPress={() => navigate('/raise-ticket')} activeOpacity={0.8}>
+            <View style={styles.supportIconWrap}><MaterialIcons name="support-agent" size={20} color={colors.primary} /></View>
+            <View style={styles.supportTextBlock}><Text style={styles.supportLabel}>{t('support.raiseTicket')}</Text><Text style={styles.supportSub}>{t('support.ticketTitle')}</Text></View>
+            <MaterialIcons name="chevron-right" size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.supportItem} onPress={() => navigate('/review-tickets')} activeOpacity={0.8}>
+            <View style={styles.supportIconWrap}><MaterialIcons name="history" size={20} color={colors.primary} /></View>
+            <View style={styles.supportTextBlock}><Text style={styles.supportLabel}>{t('support.reviewTicketsReports')}</Text><Text style={styles.supportSub}>{t('support.myTickets')} · {t('support.myReports')}</Text></View>
+            <MaterialIcons name="chevron-right" size={18} color={colors.textTertiary} />
           </TouchableOpacity>
         </ScrollView>
 
@@ -306,6 +319,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
+  supportItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
+  supportIconWrap: { width: 36, height: 36, borderRadius: Radius.md, backgroundColor: colors.primary + '14', alignItems: 'center', justifyContent: 'center' },
+  supportTextBlock: { flex: 1, minWidth: 0 },
+  supportLabel: { color: colors.textPrimary, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
+  supportSub: { color: colors.textTertiary, fontSize: FontSize.xs, marginTop: 2 },
   referBadgeText: {
     fontSize: 9,
     fontWeight: FontWeight.extraBold,

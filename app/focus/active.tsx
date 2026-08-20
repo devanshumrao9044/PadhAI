@@ -12,6 +12,7 @@ import { useApp } from '@/hooks/useApp';
 import { supabase } from '@/features/core/services/supabase';
 import { isStreakRecoveryEligible, STREAK_RECOVERY_MINUTES } from '@/features/focus/services/streakRecovery';
 import { haptics } from '@/features/core/services/haptics';
+import { clearStudyGroupPresence, updateStudyGroupPresence } from '@/features/study-groups/services/studyGroups';
 
 function formatTime(secs: number): string {
   const m = Math.floor(secs / 60);
@@ -26,6 +27,7 @@ export default function FocusActiveScreen() {
   const router = useRouter();
   const {
     activeSession,
+    user,
     completeSession,
     breakSession,
     subjects,
@@ -50,6 +52,7 @@ export default function FocusActiveScreen() {
   const isCompletingRef = useRef(false);
   const rtChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const rtChannelIdRef = useRef(0);
+  const presenceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ✅ Store subscription objects in refs so cleanup always has latest reference
   const appStateSubRef = useRef<{ remove?: () => void } | null>(null);
@@ -257,6 +260,32 @@ export default function FocusActiveScreen() {
       backSubRef.current = null;
     };
   }, [isLoading, activeSession?.sessionId, activeSession?.startedAt, plannedSecs, tick]);
+
+  useEffect(() => {
+    const groupId = activeSession?.studyGroupId;
+    const sessionId = activeSession?.sessionId;
+    const userId = user?.id;
+    if (!groupId || !sessionId || !userId) return;
+    let active = true;
+    const startedAt = activeSession.startedAt;
+    const syncPresence = (status: 'studying' | 'paused') => {
+      void updateStudyGroupPresence({ groupId, userId, sessionId, status, startedAt }).catch(() => undefined);
+    };
+    syncPresence(appStateRef.current === 'active' ? 'studying' : 'paused');
+    presenceIntervalRef.current = setInterval(() => {
+      if (active) syncPresence(appStateRef.current === 'active' ? 'studying' : 'paused');
+    }, 30_000);
+    const presenceAppStateSub = AppState.addEventListener('change', next => {
+      if (active) syncPresence(next === 'active' ? 'studying' : 'paused');
+    });
+    return () => {
+      active = false;
+      if (presenceIntervalRef.current) clearInterval(presenceIntervalRef.current);
+      presenceIntervalRef.current = null;
+      presenceAppStateSub.remove();
+      void clearStudyGroupPresence(groupId, userId).catch(() => undefined);
+    };
+  }, [activeSession?.sessionId, activeSession?.startedAt, activeSession?.studyGroupId, user?.id]);
 
   useEffect(() => {
     const sessionId = activeSession?.sessionId;

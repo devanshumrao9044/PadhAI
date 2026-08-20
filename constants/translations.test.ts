@@ -9,6 +9,10 @@ test('core screens return the selected language without duplicating JSX copy', (
   assert.equal(translate('hi', 'analytics.weakChapters', { value: 2 }), 'कमज़ोर अध्याय (2)');
   assert.equal(translate('en', 'referral.moreReferrals', { value: 3 }), '3 more referrals to unlock your reward.');
   assert.equal(translate('hi', 'referral.moreReferrals', { value: 3 }), 'रिवॉर्ड अनलॉक करने के लिए 3 और रेफरल चाहिए।');
+  assert.equal(translate('en', 'groups.title'), 'Study Groups');
+  assert.equal(translate('hi', 'groups.title'), 'स्टडी ग्रुप');
+  assert.equal(translate('en', 'support.raiseTicket'), 'Raise a ticket');
+  assert.equal(translate('hi', 'support.reviewTicketsReports'), 'टिकट / रिपोर्ट देखें');
 });
 
 test('translation interpolation preserves unresolved placeholders instead of silently dropping them', () => {

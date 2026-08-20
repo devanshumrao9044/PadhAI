@@ -24,6 +24,7 @@ import { normalizeChapterAnalyticsRows } from '@/features/analytics/services/cha
 import { reconcileTrackerState } from '@/features/tracker/services/trackerState';
 import { getRecoveredStreak, isStreakRecoveryEligible } from '@/features/focus/services/streakRecovery';
 import { haptics } from '@/features/core/services/haptics';
+import { clearStudyGroupPresence, recordStudyGroupSession } from '@/features/study-groups/services/studyGroups';
 import {
   buildBaselineMarker,
   buildWeeklySettlement,
@@ -69,7 +70,7 @@ export type AppContextType = {
   last30Days: DailySummary[];
   last90Days: DailySummary[];
   activeSession: ActiveSession | null;
-  startSession: (plannedMins: number, subjectId: string | null, chapterId: string | null, isRecoverySession?: boolean, recoveryLostStreak?: number) => Promise<string>;
+  startSession: (plannedMins: number, subjectId: string | null, chapterId: string | null, isRecoverySession?: boolean, recoveryLostStreak?: number, studyGroupId?: string | null) => Promise<string>;
   completeSession: (sessionId: string, actualMins: number) => Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number; referralXpAwarded?: number }) | null>;
   breakSession: (sessionId: string, actualMins: number) => Promise<FocusSession | null>;
   getDailySummary: (date: string) => DailySummary | null;
@@ -936,7 +937,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // ── Sessions ──────────────────────────────────────────────────────────────
-  const startSession = async (plannedMins: number, subjectId: string | null, chapterId: string | null, isRecoverySession?: boolean, recoveryLostStreak?: number): Promise<string> => {
+  const startSession = async (plannedMins: number, subjectId: string | null, chapterId: string | null, isRecoverySession?: boolean, recoveryLostStreak?: number, studyGroupId?: string | null): Promise<string> => {
     const sessionId = uuidv4();
     const active: ActiveSession = {
       sessionId,
@@ -944,6 +945,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       plannedMins,
       subjectId,
       chapterId,
+      studyGroupId: studyGroupId ?? null,
       isRecovery: isRecoverySession ?? streakRecoveryPending,
       recoveryLostStreak: isRecoverySession ? (recoveryLostStreak ?? lostStreakCount) : undefined,
     };
@@ -963,6 +965,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const activeUser = user ?? await getItem<UserProfile>(StorageKeys.USER);
       const bonusFromComeback = comebackPending ? COMEBACK_BONUS_XP : 0;
       const xp = calculateSessionXP(actualMins) + bonusFromComeback;
+      const studyGroupId = activeSession?.studyGroupId ?? null;
+      const startedAt = activeSession?.startedAt ?? new Date().toISOString();
       if (comebackPending) setComebackPendingState(false);
 
       let newXPTotal = activeUser?.xpTotal ?? 0;
@@ -980,7 +984,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         xp_earned: xp,
         xp_deducted: 0,
         comeback_bonus: bonusFromComeback,
-        started_at: activeSession?.startedAt ?? new Date().toISOString(),
+        started_at: startedAt,
         ended_at: new Date().toISOString(),
       };
 
@@ -1018,6 +1022,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
             console.warn('[Referral] Processing failed:', referralError);
           }
         }
+        if (studyGroupId) {
+          const groupSessionPayload = {
+            group_id: studyGroupId,
+            user_id: activeUser.id,
+            focus_session_id: sessionId,
+            started_at: startedAt,
+            ended_at: sessionPayload.ended_at,
+            actual_minutes: actualMins,
+            completed: true,
+            broken: false,
+          };
+          try {
+            if (sessionSaved) {
+              await recordStudyGroupSession({
+                groupId: studyGroupId,
+                userId: activeUser.id,
+                focusSessionId: sessionId,
+                startedAt,
+                endedAt: sessionPayload.ended_at,
+                actualMinutes: actualMins,
+                completed: true,
+                broken: false,
+              });
+            } else {
+              await addToSyncQueue({ table: 'study_group_sessions', action: 'insert', payload: groupSessionPayload });
+            }
+          } catch {
+            await addToSyncQueue({ table: 'study_group_sessions', action: 'insert', payload: groupSessionPayload });
+          }
+          try {
+            await clearStudyGroupPresence(studyGroupId, activeUser.id);
+          } catch {
+            // Stale presence is treated as offline by the secure member-summary RPC.
+          }
+        }
       }
       const oldLevelRank = activeUser ? getLevelForUser(activeUser).rank : 1;
       const newLevelRank = activeUser ? getLevelForUser({ ...activeUser, xpTotal: newXPTotal }).rank : 1;
@@ -1035,6 +1074,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const planned = activeSession?.plannedMins ?? 1;
       const brokenAt = Math.floor((actualMins / planned) * 100);
       const penalty = Math.floor(calculateSessionXP(planned) * XP_REWARDS.sessionBrokenMultiplier);
+      const studyGroupId = activeSession?.studyGroupId ?? null;
+      const startedAt = activeSession?.startedAt ?? new Date().toISOString();
       
       const sessionPayload = {
         id: sessionId,
@@ -1048,7 +1089,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         xp_earned: 0,
         xp_deducted: penalty,
         break_reason: 'user_abandoned',
-        started_at: activeSession?.startedAt ?? new Date().toISOString(),
+        started_at: startedAt,
         ended_at: new Date().toISOString(),
       };
 
@@ -1065,11 +1106,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await setItem(StorageKeys.ACTIVE_SESSION, null);
       if (activeUser) {
         await processPostSessionData(actualMins, -penalty, false, activeUser);
+        let sessionSaved = false;
         try {
           const { error } = await supabase.from('focus_sessions').insert([sessionPayload]);
           if (error) throw error;
+          sessionSaved = true;
         } catch {
           await addToSyncQueue({ table: 'focus_sessions', action: 'insert', payload: sessionPayload });
+        }
+        if (studyGroupId) {
+          const groupSessionPayload = {
+            group_id: studyGroupId,
+            user_id: activeUser.id,
+            focus_session_id: sessionId,
+            started_at: startedAt,
+            ended_at: sessionPayload.ended_at,
+            actual_minutes: actualMins,
+            completed: false,
+            broken: true,
+          };
+          try {
+            if (sessionSaved) {
+              await recordStudyGroupSession({
+                groupId: studyGroupId,
+                userId: activeUser.id,
+                focusSessionId: sessionId,
+                startedAt,
+                endedAt: sessionPayload.ended_at,
+                actualMinutes: actualMins,
+                completed: false,
+                broken: true,
+              });
+            } else {
+              await addToSyncQueue({ table: 'study_group_sessions', action: 'insert', payload: groupSessionPayload });
+            }
+          } catch {
+            await addToSyncQueue({ table: 'study_group_sessions', action: 'insert', payload: groupSessionPayload });
+          }
+          try {
+            await clearStudyGroupPresence(studyGroupId, activeUser.id);
+          } catch {
+            // Stale presence is treated as offline by the secure member-summary RPC.
+          }
         }
       }
       processSyncQueue();

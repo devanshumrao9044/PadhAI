@@ -20,10 +20,11 @@ export default function FocusScreen() {
   const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
-  const { subjectId: routeSubjectId, chapterId: routeChapterId } = useLocalSearchParams<{ subjectId?: string; chapterId?: string }>();
+  const { subjectId: routeSubjectId, chapterId: routeChapterId, studyGroupId: routeStudyGroupId } = useLocalSearchParams<{ subjectId?: string; chapterId?: string; studyGroupId?: string }>();
   const { subjects, chapters, startSession } = useApp();
   const initialSubjectId = typeof routeSubjectId === 'string' ? routeSubjectId : null;
   const initialChapterId = typeof routeChapterId === 'string' ? routeChapterId : null;
+  const studyGroupId = typeof routeStudyGroupId === 'string' ? routeStudyGroupId : null;
   const [selectedMins, setSelectedMins] = useState(25);
   const [customMode, setCustomMode] = useState(false);
   const [customInput, setCustomInput] = useState('');
@@ -86,7 +87,7 @@ export default function FocusScreen() {
     if (isLockInDisabled) return;
     setStarting(true);
     try {
-      await startSession(effectiveMins, selectedSubjectId, selectedChapterId);
+      await startSession(effectiveMins, selectedSubjectId, selectedChapterId, false, undefined, studyGroupId);
       router.push('/focus/active');
     } catch {
       Alert.alert(t('focus.startErrorTitle'), t('focus.startErrorMessage'));
