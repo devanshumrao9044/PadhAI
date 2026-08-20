@@ -11,6 +11,7 @@ import { LanguageProvider, useLanguage } from '@/contexts/LanguageContext';
 import { useApp } from '@/hooks/useApp';
 import { configureNotificationHandler, loadNotificationSettings } from '@/services/localNotifications';
 import { registerNotificationDevice } from '@/services/adminNotifications';
+import SwipeNavigationShell from '@/components/navigation/SwipeNavigationShell';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -37,8 +38,9 @@ function AppNavigation() {
   return (
     <>
       <StatusBar style={mode === 'dark' ? 'light' : 'dark'} backgroundColor={colors.background} />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
-        <Stack.Screen name="index" />
+      <SwipeNavigationShell>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+          <Stack.Screen name="index" />
         <Stack.Screen name="reset-password" options={{ animation: 'fade' }} />
         <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
         <Stack.Screen name="streak-broken" options={{ animation: 'fade', gestureEnabled: false }} />
@@ -53,8 +55,9 @@ function AppNavigation() {
         <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="admin/notifications" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="tracker/[subjectId]" options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="tracker/chapters/[chapterId]" options={{ animation: 'slide_from_right' }} />
-      </Stack>
+          <Stack.Screen name="tracker/chapters/[chapterId]" options={{ animation: 'slide_from_right' }} />
+        </Stack>
+      </SwipeNavigationShell>
       <AuthRouteGuard />
     </>
   );
