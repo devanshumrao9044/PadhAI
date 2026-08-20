@@ -11,6 +11,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { getLevelForUser } from '@/constants/levels';
+import { isPadhaiOwner } from '@/features/study-groups/services/studyGroups';
 
 const DRAWER_WIDTH = Math.min(Dimensions.get('window').width * 0.78, 300);
 
@@ -40,8 +41,23 @@ export default function SideDrawer({ visible, onClose }: Props) {
   const overlayAnim = useRef(new Animated.Value(0)).current;
   // mounted keeps the component in the tree during the close animation
   const [mounted, setMounted] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
 
   const level = user ? getLevelForUser(user) : null;
+
+  useEffect(() => {
+    let active = true;
+    if (!user?.id) {
+      setIsOwner(false);
+      return () => { active = false; };
+    }
+    void isPadhaiOwner(user.id).then(value => {
+      if (active) setIsOwner(value);
+    }).catch(() => {
+      if (active) setIsOwner(false);
+    });
+    return () => { active = false; };
+  }, [user?.id]);
 
   // Animated refs are stable; only `visible` should control drawer open/close transitions.
   useEffect(() => {
@@ -175,11 +191,11 @@ export default function SideDrawer({ visible, onClose }: Props) {
             <View style={styles.supportTextBlock}><Text style={styles.supportLabel}>{t('support.raiseTicket')}</Text><Text style={styles.supportSub}>{t('support.ticketTitle')}</Text></View>
             <MaterialIcons name="chevron-right" size={18} color={colors.textTertiary} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.supportItem} onPress={() => navigate('/review-tickets')} activeOpacity={0.8}>
+          {isOwner ? <TouchableOpacity style={styles.supportItem} onPress={() => navigate('/review-tickets')} activeOpacity={0.8}>
             <View style={styles.supportIconWrap}><MaterialIcons name="history" size={20} color={colors.primary} /></View>
-            <View style={styles.supportTextBlock}><Text style={styles.supportLabel}>{t('support.reviewTicketsReports')}</Text><Text style={styles.supportSub}>{t('support.myTickets')} · {t('support.myReports')}</Text></View>
+            <View style={styles.supportTextBlock}><Text style={styles.supportLabel}>{t('support.reviewTicketsReports')}</Text><Text style={styles.supportSub}>{t('support.ownerInbox')}</Text></View>
             <MaterialIcons name="chevron-right" size={18} color={colors.textTertiary} />
-          </TouchableOpacity>
+          </TouchableOpacity> : null}
         </ScrollView>
 
         {/* Footer */}

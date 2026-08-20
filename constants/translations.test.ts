@@ -13,6 +13,8 @@ test('core screens return the selected language without duplicating JSX copy', (
   assert.equal(translate('hi', 'groups.title'), 'स्टडी ग्रुप');
   assert.equal(translate('en', 'support.raiseTicket'), 'Raise a ticket');
   assert.equal(translate('hi', 'support.reviewTicketsReports'), 'टिकट / रिपोर्ट देखें');
+  assert.equal(translate('en', 'groups.linkCopied'), 'Invite link copied.');
+  assert.equal(translate('hi', 'support.ownerOnly'), 'यह section केवल PadhAI owner के लिए उपलब्ध है।');
 });
 
 test('translation interpolation preserves unresolved placeholders instead of silently dropping them', () => {

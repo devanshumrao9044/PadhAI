@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Modal, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -68,8 +69,10 @@ export default function StudyGroupDetailScreen() {
   const [reporting, setReporting] = useState(false);
   const [joining, setJoining] = useState(false);
   const [thankYou, setThankYou] = useState(false);
+  const [noticeMessage, setNoticeMessage] = useState('');
   const [showIconPicker, setShowIconPicker] = useState(false);
   const thankYouOpacity = useRef(new Animated.Value(0)).current;
+  const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [, setLiveNow] = useState(Date.now());
 
   const load = useCallback(async (refresh = false) => {
@@ -119,11 +122,17 @@ export default function StudyGroupDetailScreen() {
   const studyingMembers = members.filter(member => member.presenceStatus === 'studying');
   const groupTotal = members.reduce((sum, member) => sum + member.todayMinutes, 0);
 
-  const showThankYou = () => {
+  const showNotice = (message: string) => {
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    setNoticeMessage(message);
     setThankYou(true);
     thankYouOpacity.setValue(0);
     Animated.timing(thankYouOpacity, { toValue: 1, duration: 220, useNativeDriver: true }).start();
-    setTimeout(() => setThankYou(false), 3200);
+    noticeTimerRef.current = setTimeout(() => {
+      setThankYou(false);
+      setNoticeMessage('');
+      noticeTimerRef.current = null;
+    }, 3200);
   };
 
   const submitReport = async () => {
@@ -133,7 +142,7 @@ export default function StudyGroupDetailScreen() {
       await submitStudyGroupReport({ groupId, reporterId: user.id, reportedUserId: reportTarget.userId, reasonCode: reportReason, details: reportDetails });
       setReportTarget(null);
       setReportDetails('');
-      showThankYou();
+      showNotice(t('groups.reportSubmitted'));
     } catch (reportError) {
       setError(reportError instanceof Error ? reportError.message : 'Could not submit the report.');
     } finally {
@@ -165,9 +174,18 @@ export default function StudyGroupDetailScreen() {
     }
   };
 
+  const getInviteLink = () => inviteToken ? `PadhAI://study-groups/join?token=${encodeURIComponent(inviteToken)}` : '';
+
+  const copyInvite = async () => {
+    const inviteLink = getInviteLink();
+    if (!inviteLink) return;
+    await Clipboard.setStringAsync(inviteLink);
+    showNotice(t('groups.linkCopied'));
+  };
+
   const shareInvite = async () => {
     if (!group || !inviteToken) return;
-    await Share.share({ message: `${group.name} — join my PadhAI Study Group with this invite token: ${inviteToken}` });
+    await Share.share({ message: `${group.name} — join my PadhAI Study Group: ${getInviteLink()}` });
   };
 
   const regenerateInvite = async () => {
@@ -175,7 +193,7 @@ export default function StudyGroupDetailScreen() {
     try {
       const nextToken = await createStudyGroupInvite(groupId);
       setInviteToken(nextToken);
-      showThankYou();
+      showNotice(t('groups.linkRegenerated'));
     } catch (inviteError) {
       setError(inviteError instanceof Error ? inviteError.message : 'Could not create an invite.');
     }
@@ -253,7 +271,7 @@ export default function StudyGroupDetailScreen() {
           {isAdmin ? <View style={styles.adminCard}>
             <View style={styles.adminHeader}><Text style={styles.sectionTitle}>{t('groups.manageRequests')}</Text><Text style={styles.adminCount}>{pending.length}</Text></View>
             {pending.length === 0 ? <Text style={styles.body}>{t('groups.noMembers')}</Text> : pending.map(request => <View key={request.membershipId} style={styles.requestRow}><View style={styles.requestCopy}><Text style={styles.requestName}>{request.name}</Text><Text style={styles.memberStatus}>Pending request</Text></View><Pressable onPress={() => { void reviewStudyGroupMember(request.membershipId, 'approved').then(() => load(true)); }} style={styles.smallApprove}><Text style={styles.smallApproveText}>{t('groups.approve')}</Text></Pressable><Pressable onPress={() => { void reviewStudyGroupMember(request.membershipId, 'rejected').then(() => load(true)); }} style={styles.smallReject}><Text style={styles.smallRejectText}>{t('groups.reject')}</Text></Pressable></View>)}
-            <View style={styles.adminActions}><Pressable onPress={inviteToken ? shareInvite : regenerateInvite} style={styles.outlineButton}><MaterialIcons name="share" size={17} color={colors.primary} /><Text style={styles.outlineText}>{inviteToken ? t('groups.shareInvite') : t('groups.inviteLink')}</Text></Pressable><Pressable onPress={regenerateInvite} style={styles.outlineButton}><MaterialIcons name="refresh" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.inviteLink')}</Text></Pressable></View>
+            <View style={styles.adminActions}>{inviteToken ? <><Pressable onPress={() => { void copyInvite(); }} style={styles.outlineButton}><MaterialIcons name="content-copy" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.copyLink')}</Text></Pressable><Pressable onPress={() => { void shareInvite(); }} style={styles.outlineButton}><MaterialIcons name="share" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.shareInvite')}</Text></Pressable></> : null}<Pressable onPress={() => { void regenerateInvite(); }} style={styles.outlineButton}><MaterialIcons name="refresh" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.inviteLink')}</Text></Pressable></View>
             {membership?.role === 'owner' || ownerAccess ? <Pressable onPress={() => { Alert.alert(t('groups.leaveGroup'), t('groups.leaveConfirm'), [{ text: t('common.cancel'), style: 'cancel' }, { text: 'Archive', style: 'destructive', onPress: async () => { try { await archiveStudyGroup(group.id); router.replace('/study-groups' as never); } catch (archiveError) { setError(archiveError instanceof Error ? archiveError.message : 'Could not archive the group.'); } } }]); }} style={styles.archiveButton}><Text style={styles.archiveText}>Archive group</Text></Pressable> : null}
           </View> : null}
           {isApprovedMember && membership?.role !== 'owner' ? <Pressable onPress={handleLeave} style={styles.leaveButton}><Text style={styles.leaveText}>{t('groups.leaveGroup')}</Text></Pressable> : null}
@@ -268,7 +286,7 @@ export default function StudyGroupDetailScreen() {
       <Modal visible={Boolean(reportTarget)} transparent animationType="slide" onRequestClose={() => setReportTarget(null)}>
         <View style={styles.modalOverlay}><View style={styles.modalCard}><Text style={styles.modalTitle}>{t('groups.reportTitle')}</Text><Text style={styles.modalSubtitle}>{reportTarget?.label}</Text><Text style={styles.modalLabel}>{t('groups.reportReason')}</Text>{REPORT_REASONS.map(reason => <Pressable key={reason} onPress={() => setReportReason(reason)} style={styles.reasonRow}><MaterialIcons name={reportReason === reason ? 'radio-button-checked' : 'radio-button-unchecked'} size={20} color={reportReason === reason ? colors.primary : colors.textTertiary} /><Text style={styles.reasonText}>{t(`groups.reason${reason === 'fake_study_time' ? 'FakeStudy' : reason === 'inappropriate_content' ? 'Inappropriate' : reason.charAt(0).toUpperCase() + reason.slice(1)}` as any)}</Text></Pressable>)}<TextInput value={reportDetails} onChangeText={setReportDetails} placeholder={t('groups.reportDetails')} placeholderTextColor={colors.textTertiary} style={[styles.detailsInput, styles.multiline]} maxLength={1000} multiline /><View style={styles.modalActions}><Pressable onPress={() => setReportTarget(null)} style={styles.cancelButton}><Text style={styles.cancelText}>{t('common.cancel')}</Text></Pressable><Pressable onPress={() => { void submitReport(); }} disabled={reporting} style={styles.modalSubmit}><Text style={styles.primaryText}>{reporting ? t('common.loading') : t('groups.reportSubmit')}</Text></Pressable></View></View></View>
       </Modal>
-      {thankYou ? <Animated.View style={[styles.thankYou, { opacity: thankYouOpacity }]}><MaterialIcons name="check-circle" size={27} color={colors.success} /><Text style={styles.thankYouText}>{t('groups.reportSubmitted')}</Text></Animated.View> : null}
+      {thankYou ? <Animated.View style={[styles.thankYou, { opacity: thankYouOpacity }]}><MaterialIcons name="check-circle" size={27} color={colors.success} /><Text style={styles.thankYouText}>{noticeMessage}</Text></Animated.View> : null}
     </SafeAreaView>
   );
 }

@@ -9,8 +9,6 @@ import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/
 import { useApp } from '@/hooks/useApp';
 import {
   closeStudyGroupTicket,
-  getMyStudyGroupReports,
-  getMyStudyGroupTickets,
   getOwnerStudyGroupReports,
   getOwnerStudyGroupTickets,
   isPadhaiOwner,
@@ -29,6 +27,7 @@ export default function ReviewTicketsScreen() {
   const [tickets, setTickets] = useState<StudyGroupTicket[]>([]);
   const [reports, setReports] = useState<StudyGroupReport[]>([]);
   const [owner, setOwner] = useState(false);
+  const [ownerChecked, setOwnerChecked] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
@@ -39,9 +38,15 @@ export default function ReviewTicketsScreen() {
     try {
       const isOwner = await isPadhaiOwner(user.id);
       setOwner(isOwner);
+      setOwnerChecked(true);
+      if (!isOwner) {
+        setTickets([]);
+        setReports([]);
+        return;
+      }
       const [ticketRows, reportRows] = await Promise.all([
-        isOwner ? getOwnerStudyGroupTickets() : getMyStudyGroupTickets(user.id),
-        isOwner ? getOwnerStudyGroupReports() : getMyStudyGroupReports(user.id),
+        getOwnerStudyGroupTickets(),
+        getOwnerStudyGroupReports(),
       ]);
       setTickets(ticketRows);
       setReports(reportRows);
@@ -80,13 +85,38 @@ export default function ReviewTicketsScreen() {
     <Pressable onPress={() => updateReport(item)} style={({ pressed }) => [styles.card, pressed && owner && styles.pressed]}><View style={styles.cardHeader}><View style={[styles.cardIcon, { backgroundColor: colors.warning + '18' }]}><MaterialIcons name="flag" size={20} color={colors.warning} /></View><View style={styles.cardCopy}><Text style={styles.cardTitle}>{item.reasonCode.replaceAll('_', ' ')}</Text><Text style={styles.cardMeta}>{new Date(item.createdAt).toLocaleDateString()}</Text></View><Text style={styles.status}>{statusLabel(item.status, t)}</Text></View><Text style={styles.details}>{item.details || 'No additional details provided.'}</Text>{item.resolution ? <Text style={styles.resolution}>{item.resolution}</Text> : null}{owner ? <Text style={styles.ownerHint}>Tap to review</Text> : null}</Pressable>
   );
 
+  if (ownerChecked && !owner) {
+    return <SafeAreaView style={styles.container} edges={['top', 'bottom']}><View style={styles.empty}><Text style={styles.emptyText}>{t('support.ownerOnly')}</Text></View></SafeAreaView>;
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}><Pressable onPress={() => router.back()} style={styles.headerButton}><MaterialIcons name="arrow-back" size={22} color={colors.textPrimary} /></Pressable><View style={styles.headerCopy}><Text style={styles.title}>{t('support.reviewTicketsReports')}</Text><Text style={styles.subtitle}>{owner ? 'Owner view' : `${tickets.length + reports.length} items`}</Text></View><Pressable onPress={() => router.push('/raise-ticket' as never)} style={styles.addButton}><MaterialIcons name="add" size={22} color={colors.background} /></Pressable></View>
       <View style={styles.tabs}><Pressable onPress={() => setTab('tickets')} style={[styles.tab, tab === 'tickets' && styles.tabActive]}><Text style={[styles.tabText, tab === 'tickets' && styles.tabTextActive]}>{t('support.myTickets')} ({tickets.length})</Text></Pressable><Pressable onPress={() => setTab('reports')} style={[styles.tab, tab === 'reports' && styles.tabActive]}><Text style={[styles.tabText, tab === 'reports' && styles.tabTextActive]}>{t('support.myReports')} ({reports.length})</Text></Pressable></View>
       {owner ? <Pressable onPress={() => router.push('/admin/study-groups' as never)} style={styles.ownerLink}><MaterialIcons name="admin-panel-settings" size={18} color={colors.primary} /><Text style={styles.ownerLinkText}>Manage all Study Groups</Text><MaterialIcons name="chevron-right" size={18} color={colors.textTertiary} /></Pressable> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      {tab === 'tickets' ? <FlatList<StudyGroupTicket> data={tickets} keyExtractor={item => item.id} renderItem={renderTicket} contentContainerStyle={tickets.length ? styles.list : styles.empty} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void load(true); }} tintColor={colors.primary} />} ListEmptyComponent={<Text style={styles.emptyText}>{t('support.noTickets')}</Text>} showsVerticalScrollIndicator={false} /> : <FlatList<StudyGroupReport> data={reports} keyExtractor={item => item.id} renderItem={renderReport} contentContainerStyle={reports.length ? styles.list : styles.empty} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void load(true); }} tintColor={colors.primary} />} ListEmptyComponent={<Text style={styles.emptyText}>{t('support.noReports')}</Text>} showsVerticalScrollIndicator={false} />}
+      {!ownerChecked ? <Text style={styles.emptyText}>{t('common.loading')}</Text> : !owner ? <View style={styles.empty}><Text style={styles.emptyText}>{t('support.ownerOnly')}</Text></View> : null}
+      {owner ? (tab === 'tickets' ? (
+        <FlatList<StudyGroupTicket>
+          data={tickets}
+          keyExtractor={item => item.id}
+          renderItem={renderTicket}
+          contentContainerStyle={tickets.length ? styles.list : styles.empty}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void load(true); }} tintColor={colors.primary} />}
+          ListEmptyComponent={<Text style={styles.emptyText}>{t('support.noTickets')}</Text>}
+          showsVerticalScrollIndicator={false}
+        />
+      ) : (
+        <FlatList<StudyGroupReport>
+          data={reports}
+          keyExtractor={item => item.id}
+          renderItem={renderReport}
+          contentContainerStyle={reports.length ? styles.list : styles.empty}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void load(true); }} tintColor={colors.primary} />}
+          ListEmptyComponent={<Text style={styles.emptyText}>{t('support.noReports')}</Text>}
+          showsVerticalScrollIndicator={false}
+        />
+      )) : null}
     </SafeAreaView>
   );
 }

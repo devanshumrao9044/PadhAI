@@ -8,13 +8,15 @@ PadhAI now includes a zero-cost Study Groups feature for students who want to st
 
 Permanent study time is derived from the existing PadhAI focus-session lifecycle. A group session is written only when a focus session completes or breaks, while active presence is updated with a low-write heartbeat and rendered locally between updates. Stale presence is treated as offline after 90 seconds. Group-list data is compressed in the existing phone cache with a 60-second TTL.
 
-The implementation adds the following production tables: `study_groups`, `study_group_members`, `study_group_invites`, `study_group_presence`, `study_group_sessions`, `study_group_reports`, and `study_group_tickets`. The tracked migrations are `20260820_study_groups_moderation.sql`, `20260820_study_groups_member_summary.sql`, `20260820_study_groups_pending_visibility.sql`, and `20260820_study_groups_pending_summary.sql`.
+The implementation adds the following production tables: `study_groups`, `study_group_members`, `study_group_invites`, `study_group_presence`, `study_group_sessions`, `study_group_reports`, and `study_group_tickets`. The tracked migrations are `20260820_study_groups_moderation.sql`, `20260820_study_groups_member_summary.sql`, `20260820_study_groups_pending_visibility.sql`, `20260820_study_groups_pending_summary.sql`, and `20260820_study_groups_owner_only_moderation.sql`.
 
 ## Access rules
 
 A private group is visible to its approved members, its owner/admin, the PadhAI owner, or a user with their own pending membership. Pending members can see only their own group preview and approval state; member activity is returned through a secure RPC only after approval. Public search is bounded to 100 results. Owner and admin operations are protected by server-side SECURITY DEFINER RPC checks using `auth.uid()` and fixed search paths. All new tables have RLS enabled.
 
-The PadhAI owner can inspect every group without joining and can review reports and tickets from the owner view. Group owners/admins can approve or reject requests, share or regenerate invites, archive their group, and review group-level moderation items. Normal users can leave groups, report a member or group, raise tickets, and review their own tickets and reports.
+The PadhAI owner can inspect every group without joining and can review all reports and tickets from the private owner inbox. Group owners/admins can approve or reject requests, share or regenerate invites, archive their group, and manage membership, but they cannot read or resolve any complaint or app-level ticket. Normal users can leave groups, report a member or group, and raise tickets. The Review Tickets/Reports route and sidebar entry are owner-only.
+
+Invite management now has separate `Copy link`, `Share invite`, and `Regenerate invite` actions. Copying uses the installed Expo Clipboard module and shows an explicit “Invite link copied” notice; report confirmation and invite-action notices use separate messages.
 
 ## User flows
 
