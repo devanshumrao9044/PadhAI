@@ -7,9 +7,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
+import { DarkColors, ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { LEVELS, getLevelForUser } from '@/constants/levels';
 import { useApp } from '@/hooks/useApp';
 import { supabase } from '@/services/supabase';
@@ -150,10 +151,10 @@ function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
   const rankBg = rankColors[entry.rank] ?? levelDef.color;
   const isTopThree = entry.rank <= 3;
   const rowColors: [string, string] = isMe
-    ? [colors.primary + '2A', colors.primary + '08']
+    ? [colors.primary + '38', colors.surface + 'B8']
     : isTopThree
-    ? [rankBg + '24', colors.surface]
-    : [colors.surfaceVariant, colors.surface];
+    ? [rankBg + '30', colors.surface + 'D9']
+    : [colors.surfaceVariant + 'C8', colors.surface + 'D9'];
 
   return (
     <LinearGradient
@@ -198,12 +199,24 @@ export default function LeaderboardScreen() {
   const [celebrationStateReady, setCelebrationStateReady] = useState(false);
   const [guideVisible, setGuideVisible] = useState(false);
   const celebrationProgress = useRef(new Animated.Value(0)).current;
+  const screenEntranceProgress = useRef(new Animated.Value(0)).current;
+  const rankCardProgress = useRef(new Animated.Value(0)).current;
+  const livePulse = useRef(new Animated.Value(0.72)).current;
   const celebrationAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
   const celebrationAnimatedStyle = useMemo(() => ({
     opacity: celebrationProgress,
     transform: [{ scale: celebrationProgress.interpolate({ inputRange: [0, 1], outputRange: [0.985, 1] }) }],
   }), [celebrationProgress]);
+  const screenEntranceStyle = useMemo(() => ({
+    opacity: screenEntranceProgress,
+    transform: [{ translateY: screenEntranceProgress.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
+  }), [screenEntranceProgress]);
+  const rankCardEntranceStyle = useMemo(() => ({
+    opacity: rankCardProgress,
+    transform: [{ translateY: rankCardProgress.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }],
+  }), [rankCardProgress]);
   const previousTopThreeRankRef = useRef<number | null | undefined>(undefined);
+  const isDarkTheme = colors.background === DarkColors.background;
   const leaderboardRequestIdRef = useRef(0);
 
   const currentLevel = user ? getLevelForUser(user) : LEVELS[0];
@@ -257,6 +270,25 @@ export default function LeaderboardScreen() {
       }
     });
   }, [celebrationProgress]);
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(screenEntranceProgress, { toValue: 1, duration: 320, useNativeDriver: true }),
+      Animated.sequence([
+        Animated.delay(70),
+        Animated.timing(rankCardProgress, { toValue: 1, duration: 280, useNativeDriver: true }),
+      ]),
+    ]).start();
+
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(livePulse, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(livePulse, { toValue: 0.72, duration: 900, useNativeDriver: true }),
+      ]),
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [livePulse, rankCardProgress, screenEntranceProgress]);
 
   useEffect(() => {
     previousTopThreeRankRef.current = undefined;
@@ -393,13 +425,19 @@ export default function LeaderboardScreen() {
           </View>
         </View>
 
+        <Animated.View style={screenEntranceStyle}>
         {/* ── Section 1: Hero Level Carousel ────────────────────────────── */}
-        <LinearGradient
-          colors={[colors.background, colors.surfaceVariant]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
+        <BlurView
+          intensity={isDarkTheme ? 44 : 62}
+          tint={isDarkTheme ? 'dark' : 'light'}
           style={styles.heroSection}
         >
+          <LinearGradient
+            colors={[colors.primary + '18', colors.surface + '66', colors.background + '18']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
           {/* Spotlight glow behind current level */}
           <View style={[styles.spotlight, { backgroundColor: currentLevel.color + '20' }]} />
 
@@ -428,10 +466,10 @@ export default function LeaderboardScreen() {
             <Text style={[styles.levelSubtitle, { color: currentLevel.color }]}>{currentLevelTitle}</Text>
           </View>
 
-        </LinearGradient>
+        </BlurView>
 
         {/* ── Section 2: Rank Status Card ───────────────────────────────── */}
-        <View style={styles.rankCard}>
+        <Animated.View style={[styles.rankCard, rankCardEntranceStyle]}>
           <View style={styles.rankSummaryRow}>
             <View style={styles.rankSummaryCard}>
               <Text style={styles.rankSummaryLabel}>{t('leaderboard.currentRank')}</Text>
@@ -451,13 +489,13 @@ export default function LeaderboardScreen() {
           {entries.length > 0 ? (
             <RankZoneBar rank={myRank} total={entries.length} />
           ) : null}
-        </View>
+        </Animated.View>
 
         {/* ── Section 3: Leaderboard List ───────────────────────────────── */}
         <View style={styles.listSection}>
             <View style={styles.sectionHeadingRow}>
               <Text style={styles.sectionTitle}>{t('leaderboard.title', { value: currentLevel.rank })}</Text>
-              <View testID="leaderboard-live" style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>{t('leaderboard.live')}</Text></View>
+              <View testID="leaderboard-live" style={styles.livePill}><Animated.View style={[styles.liveDot, { opacity: livePulse, transform: [{ scale: livePulse }] }]} /><Text style={styles.liveText}>{t('leaderboard.live')}</Text></View>
             </View>
             <Text style={styles.sectionSubtitle}>{t('leaderboard.subtitle')}</Text>
 
@@ -486,6 +524,7 @@ export default function LeaderboardScreen() {
             </View>
           )}
         </View>
+        </Animated.View>
       </ScrollView>
 
       <LeaderboardGuideSheet visible={guideVisible} onClose={() => setGuideVisible(false)} />
@@ -525,11 +564,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingVertical: Spacing.sm,
     borderRadius: Radius.lg,
     borderWidth: 1,
-    borderColor: '#FFD70088',
-    backgroundColor: colors.surface,
+    borderColor: colors.warning + '99',
+    backgroundColor: colors.surface + 'E6',
   },
   celebrationCopy: { flex: 1 },
-  celebrationTitle: { color: '#FFD700', fontSize: FontSize.sm, fontWeight: FontWeight.extraBold },
+  celebrationTitle: { color: colors.warning, fontSize: FontSize.sm, fontWeight: FontWeight.extraBold },
   celebrationSubtitle: { color: colors.textSecondary, fontSize: FontSize.xs, marginTop: 2 },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 100 },
@@ -571,7 +610,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingBottom: 22,
     overflow: 'hidden',
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.borderStrong,
+    backgroundColor: colors.surface + '42',
   },
   spotlight: {
     position: 'absolute',
@@ -670,22 +710,22 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
 
   // ── Section 2 Rank Card ────────────────────────────────────────────────────
   rankCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surface + 'D9',
     borderRadius: Radius.lg,
     marginHorizontal: Spacing.md,
     marginTop: Spacing.md,
     marginBottom: Spacing.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderStrong,
     padding: Spacing.md,
-    shadowColor: '#1C2D44',
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 2,
   },
   rankSummaryRow: { flexDirection: 'row', gap: 8, marginBottom: Spacing.md },
-  rankSummaryCard: { flex: 1, minWidth: 0, minHeight: 74, justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 10, borderRadius: Radius.md, backgroundColor: colors.surfaceVariant, borderWidth: 1, borderColor: colors.border },
+  rankSummaryCard: { flex: 1, minWidth: 0, minHeight: 74, justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 10, borderRadius: Radius.md, backgroundColor: colors.surfaceVariant + 'CC', borderWidth: 1, borderColor: colors.borderStrong },
   rankSummaryLabel: { color: colors.textSecondary, fontSize: FontSize.xs, lineHeight: 16, fontWeight: FontWeight.semiBold, textAlign: 'center', flexShrink: 1 },
   rankSummaryValue: { color: colors.textPrimary, fontSize: FontSize.lg, lineHeight: 24, fontWeight: FontWeight.extraBold, textAlign: 'center', marginTop: 2, flexShrink: 1 },
   weeklyUpdateCard: { display: 'none' },
@@ -813,7 +853,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: Spacing.md,
   },
   sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 },
-  livePill: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.success + '18', borderRadius: 4, paddingHorizontal: 9, paddingVertical: 5, borderWidth: 1, borderColor: colors.success + '66' },
+  livePill: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.success + '20', borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: colors.success + '88' },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.success },
   liveText: { color: colors.success, fontSize: 10, lineHeight: 14, fontWeight: FontWeight.bold, letterSpacing: 0.6 },
   sectionTitle: { flex: 1, minWidth: 0, color: colors.textPrimary, fontSize: FontSize.lg, lineHeight: 24, fontWeight: FontWeight.bold, flexShrink: 1 },
@@ -823,6 +863,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   listContainer: { gap: 10, paddingBottom: Spacing.xl },
   boardRow: {
     minHeight: 76,
+    backgroundColor: colors.surface + 'B8',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
