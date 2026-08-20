@@ -22,11 +22,14 @@ export default function SwipeNavigationShell({ children }: Props) {
   const segments = useSegments();
   const { width } = useWindowDimensions();
   const tabIndex = getTabIndex(segments);
+  const isLockedScreen = ['focus', 'streak-broken', 'onboarding', 'reset-password'].includes(segments[0] ?? '');
   const gestureStartRef = useRef({ x: 0, y: 0 });
 
   const handleSwipe = useCallback((dx: number, dy: number, velocityX: number) => {
     if (Math.abs(dx) < SWIPE_DISTANCE || Math.abs(dx) <= Math.abs(dy) * 1.35) return;
     if (Math.abs(velocityX) < SWIPE_VELOCITY && Math.abs(dx) < SWIPE_DISTANCE + 18) return;
+
+    if (isLockedScreen) return;
 
     if (tabIndex >= 0) {
       const direction = dx < 0 ? 1 : -1;
@@ -44,7 +47,7 @@ export default function SwipeNavigationShell({ children }: Props) {
       void haptics.tabSwitch();
       router.back();
     }
-  }, [router, tabIndex]);
+  }, [isLockedScreen, router, tabIndex]);
 
   const responder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponderCapture: event => {
@@ -57,7 +60,7 @@ export default function SwipeNavigationShell({ children }: Props) {
       const startedAtCorrectEdge = gesture.dx < 0
         ? gestureStartRef.current.x >= width - EDGE_BACK_WIDTH
         : gestureStartRef.current.x <= EDGE_BACK_WIDTH;
-      return startedAtCorrectEdge && (tabIndex >= 0 || gesture.dx > 0);
+      return !isLockedScreen && startedAtCorrectEdge && (tabIndex >= 0 || gesture.dx > 0);
     },
     onPanResponderRelease: (_, gesture) => {
       handleSwipe(gesture.dx, gesture.dy, gesture.vx);
@@ -65,7 +68,7 @@ export default function SwipeNavigationShell({ children }: Props) {
     onPanResponderTerminate: () => {
       gestureStartRef.current = { x: 0, y: 0 };
     },
-  }), [handleSwipe, tabIndex, width]);
+  }), [handleSwipe, isLockedScreen, tabIndex, width]);
 
   return <View style={styles.container} {...responder.panHandlers}>{children}</View>;
 }
