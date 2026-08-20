@@ -31,11 +31,23 @@ export default function FocusScreen() {
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(initialChapterId);
   const [starting, setStarting] = useState(false);
   const inputRef = useRef<TextInput>(null);
+  const autofocusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (autofocusTimerRef.current) clearTimeout(autofocusTimerRef.current);
+  }, []);
 
   const handleDurationSelect = (d: number) => {
+    if (autofocusTimerRef.current) {
+      clearTimeout(autofocusTimerRef.current);
+      autofocusTimerRef.current = null;
+    }
     if (d === CUSTOM_KEY) {
       setCustomMode(true);
-      setTimeout(() => inputRef.current?.focus(), 100);
+      autofocusTimerRef.current = setTimeout(() => {
+        inputRef.current?.focus();
+        autofocusTimerRef.current = null;
+      }, 100);
     } else {
       setCustomMode(false);
       setSelectedMins(d);

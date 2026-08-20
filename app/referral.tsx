@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors } from '@/constants/theme';
@@ -28,6 +28,13 @@ export default function ReferralScreen() {
   const [hasUnlockedReward, setHasUnlockedReward] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showReward, setShowReward] = useState(false);
+  const mountedRef = useRef(true);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    mountedRef.current = false;
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+  }, []);
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -38,6 +45,7 @@ export default function ReferralScreen() {
       return;
     }
     const stats = await fetchReferralStats(user.id);
+    if (!mountedRef.current) return;
     setMyCode(stats.myCode?.toUpperCase() ?? null);
     setCompleted(stats.completed);
     setPending(stats.pending);
@@ -51,6 +59,7 @@ export default function ReferralScreen() {
         .eq('id', user.id)
         .single();
 
+      if (!mountedRef.current) return;
       if (!userData?.reward_popup_seen) {
         setShowReward(true);
         await supabase
@@ -68,7 +77,11 @@ export default function ReferralScreen() {
     if (!myCode) return;
     await Clipboard.setStringAsync(myCode);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    copyTimeoutRef.current = setTimeout(() => {
+      if (mountedRef.current) setCopied(false);
+      copyTimeoutRef.current = null;
+    }, 2000);
   }
 
   async function handleShare() {

@@ -77,6 +77,7 @@ export default function AuthRouteGuard() {
 
     checkedSessionId.current = sessionRouteKey;
     let cancelled = false;
+    const retryTimers: ReturnType<typeof setTimeout>[] = [];
     const userId = session.user.id;
     const profile = appUser;
 
@@ -102,13 +103,14 @@ export default function AuthRouteGuard() {
         if (cancelled) return;
         const landingRoute = appIsOnboarded ? '/(tabs)' : '/onboarding';
         router.replace(landingRoute);
+        if (cancelled) return;
         // On web and some native startup frames the first replace can be
         // ignored while the root navigator is committing its state. Retry a
         // few times, cancelling all retries if auth or the route changes.
         [150, 350, 700].forEach((delay) => {
-          setTimeout(() => {
+          retryTimers.push(setTimeout(() => {
             if (!cancelled && !isProtected) router.replace(landingRoute);
-          }, delay);
+          }, delay));
         });
       } catch {
         if (!cancelled) router.replace('/(tabs)');
@@ -117,6 +119,7 @@ export default function AuthRouteGuard() {
 
     return () => {
       cancelled = true;
+      retryTimers.forEach(timer => clearTimeout(timer));
     };
   }, [appContext, appIsOnboarded, appLoading, appUser, isProtected, isSessionAllowedPublicRoute, navigationReady, ready, router, session]);
 

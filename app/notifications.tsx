@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -41,17 +41,25 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => () => {
+    mountedRef.current = false;
+  }, []);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
       const nextItems = await loadUserNotifications();
+      if (!mountedRef.current) return;
       setItems(nextItems);
       setAttachmentUrls({});
     } catch (error: any) {
-      Alert.alert(t('notifications.title'), error?.message ?? t('notifications.loadFailed'));
+      if (mountedRef.current) Alert.alert(t('notifications.title'), error?.message ?? t('notifications.loadFailed'));
     } finally {
-      if (isRefresh) setRefreshing(false); else setLoading(false);
+      if (mountedRef.current) {
+        if (isRefresh) setRefreshing(false); else setLoading(false);
+      }
     }
   }, [t]);
 
@@ -80,9 +88,11 @@ export default function NotificationsScreen() {
     setBusyId(item.id);
     try {
       await markUserNotificationRead(item.id);
-      setItems(current => current.map(entry => entry.id === item.id ? { ...entry, readAt: new Date().toISOString() } : entry));
+      if (mountedRef.current) {
+        setItems(current => current.map(entry => entry.id === item.id ? { ...entry, readAt: new Date().toISOString() } : entry));
+      }
     } finally {
-      setBusyId(null);
+      if (mountedRef.current) setBusyId(null);
     }
   };
 
@@ -99,6 +109,7 @@ export default function NotificationsScreen() {
             setBusyId(item.id);
             try {
               await deleteUserNotification(item.id);
+              if (!mountedRef.current) return;
               setItems(current => current.filter(entry => entry.id !== item.id));
               setAttachmentUrls(current => {
                 const next = { ...current };
@@ -106,9 +117,9 @@ export default function NotificationsScreen() {
                 return next;
               });
             } catch (error: any) {
-              Alert.alert(t('notifications.title'), error?.message ?? t('notifications.deleteFailed'));
+              if (mountedRef.current) Alert.alert(t('notifications.title'), error?.message ?? t('notifications.deleteFailed'));
             } finally {
-              setBusyId(null);
+              if (mountedRef.current) setBusyId(null);
             }
           },
         },

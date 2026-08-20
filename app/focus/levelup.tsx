@@ -110,31 +110,51 @@ export default function LevelUpScreen() {
       Animated.spring(rankBadgeScale, { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
     ]).start();
 
-    setTimeout(() => {
+    const textTimeout = setTimeout(() => {
       Animated.parallel([
         Animated.timing(textFade, { toValue: 1, duration: 400, useNativeDriver: true }),
         Animated.spring(textSlide, { toValue: 0, tension: 60, friction: 8, useNativeDriver: true }),
       ]).start();
     }, 400);
 
-    setTimeout(() => {
+    const buttonTimeout = setTimeout(() => {
       Animated.timing(btnFade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
     }, 800);
 
     // Continuous beam rotation
-    Animated.loop(
+    const beamLoop = Animated.loop(
       Animated.timing(beamRotate, { toValue: 1, duration: 8000, useNativeDriver: true })
-    ).start();
+    );
+    beamLoop.start();
 
     // Badge breathe pulse
-    setTimeout(() => {
-      Animated.loop(
+    let badgePulseLoop: ReturnType<typeof Animated.loop> | null = null;
+    const pulseTimeout = setTimeout(() => {
+      badgePulseLoop = Animated.loop(
         Animated.sequence([
           Animated.timing(badgePulse, { toValue: 1.06, duration: 900, useNativeDriver: true }),
           Animated.timing(badgePulse, { toValue: 1, duration: 900, useNativeDriver: true }),
         ])
-      ).start();
+      );
+      badgePulseLoop.start();
     }, 700);
+
+    return () => {
+      clearTimeout(textTimeout);
+      clearTimeout(buttonTimeout);
+      clearTimeout(pulseTimeout);
+      beamLoop.stop();
+      badgePulseLoop?.stop();
+      bgFlash.stopAnimation();
+      badgeScale.stopAnimation();
+      badgePulse.stopAnimation();
+      textFade.stopAnimation();
+      textSlide.stopAnimation();
+      btnFade.stopAnimation();
+      beamRotate.stopAnimation();
+      rankBadgeScale.stopAnimation();
+      rankBadgeOpacity.stopAnimation();
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const spin = beamRotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });

@@ -203,15 +203,19 @@ export default function FocusActiveScreen() {
     const alreadyElapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
     elapsedRef.current = alreadyElapsed;
     setElapsed(alreadyElapsed);
+    if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = setInterval(tick, 500);
 
     // ✅ Bulletproof AppState listener setup
     try {
       const sub = AppState.addEventListener('change', next => {
         if (appStateRef.current === 'active' && next !== 'active') {
-          if (intervalRef.current) clearInterval(intervalRef.current);
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
         } else if (appStateRef.current !== 'active' && next === 'active') {
-          intervalRef.current = setInterval(tick, 500);
+          if (!intervalRef.current) intervalRef.current = setInterval(tick, 500);
         }
         appStateRef.current = next;
       });
@@ -235,7 +239,9 @@ export default function FocusActiveScreen() {
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      intervalRef.current = null;
       if (tapTimer.current) clearTimeout(tapTimer.current);
+      tapTimer.current = null;
 
       // ✅ Absolute safe cleanup — checks existence AND type before calling
       const asub = appStateSubRef.current;

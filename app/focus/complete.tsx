@@ -116,33 +116,38 @@ export default function FocusCompleteScreen() {
       Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
     ]).start();
 
-    Animated.loop(
+    const glowLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(glowAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
         Animated.timing(glowAnim, { toValue: 0.4, duration: 1200, useNativeDriver: true }),
       ])
-    ).start();
+    );
+    glowLoop.start();
+
+    let comebackTimeout: ReturnType<typeof setTimeout> | null = null;
+    let recoveryTimeout: ReturnType<typeof setTimeout> | null = null;
+    let shimmerLoop: ReturnType<typeof Animated.loop> | null = null;
 
     if (isComeback) {
-      setTimeout(() => {
+      shimmerLoop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(shimmerAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
+          Animated.timing(shimmerAnim, { toValue: 0, duration: 900, useNativeDriver: true }),
+        ])
+      );
+      comebackTimeout = setTimeout(() => {
         Animated.parallel([
           Animated.spring(comebackSlide, { toValue: 0, tension: 60, friction: 8, useNativeDriver: true }),
           Animated.timing(comebackOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
           Animated.spring(comebackScale, { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
         ]).start();
-
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(shimmerAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
-            Animated.timing(shimmerAnim, { toValue: 0, duration: 900, useNativeDriver: true }),
-          ])
-        ).start();
+        shimmerLoop?.start();
       }, 600);
     }
 
     // Recovery badge animation (always shown if isRecovery)
     if (isRecovery) {
-      setTimeout(() => {
+      recoveryTimeout = setTimeout(() => {
         Animated.parallel([
           Animated.spring(recoverySlide, { toValue: 0, tension: 55, friction: 8, useNativeDriver: true }),
           Animated.timing(recoveryOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
@@ -150,6 +155,23 @@ export default function FocusCompleteScreen() {
         ]).start();
       }, isComeback ? 1000 : 700);
     }
+
+    return () => {
+      if (comebackTimeout) clearTimeout(comebackTimeout);
+      if (recoveryTimeout) clearTimeout(recoveryTimeout);
+      glowLoop.stop();
+      shimmerLoop?.stop();
+      scaleAnim.stopAnimation();
+      fadeAnim.stopAnimation();
+      glowAnim.stopAnimation();
+      comebackSlide.stopAnimation();
+      comebackOpacity.stopAnimation();
+      comebackScale.stopAnimation();
+      shimmerAnim.stopAnimation();
+      recoverySlide.stopAnimation();
+      recoveryOpacity.stopAnimation();
+      recoveryScale.stopAnimation();
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const showConfetti = isComeback || isRecovery;

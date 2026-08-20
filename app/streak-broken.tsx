@@ -46,7 +46,7 @@ export default function StreakBrokenScreen() {
     ]).start();
 
     // Challenge card slides in after the hero section fades
-    setTimeout(() => {
+    const challengeTimeout = setTimeout(() => {
       Animated.parallel([
         Animated.timing(challengeOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
         Animated.spring(challengeSlide, { toValue: 0, tension: 50, friction: 9, useNativeDriver: true }),
@@ -63,8 +63,14 @@ export default function StreakBrokenScreen() {
     const pulseTimeout = setTimeout(() => pulse.start(), 1200);
 
     return () => {
-      pulse.stop();
+      clearTimeout(challengeTimeout);
       clearTimeout(pulseTimeout);
+      pulse.stop();
+      fadeAnim.stopAnimation();
+      scaleAnim.stopAnimation();
+      challengeOpacity.stopAnimation();
+      challengeSlide.stopAnimation();
+      pulseAnim.stopAnimation();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
