@@ -2,6 +2,10 @@ import { Linking, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { supabase } from '@/features/core/services/supabase';
+import {
+  NOTIFICATION_MAX_IMAGE_OUTPUT_BYTES,
+  NOTIFICATION_MAX_PDF_BYTES,
+} from '@/features/notifications/services/notificationAttachmentsPolicy';
 import type { PreparedNotificationAttachment } from '@/features/notifications/services/notificationAttachments';
 
 export type NotificationRecipient = {
@@ -130,6 +134,18 @@ function randomAttachmentId(): string {
 }
 
 export async function uploadNotificationAttachment(userId: string, attachment: PreparedNotificationAttachment): Promise<NotificationAttachmentInput> {
+  const expectedLimit = attachment.mimeType === 'image/jpeg'
+    ? NOTIFICATION_MAX_IMAGE_OUTPUT_BYTES
+    : NOTIFICATION_MAX_PDF_BYTES;
+  if (attachment.body.byteLength < 1 || attachment.sizeBytes !== attachment.body.byteLength || attachment.sizeBytes > expectedLimit) {
+    throw new Error('Attachment exceeds the allowed compressed size. Please choose a smaller file.');
+  }
+  if (
+    (attachment.mimeType === 'image/jpeg' && attachment.extension !== 'jpg')
+    || (attachment.mimeType === 'application/pdf' && attachment.extension !== 'pdf')
+  ) {
+    throw new Error('Attachment type does not match its file extension.');
+  }
   const path = `${userId}/${randomAttachmentId()}.${attachment.extension}`;
   const { error } = await supabase.storage
     .from('notification-attachments')

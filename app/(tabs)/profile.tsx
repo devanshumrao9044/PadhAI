@@ -262,6 +262,9 @@ export default function ProfileScreen() {
         const mimeType = 'image/jpeg';
         const filePath = `${authUser.id}/${authUser.id}-${Date.now()}.${ext}`;
         const preparedAvatar = await prepareAvatarImage(editAvatarUrl);
+        if (preparedAvatar.bytes > MAX_AVATAR_OUTPUT_BYTES) {
+          throw new Error(`Compressed photo exceeds ${formatFileSize(MAX_AVATAR_OUTPUT_BYTES)}.`);
+        }
 
         const { error: uploadError } = await supabase.storage
           .from('avatars')
@@ -587,6 +590,12 @@ export default function ProfileScreen() {
                   <MaterialIcons name="photo-camera" size={14} color="#FFF" />
                 </View>
               </TouchableOpacity>
+              <Text style={styles.avatarHelper}>
+                {t('profile.avatarUploadHelper', {
+                  source: formatFileSize(MAX_AVATAR_SOURCE_BYTES),
+                  output: formatFileSize(MAX_AVATAR_OUTPUT_BYTES),
+                })}
+              </Text>
               {avatarError ? <Text style={styles.avatarError}>{avatarError}</Text> : null}
 
               <Text style={styles.inputLabel}>{t('profile.fullName')}</Text>
@@ -831,7 +840,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   modalSettingValue: { color: colors.textSecondary, fontSize: FontSize.xs, lineHeight: 17, marginTop: 2, flexShrink: 1 },
   modalReminderGroup: { marginLeft: Spacing.sm, paddingLeft: Spacing.sm, borderLeftWidth: 2, borderLeftColor: colors.border },
   modalAvatarEdit: { alignSelf: 'center', marginBottom: 6, position: 'relative' },
-  avatarError: { fontSize: FontSize.xs, color: colors.danger, textAlign: 'center', marginBottom: Spacing.sm },
+  avatarHelper: { fontSize: 11, lineHeight: 16, color: colors.textTertiary, textAlign: 'center', marginBottom: 6, paddingHorizontal: 12 },
+  avatarError: { fontSize: FontSize.xs, lineHeight: 17, color: colors.danger, textAlign: 'center', marginBottom: Spacing.sm },
   avatarImageSmall: { width: 64, height: 64, borderRadius: 32 },
   cameraIconBadge: { position: 'absolute', bottom: 0, right: -4, backgroundColor: colors.primary, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface },
   inputLabel: { fontSize: FontSize.xs, lineHeight: 16, fontWeight: FontWeight.bold, color: colors.textSecondary, marginBottom: 6, marginTop: 10 },

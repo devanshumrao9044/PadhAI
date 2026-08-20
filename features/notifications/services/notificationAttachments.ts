@@ -1,7 +1,21 @@
 import * as ImageManipulator from 'expo-image-manipulator';
-export const NOTIFICATION_MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
-export const NOTIFICATION_MAX_IMAGE_OUTPUT_BYTES = 512 * 1024;
-export const NOTIFICATION_MAX_IMAGE_DIMENSION = 1600;
+import {
+  formatAttachmentSize,
+  NOTIFICATION_MAX_IMAGE_DIMENSION,
+  NOTIFICATION_MAX_IMAGE_OUTPUT_BYTES,
+  NOTIFICATION_MAX_PDF_BYTES,
+  NOTIFICATION_MAX_SOURCE_BYTES,
+  type NotificationFileAsset,
+  validateNotificationImageAsset,
+  validateNotificationPdfAsset,
+} from './notificationAttachmentsPolicy.ts';
+
+export {
+  NOTIFICATION_MAX_IMAGE_DIMENSION,
+  NOTIFICATION_MAX_IMAGE_OUTPUT_BYTES,
+  NOTIFICATION_MAX_PDF_BYTES,
+  NOTIFICATION_MAX_SOURCE_BYTES,
+} from './notificationAttachmentsPolicy.ts';
 
 const IMAGE_QUALITY_ATTEMPTS = [0.82, 0.72, 0.62, 0.52, 0.42];
 
@@ -13,12 +27,7 @@ export type PreparedNotificationAttachment = {
   displayName: string;
 };
 
-type FileAsset = {
-  uri: string;
-  fileName?: string | null;
-  name?: string;
-  mimeType?: string | null;
-};
+type FileAsset = NotificationFileAsset;
 
 async function readUri(uri: string): Promise<ArrayBuffer> {
   const response = await fetch(uri);
@@ -27,6 +36,7 @@ async function readUri(uri: string): Promise<ArrayBuffer> {
 }
 
 export async function prepareNotificationImage(asset: FileAsset): Promise<PreparedNotificationAttachment> {
+  validateNotificationImageAsset(asset);
   let lastSize = 0;
   for (const quality of IMAGE_QUALITY_ATTEMPTS) {
     const result = await ImageManipulator.manipulateAsync(
@@ -42,7 +52,7 @@ export async function prepareNotificationImage(asset: FileAsset): Promise<Prepar
         mimeType: 'image/jpeg',
         sizeBytes: lastSize,
         extension: 'jpg',
-        displayName: asset.fileName ?? asset.name ?? 'notification-image.jpg',
+        displayName: `${(asset.fileName ?? asset.name ?? 'notification-image').replace(/\.[^.]+$/, '')}.jpg`,
       };
     }
   }
@@ -50,9 +60,10 @@ export async function prepareNotificationImage(asset: FileAsset): Promise<Prepar
 }
 
 export async function prepareNotificationPdf(asset: FileAsset): Promise<PreparedNotificationAttachment> {
+  validateNotificationPdfAsset(asset);
   const body = await readUri(asset.uri);
-  if (body.byteLength < 1 || body.byteLength > NOTIFICATION_MAX_ATTACHMENT_BYTES) {
-    throw new Error(`PDF must be smaller than ${Math.floor(NOTIFICATION_MAX_ATTACHMENT_BYTES / (1024 * 1024))} MB.`);
+  if (body.byteLength < 1 || body.byteLength > NOTIFICATION_MAX_PDF_BYTES) {
+    throw new Error(`PDF must be smaller than ${formatAttachmentSize(NOTIFICATION_MAX_PDF_BYTES)}.`);
   }
   return {
     body,
