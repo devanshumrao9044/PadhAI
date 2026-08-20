@@ -65,6 +65,9 @@ const TRANSLATIONS = {
       noMembers: 'No approved members yet.',
     },
     support: {
+      helpSupport: 'Help & Support',
+      reportProblem: 'Report a problem',
+      reviewStatusHint: 'You can review the status anytime from Help & Support.',
       raiseTicket: 'Raise a ticket',
       reviewTicketsReports: 'Review tickets / reports',
       myTickets: 'My tickets',
@@ -715,6 +718,9 @@ const TRANSLATIONS = {
       noMembers: 'अभी कोई approved member नहीं है।',
     },
     support: {
+      helpSupport: 'मदद और सहायता',
+      reportProblem: 'समस्या बताएं',
+      reviewStatusHint: 'आप Help & Support से अपने टिकट का status देख सकते हैं।',
       raiseTicket: 'टिकट उठाएँ',
       reviewTicketsReports: 'टिकट / रिपोर्ट देखें',
       myTickets: 'मेरे टिकट',

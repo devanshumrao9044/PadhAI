@@ -275,7 +275,7 @@ export default function StudyGroupDetailScreen() {
             {membership?.role === 'owner' || ownerAccess ? <Pressable onPress={() => { Alert.alert(t('groups.leaveGroup'), t('groups.leaveConfirm'), [{ text: t('common.cancel'), style: 'cancel' }, { text: 'Archive', style: 'destructive', onPress: async () => { try { await archiveStudyGroup(group.id); router.replace('/study-groups' as never); } catch (archiveError) { setError(archiveError instanceof Error ? archiveError.message : 'Could not archive the group.'); } } }]); }} style={styles.archiveButton}><Text style={styles.archiveText}>Archive group</Text></Pressable> : null}
           </View> : null}
           {isApprovedMember && membership?.role !== 'owner' ? <Pressable onPress={handleLeave} style={styles.leaveButton}><Text style={styles.leaveText}>{t('groups.leaveGroup')}</Text></Pressable> : null}
-          {isApprovedMember ? <Pressable onPress={() => router.push('/raise-ticket' as never)} style={styles.supportLink}><MaterialIcons name="support-agent" size={18} color={colors.primary} /><Text style={styles.outlineText}>{t('support.raiseTicket')}</Text></Pressable> : null}
+          {isApprovedMember ? <Pressable onPress={() => router.push('/raise-ticket' as never)} style={styles.supportLink}><MaterialIcons name="support-agent" size={18} color={colors.primary} /><Text style={styles.outlineText}>{t('support.reportProblem')}</Text></Pressable> : null}
         </> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </ScrollView>

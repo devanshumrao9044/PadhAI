@@ -188,7 +188,7 @@ export default function SideDrawer({ visible, onClose }: Props) {
           <View style={styles.divider} />
           <TouchableOpacity style={styles.supportItem} onPress={() => navigate('/raise-ticket')} activeOpacity={0.8}>
             <View style={styles.supportIconWrap}><MaterialIcons name="support-agent" size={20} color={colors.primary} /></View>
-            <View style={styles.supportTextBlock}><Text style={styles.supportLabel}>{t('support.raiseTicket')}</Text><Text style={styles.supportSub}>{t('support.ticketTitle')}</Text></View>
+            <View style={styles.supportTextBlock}><Text style={styles.supportLabel}>{t('support.helpSupport')}</Text><Text style={styles.supportSub}>{t('support.reportProblem')}</Text></View>
             <MaterialIcons name="chevron-right" size={18} color={colors.textTertiary} />
           </TouchableOpacity>
           {isOwner ? <TouchableOpacity style={styles.supportItem} onPress={() => navigate('/review-tickets')} activeOpacity={0.8}>

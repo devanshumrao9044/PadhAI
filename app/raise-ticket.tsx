@@ -48,12 +48,12 @@ export default function RaiseTicketScreen() {
   };
 
   if (submitted) {
-    return <SafeAreaView style={styles.container} edges={['top', 'bottom']}><Animated.View style={[styles.successPanel, { transform: [{ scale }] }]}><View style={styles.successIcon}><MaterialIcons name="check" size={40} color={colors.success} /></View><Text style={styles.successTitle}>{t('support.ticketSubmitted')}</Text><Text style={styles.successBody}>You can review the status anytime from the sidebar.</Text><Pressable onPress={() => router.replace('/review-tickets' as never)} style={styles.primaryButton}><Text style={styles.primaryText}>{t('support.reviewTicketsReports')}</Text></Pressable><Pressable onPress={() => router.back()} style={styles.secondaryButton}><Text style={styles.secondaryText}>{t('common.close')}</Text></Pressable></Animated.View></SafeAreaView>;
+    return <SafeAreaView style={styles.container} edges={['top', 'bottom']}><Animated.View style={[styles.successPanel, { transform: [{ scale }] }]}><View style={styles.successIcon}><MaterialIcons name="check" size={40} color={colors.success} /></View><Text style={styles.successTitle}>{t('support.ticketSubmitted')}</Text><Text style={styles.successBody}>{t('support.reviewStatusHint')}</Text><Pressable onPress={() => router.replace('/review-tickets' as never)} style={styles.primaryButton}><Text style={styles.primaryText}>{t('support.reviewTicketsReports')}</Text></Pressable><Pressable onPress={() => router.back()} style={styles.secondaryButton}><Text style={styles.secondaryText}>{t('common.close')}</Text></Pressable></Animated.View></SafeAreaView>;
   }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}><Pressable onPress={() => router.back()} style={styles.headerButton}><MaterialIcons name="arrow-back" size={22} color={colors.textPrimary} /></Pressable><Text style={styles.title}>{t('support.raiseTicket')}</Text></View>
+      <View style={styles.header}><Pressable onPress={() => router.back()} style={styles.headerButton}><MaterialIcons name="arrow-back" size={22} color={colors.textPrimary} /></Pressable><Text style={styles.title}>{t('support.reportProblem')}</Text></View>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.heroTitle}>{t('support.ticketTitle')}</Text>
         <Text style={styles.heroBody}>Use this for bugs, account issues, group concerns or feature suggestions. Do not share passwords.</Text>

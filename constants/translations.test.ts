@@ -11,6 +11,10 @@ test('core screens return the selected language without duplicating JSX copy', (
   assert.equal(translate('hi', 'referral.moreReferrals', { value: 3 }), 'रिवॉर्ड अनलॉक करने के लिए 3 और रेफरल चाहिए।');
   assert.equal(translate('en', 'groups.title'), 'Study Groups');
   assert.equal(translate('hi', 'groups.title'), 'स्टडी ग्रुप');
+  assert.equal(translate('en', 'support.helpSupport'), 'Help & Support');
+  assert.equal(translate('en', 'support.reportProblem'), 'Report a problem');
+  assert.equal(translate('hi', 'support.helpSupport'), 'मदद और सहायता');
+  assert.equal(translate('hi', 'support.reportProblem'), 'समस्या बताएं');
   assert.equal(translate('en', 'support.raiseTicket'), 'Raise a ticket');
   assert.equal(translate('hi', 'support.reviewTicketsReports'), 'टिकट / रिपोर्ट देखें');
   assert.equal(translate('en', 'groups.linkCopied'), 'Invite link copied.');
