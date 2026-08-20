@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -12,9 +12,12 @@ import {
   getMyStudyGroups,
   searchPublicStudyGroups,
   STUDY_GROUP_ICON_OPTIONS,
+  submitStudyGroupReport,
   type StudyGroup,
   type StudyGroupMembership,
+  type StudyGroupReportReason,
 } from '@/features/study-groups/services/studyGroups';
+import StudyGroupReportSheet from '@/components/study-groups/StudyGroupReportSheet';
 
 type MyGroupEntry = { group: StudyGroup; membership: StudyGroupMembership };
 type ListItem = { kind: 'mine' | 'search'; entry: MyGroupEntry | StudyGroup };
@@ -36,6 +39,8 @@ export default function StudyGroupsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
+  const [reportGroup, setReportGroup] = useState<StudyGroup | null>(null);
+  const [reportNotice, setReportNotice] = useState('');
 
   const loadGroups = useCallback(async (force = false) => {
     if (!user?.id) return;
@@ -75,6 +80,20 @@ export default function StudyGroupsScreen() {
     }
   };
 
+  const openGroupMenu = (group: StudyGroup) => {
+    Alert.alert(t('groups.moreOptions'), group.name, [
+      { text: t('groups.reportGroupAction'), onPress: () => setReportGroup(group) },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
+
+  const submitGroupReport = async (reasonCode: StudyGroupReportReason, details: string) => {
+    if (!reportGroup) return;
+    await submitStudyGroupReport({ groupId: reportGroup.id, reasonCode, details });
+    setReportGroup(null);
+    setReportNotice(t('groups.reportSubmitted'));
+  };
+
   const items: ListItem[] = query.trim()
     ? searchResults.map(entry => ({ kind: 'search' as const, entry }))
     : myGroups.map(entry => ({ kind: 'mine' as const, entry }));
@@ -85,14 +104,19 @@ export default function StudyGroupsScreen() {
     const membership = isMine ? (item.entry as MyGroupEntry).membership : null;
     const statusText = membership?.status === 'pending' ? t('groups.pendingApproval') : group.visibility === 'private' ? t('groups.privateGroup') : t('groups.publicGroup');
     return (
-      <Pressable onPress={() => router.push(`/study-groups/${group.id}` as never)} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+      <View style={styles.card}>
         <View style={styles.cardTop}>
-          <View style={styles.groupIcon}><MaterialIcons name={iconName(group.iconKey) as any} size={25} color={colors.primary} /></View>
-          <View style={styles.cardCopy}>
-            <Text style={styles.groupName} numberOfLines={1}>{group.name}</Text>
-            <Text style={styles.groupMeta} numberOfLines={1}>{group.targetExam} · {statusText}</Text>
-          </View>
-          <MaterialIcons name="chevron-right" size={22} color={colors.textTertiary} />
+          <Pressable onPress={() => router.push(`/study-groups/${group.id}` as never)} style={({ pressed }) => [styles.cardMain, pressed && styles.pressed]}>
+            <View style={styles.groupIcon}><MaterialIcons name={iconName(group.iconKey) as any} size={25} color={colors.primary} /></View>
+            <View style={styles.cardCopy}>
+              <Text style={styles.groupName} numberOfLines={1}>{group.name}</Text>
+              <Text style={styles.groupMeta} numberOfLines={1}>{group.targetExam} · {statusText}</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={22} color={colors.textTertiary} />
+          </Pressable>
+          <Pressable onPress={() => openGroupMenu(group)} style={styles.moreButton} accessibilityLabel={t('groups.moreOptions')} hitSlop={8}>
+            <MaterialIcons name="more-vert" size={22} color={colors.textSecondary} />
+          </Pressable>
         </View>
         {group.description ? <Text style={styles.description} numberOfLines={2}>{group.description}</Text> : null}
         <View style={styles.statsRow}>
@@ -100,7 +124,7 @@ export default function StudyGroupsScreen() {
           <Text style={styles.stat}><MaterialIcons name="people-outline" size={14} color={colors.textSecondary} /> {group.maxMembers} {t('groups.members')}</Text>
           {group.joinCode ? <Text style={styles.code}>{group.joinCode}</Text> : null}
         </View>
-      </Pressable>
+      </View>
     );
   };
 
@@ -135,6 +159,7 @@ export default function StudyGroupsScreen() {
         <Text style={styles.sectionLabel}>{query.trim() ? t('groups.searchGroups') : t('groups.myGroups')}</Text>
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
+      {reportNotice ? <Text style={styles.notice}>{reportNotice}</Text> : null}
       <FlatList
         data={items}
         keyExtractor={(item) => `${item.kind}-${item.kind === 'mine' ? (item.entry as MyGroupEntry).group.id : (item.entry as StudyGroup).id}`}
@@ -143,6 +168,12 @@ export default function StudyGroupsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void loadGroups(true); }} tintColor={colors.primary} />}
         ListEmptyComponent={loading ? <Text style={styles.emptyText}>{t('common.loading')}</Text> : <Text style={styles.emptyText}>{query.trim() ? t('groups.noGroups') : t('groups.noGroups')}</Text>}
         showsVerticalScrollIndicator={false}
+      />
+      <StudyGroupReportSheet
+        visible={Boolean(reportGroup)}
+        groupName={reportGroup?.name ?? ''}
+        onClose={() => setReportGroup(null)}
+        onSubmitted={submitGroupReport}
       />
     </SafeAreaView>
   );
@@ -166,11 +197,14 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   secondaryButtonText: { color: colors.primary, fontSize: FontSize.xs, fontWeight: FontWeight.semiBold },
   sectionLabel: { color: colors.textTertiary, fontSize: FontSize.xs, fontWeight: FontWeight.bold, textTransform: 'uppercase', letterSpacing: 1, marginLeft: 'auto' },
   error: { color: colors.danger, paddingHorizontal: Spacing.md, lineHeight: 19 },
+  notice: { color: colors.success, paddingHorizontal: Spacing.md, lineHeight: 19 },
   listContent: { padding: Spacing.md, paddingTop: Spacing.xs, gap: Spacing.sm, paddingBottom: 40 },
   emptyContent: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl },
   emptyText: { color: colors.textSecondary, fontSize: FontSize.md, textAlign: 'center', lineHeight: 22 },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.lg, padding: Spacing.md, gap: Spacing.sm },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  cardMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, minWidth: 0 },
+  moreButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   groupIcon: { width: 48, height: 48, borderRadius: Radius.md, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center' },
   cardCopy: { flex: 1, minWidth: 0 },
   groupName: { color: colors.textPrimary, fontSize: FontSize.lg, fontWeight: FontWeight.bold },

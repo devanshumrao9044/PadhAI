@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, Modal, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Animated, Modal, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -10,6 +10,7 @@ import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/
 import { useApp } from '@/hooks/useApp';
 import {
   archiveStudyGroup,
+  canManageStudyGroupMember,
   createStudyGroupInvite,
   formatStudyDuration,
   getMyStudyGroupMemberships,
@@ -20,23 +21,38 @@ import {
   isPadhaiOwner,
   joinStudyGroup,
   leaveStudyGroup,
+  removeStudyGroupMember,
   reviewStudyGroupMember,
+  updateStudyGroupDetails,
   updateStudyGroupIcon,
+  updateStudyGroupMemberRole,
   STUDY_GROUP_ICON_OPTIONS,
   submitStudyGroupReport,
   subscribeToStudyGroup,
+  DEFAULT_STUDY_GROUP_PERMISSIONS,
   type StudyGroup,
   type StudyGroupMember,
   type StudyGroupPendingMember,
   type StudyGroupMembership,
+  type StudyGroupPermissions,
+  type StudyGroupPermissionKey,
   type StudyGroupReportReason,
 } from '@/features/study-groups/services/studyGroups';
-
-const REPORT_REASONS: StudyGroupReportReason[] = ['spam', 'abuse', 'fake_study_time', 'inappropriate_content', 'harassment', 'privacy', 'other'];
+import StudyGroupReportSheet from '@/components/study-groups/StudyGroupReportSheet';
 
 function iconName(iconKey: string): string {
   return STUDY_GROUP_ICON_OPTIONS.find(option => option.key === iconKey)?.icon ?? 'menu-book';
 }
+
+const PERMISSION_ITEMS: { key: StudyGroupPermissionKey; labelKey: string }[] = [
+  { key: 'manageJoinRequests', labelKey: 'permissionManageRequests' },
+  { key: 'removeMembers', labelKey: 'permissionRemoveMembers' },
+  { key: 'manageInvites', labelKey: 'permissionManageInvites' },
+  { key: 'editGroup', labelKey: 'permissionEditGroup' },
+  { key: 'assignCoAdmin', labelKey: 'permissionAssignCoAdmin' },
+  { key: 'editCoAdminPermissions', labelKey: 'permissionEditCoAdminPermissions' },
+  { key: 'demoteCoAdmin', labelKey: 'permissionDemoteCoAdmin' },
+];
 
 function formatLiveDuration(startedAt: string | null): string {
   if (!startedAt) return '00:00:00';
@@ -63,14 +79,22 @@ export default function StudyGroupDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [reportTarget, setReportTarget] = useState<{ userId: string | null; label: string } | null>(null);
-  const [reportReason, setReportReason] = useState<StudyGroupReportReason>('spam');
-  const [reportDetails, setReportDetails] = useState('');
-  const [reporting, setReporting] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [manageTarget, setManageTarget] = useState<StudyGroupMember | null>(null);
+  const [permissionDraft, setPermissionDraft] = useState<StudyGroupPermissions>(DEFAULT_STUDY_GROUP_PERMISSIONS);
+  const [managing, setManaging] = useState(false);
   const [joining, setJoining] = useState(false);
   const [thankYou, setThankYou] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState('');
   const [showIconPicker, setShowIconPicker] = useState(false);
+  const [showGroupEditor, setShowGroupEditor] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editRules, setEditRules] = useState('');
+  const [editTargetExam, setEditTargetExam] = useState('');
+  const [editDailyGoal, setEditDailyGoal] = useState('120');
+  const [editMaxMembers, setEditMaxMembers] = useState('12');
+  const [savingGroup, setSavingGroup] = useState(false);
   const thankYouOpacity = useRef(new Animated.Value(0)).current;
   const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [, setLiveNow] = useState(Date.now());
@@ -93,8 +117,8 @@ export default function StudyGroupDetailScreen() {
       if (canSeeMembers) {
         const [memberRows, pendingRows, currentInvite] = await Promise.all([
           getStudyGroupMembers(groupId),
-          appOwner || myMembership?.role === 'owner' || myMembership?.role === 'admin' ? getPendingStudyGroupMembers(groupId) : Promise.resolve([]),
-          appOwner || myMembership?.role === 'owner' || myMembership?.role === 'admin' ? getStudyGroupInviteToken(groupId) : Promise.resolve(null),
+          appOwner || myMembership?.role === 'owner' || Boolean(myMembership?.permissions.manageJoinRequests) ? getPendingStudyGroupMembers(groupId) : Promise.resolve([]),
+          appOwner || myMembership?.role === 'owner' || Boolean(myMembership?.permissions.manageInvites) ? getStudyGroupInviteToken(groupId) : Promise.resolve(null),
         ]);
         setMembers(memberRows);
         setPending(pendingRows);
@@ -118,6 +142,9 @@ export default function StudyGroupDetailScreen() {
   }, [groupId, load]);
 
   const isAdmin = ownerAccess || membership?.role === 'owner' || membership?.role === 'admin';
+  const canEditGroup = ownerAccess || membership?.role === 'owner' || Boolean(membership?.permissions.editGroup);
+  const canManageInvites = ownerAccess || membership?.role === 'owner' || Boolean(membership?.permissions.manageInvites);
+  const canManageJoinRequests = ownerAccess || membership?.role === 'owner' || Boolean(membership?.permissions.manageJoinRequests);
   const isApprovedMember = ownerAccess || membership?.status === 'approved';
   const studyingMembers = members.filter(member => member.presenceStatus === 'studying');
   const groupTotal = members.reduce((sum, member) => sum + member.todayMinutes, 0);
@@ -135,18 +162,72 @@ export default function StudyGroupDetailScreen() {
     }, 3200);
   };
 
-  const submitReport = async () => {
-    if (!groupId || !user?.id || !reportTarget) return;
-    setReporting(true);
+  const submitReport = async (reasonCode: StudyGroupReportReason, details: string) => {
+    if (!groupId) return;
+    await submitStudyGroupReport({ groupId, reasonCode, details });
+    showNotice(t('groups.reportSubmitted'));
+  };
+
+  const canManageTargetAction = (action: 'demote' | 'remove', permissionKey: 'demoteCoAdmin' | 'removeMembers') => {
+    if (!manageTarget) return false;
+    const actorRole = ownerAccess ? 'owner' : membership?.role ?? 'member';
+    const hasPermission = ownerAccess || membership?.role === 'owner' || Boolean(membership?.permissions[permissionKey]);
+    return canManageStudyGroupMember(actorRole, manageTarget.role, action, hasPermission);
+  };
+
+  const openMemberManager = (member: StudyGroupMember) => {
+    if (member.userId === user?.id || member.role === 'owner') return;
+    const actorRole = ownerAccess ? 'owner' : membership?.role ?? 'member';
+    const action = member.role === 'admin' ? 'editPermissions' : 'promote';
+    const permissionKey = member.role === 'admin' ? 'editCoAdminPermissions' : 'assignCoAdmin';
+    const hasPermission = ownerAccess || membership?.role === 'owner' || Boolean(membership?.permissions[permissionKey]);
+    if (!canManageStudyGroupMember(actorRole, member.role, action, hasPermission)) return;
+    setPermissionDraft(member.role === 'admin' ? member.permissions : { ...DEFAULT_STUDY_GROUP_PERMISSIONS });
+    setManageTarget(member);
+  };
+
+  const saveMemberPermissions = async () => {
+    if (!manageTarget) return;
+    setManaging(true);
     try {
-      await submitStudyGroupReport({ groupId, reporterId: user.id, reportedUserId: reportTarget.userId, reasonCode: reportReason, details: reportDetails });
-      setReportTarget(null);
-      setReportDetails('');
-      showNotice(t('groups.reportSubmitted'));
-    } catch (reportError) {
-      setError(reportError instanceof Error ? reportError.message : 'Could not submit the report.');
+      await updateStudyGroupMemberRole({ membershipId: manageTarget.membershipId, role: 'admin', permissions: permissionDraft });
+      setManageTarget(null);
+      showNotice(t('groups.permissionsUpdated'));
+      await load(true);
+    } catch (manageError) {
+      setError(manageError instanceof Error ? manageError.message : 'Could not update member permissions.');
     } finally {
-      setReporting(false);
+      setManaging(false);
+    }
+  };
+
+  const demoteMember = async () => {
+    if (!manageTarget) return;
+    setManaging(true);
+    try {
+      await updateStudyGroupMemberRole({ membershipId: manageTarget.membershipId, role: 'member', permissions: DEFAULT_STUDY_GROUP_PERMISSIONS });
+      setManageTarget(null);
+      showNotice(t('groups.permissionsUpdated'));
+      await load(true);
+    } catch (manageError) {
+      setError(manageError instanceof Error ? manageError.message : 'Could not demote the co-admin.');
+    } finally {
+      setManaging(false);
+    }
+  };
+
+  const removeMember = async () => {
+    if (!manageTarget) return;
+    setManaging(true);
+    try {
+      await removeStudyGroupMember(manageTarget.membershipId);
+      setManageTarget(null);
+      showNotice(t('groups.memberRemoved'));
+      await load(true);
+    } catch (manageError) {
+      setError(manageError instanceof Error ? manageError.message : 'Could not remove the member.');
+    } finally {
+      setManaging(false);
     }
   };
 
@@ -160,6 +241,41 @@ export default function StudyGroupDetailScreen() {
       setError(joinError instanceof Error ? joinError.message : 'Could not join this group.');
     } finally {
       setJoining(false);
+    }
+  };
+
+  const openGroupEditor = () => {
+    if (!group || !canEditGroup) return;
+    setEditName(group.name);
+    setEditDescription(group.description);
+    setEditRules(group.rules);
+    setEditTargetExam(group.targetExam);
+    setEditDailyGoal(String(group.dailyGoalMinutes));
+    setEditMaxMembers(String(group.maxMembers));
+    setShowGroupEditor(true);
+  };
+
+  const saveGroupDetails = async () => {
+    if (!group) return;
+    setSavingGroup(true);
+    setError('');
+    try {
+      await updateStudyGroupDetails({
+        groupId: group.id,
+        name: editName,
+        description: editDescription,
+        rules: editRules,
+        targetExam: editTargetExam,
+        dailyGoalMinutes: Number(editDailyGoal),
+        maxMembers: Number(editMaxMembers),
+      });
+      setShowGroupEditor(false);
+      showNotice(t('groups.permissionsUpdated'));
+      await load(true);
+    } catch (editError) {
+      setError(editError instanceof Error ? editError.message : 'Could not update the group.');
+    } finally {
+      setSavingGroup(false);
     }
   };
 
@@ -220,6 +336,10 @@ export default function StudyGroupDetailScreen() {
   const renderMember = (member: StudyGroupMember) => {
     const label = member.userId === user?.id ? 'You' : member.name;
     const liveDuration = member.presenceStatus === 'studying' || member.presenceStatus === 'paused' ? formatLiveDuration(member.presenceStartedAt) : formatStudyDuration(member.todayMinutes);
+    const actorRole = ownerAccess ? 'owner' : membership?.role ?? 'member';
+    const memberAction = member.role === 'admin' ? 'editPermissions' : 'promote';
+    const memberPermission = member.role === 'admin' ? 'editCoAdminPermissions' : 'assignCoAdmin';
+    const canOpenManager = member.userId !== user?.id && member.role !== 'owner' && canManageStudyGroupMember(actorRole, member.role, memberAction, ownerAccess || membership?.role === 'owner' || Boolean(membership?.permissions[memberPermission]));
     return (
       <View key={member.membershipId} style={styles.memberCard}>
         <View style={[styles.memberIcon, member.presenceStatus === 'studying' && styles.memberIconLive]}>
@@ -233,7 +353,7 @@ export default function StudyGroupDetailScreen() {
           <Text style={[styles.memberTime, member.presenceStatus === 'studying' && styles.liveText]}>{liveDuration}</Text>
           <Text style={styles.memberToday}>{member.presenceStatus === 'studying' ? 'live' : t('groups.today')}</Text>
         </View>
-        {member.userId !== user?.id ? <Pressable onPress={() => setReportTarget({ userId: member.userId, label: member.name })} style={styles.moreButton} accessibilityLabel={t('groups.reportMember')}><MaterialIcons name="flag" size={18} color={colors.textTertiary} /></Pressable> : null}
+        {canOpenManager ? <Pressable onLongPress={() => openMemberManager(member)} delayLongPress={420} style={styles.memberManageHint} accessibilityLabel={t('groups.memberActions')}><MaterialIcons name="more-horiz" size={20} color={colors.textTertiary} /></Pressable> : null}
       </View>
     );
   };
@@ -245,7 +365,7 @@ export default function StudyGroupDetailScreen() {
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.headerButton}><MaterialIcons name="arrow-back" size={22} color={colors.textPrimary} /></Pressable>
         <View style={styles.headerCopy}><Text style={styles.title} numberOfLines={1}>{group?.name ?? t('groups.title')}</Text><Text style={styles.subtitle}>{group?.targetExam ?? ''}</Text></View>
-        <Pressable onPress={() => setReportTarget({ userId: null, label: group?.name ?? 'group' })} style={styles.headerButton} accessibilityLabel={t('groups.reportGroup')}><MaterialIcons name="flag" size={20} color={colors.textSecondary} /></Pressable>
+        <Pressable onPress={() => setReportOpen(true)} style={styles.headerButton} accessibilityLabel={t('groups.reportGroup')}><MaterialIcons name="flag" size={20} color={colors.textSecondary} /></Pressable>
       </View>
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void load(true); }} tintColor={colors.primary} />}>
         {group ? <>
@@ -269,9 +389,9 @@ export default function StudyGroupDetailScreen() {
           </> : membership?.status === 'pending' ? <View style={styles.pendingCard}><MaterialIcons name="hourglass-top" size={22} color={colors.warning} /><Text style={styles.pendingText}>{t('groups.pendingApproval')}</Text></View> : <View style={styles.pendingCard}><MaterialIcons name="public" size={22} color={colors.primary} /><Text style={styles.pendingText}>{t('groups.requestToJoin')}</Text><Pressable onPress={() => { void joinPublicGroup(); }} disabled={joining} style={styles.smallApprove}><Text style={styles.smallApproveText}>{joining ? '…' : t('groups.joinGroup')}</Text></Pressable></View>}
 
           {isAdmin ? <View style={styles.adminCard}>
-            <View style={styles.adminHeader}><Text style={styles.sectionTitle}>{t('groups.manageRequests')}</Text><Text style={styles.adminCount}>{pending.length}</Text></View>
-            {pending.length === 0 ? <Text style={styles.body}>{t('groups.noMembers')}</Text> : pending.map(request => <View key={request.membershipId} style={styles.requestRow}><View style={styles.requestCopy}><Text style={styles.requestName}>{request.name}</Text><Text style={styles.memberStatus}>Pending request</Text></View><Pressable onPress={() => { void reviewStudyGroupMember(request.membershipId, 'approved').then(() => load(true)); }} style={styles.smallApprove}><Text style={styles.smallApproveText}>{t('groups.approve')}</Text></Pressable><Pressable onPress={() => { void reviewStudyGroupMember(request.membershipId, 'rejected').then(() => load(true)); }} style={styles.smallReject}><Text style={styles.smallRejectText}>{t('groups.reject')}</Text></Pressable></View>)}
-            <View style={styles.adminActions}>{inviteToken ? <><Pressable onPress={() => { void copyInvite(); }} style={styles.outlineButton}><MaterialIcons name="content-copy" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.copyLink')}</Text></Pressable><Pressable onPress={() => { void shareInvite(); }} style={styles.outlineButton}><MaterialIcons name="share" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.shareInvite')}</Text></Pressable></> : null}<Pressable onPress={() => { void regenerateInvite(); }} style={styles.outlineButton}><MaterialIcons name="refresh" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.inviteLink')}</Text></Pressable></View>
+            {canManageJoinRequests ? <><View style={styles.adminHeader}><Text style={styles.sectionTitle}>{t('groups.manageRequests')}</Text><Text style={styles.adminCount}>{pending.length}</Text></View>{pending.length === 0 ? <Text style={styles.body}>{t('groups.noMembers')}</Text> : pending.map(request => <View key={request.membershipId} style={styles.requestRow}><View style={styles.requestCopy}><Text style={styles.requestName}>{request.name}</Text><Text style={styles.memberStatus}>Pending request</Text></View><Pressable onPress={() => { void reviewStudyGroupMember(request.membershipId, 'approved').then(() => load(true)); }} style={styles.smallApprove}><Text style={styles.smallApproveText}>{t('groups.approve')}</Text></Pressable><Pressable onPress={() => { void reviewStudyGroupMember(request.membershipId, 'rejected').then(() => load(true)); }} style={styles.smallReject}><Text style={styles.smallRejectText}>{t('groups.reject')}</Text></Pressable></View>)}</> : null}
+            {canEditGroup ? <Pressable onPress={openGroupEditor} style={styles.outlineButton}><MaterialIcons name="edit" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.permissionEditGroup')}</Text></Pressable> : null}
+            {canManageInvites ? <View style={styles.adminActions}>{inviteToken ? <><Pressable onPress={() => { void copyInvite(); }} style={styles.outlineButton}><MaterialIcons name="content-copy" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.copyLink')}</Text></Pressable><Pressable onPress={() => { void shareInvite(); }} style={styles.outlineButton}><MaterialIcons name="share" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.shareInvite')}</Text></Pressable></> : null}<Pressable onPress={() => { void regenerateInvite(); }} style={styles.outlineButton}><MaterialIcons name="refresh" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.inviteLink')}</Text></Pressable></View> : null}
             {membership?.role === 'owner' || ownerAccess ? <Pressable onPress={() => { Alert.alert(t('groups.leaveGroup'), t('groups.leaveConfirm'), [{ text: t('common.cancel'), style: 'cancel' }, { text: 'Archive', style: 'destructive', onPress: async () => { try { await archiveStudyGroup(group.id); router.replace('/study-groups' as never); } catch (archiveError) { setError(archiveError instanceof Error ? archiveError.message : 'Could not archive the group.'); } } }]); }} style={styles.archiveButton}><Text style={styles.archiveText}>Archive group</Text></Pressable> : null}
           </View> : null}
           {isApprovedMember && membership?.role !== 'owner' ? <Pressable onPress={handleLeave} style={styles.leaveButton}><Text style={styles.leaveText}>{t('groups.leaveGroup')}</Text></Pressable> : null}
@@ -283,8 +403,12 @@ export default function StudyGroupDetailScreen() {
       <Modal visible={showIconPicker} transparent animationType="slide" onRequestClose={() => setShowIconPicker(false)}>
         <View style={styles.modalOverlay}><View style={styles.modalCard}><Text style={styles.modalTitle}>{t('groups.chooseIcon')}</Text><Text style={styles.modalSubtitle}>{t('groups.iconHint')}</Text><View style={styles.iconGrid}>{STUDY_GROUP_ICON_OPTIONS.map(option => <Pressable key={option.key} onPress={() => { void chooseIcon(option.key); }} style={styles.reasonRow}><View style={styles.iconPickerChoice}><MaterialIcons name={option.icon as any} size={25} color={colors.primary} /></View><Text style={styles.reasonText}>{option.key}</Text></Pressable>)}</View><Pressable onPress={() => setShowIconPicker(false)} style={styles.cancelButton}><Text style={styles.cancelText}>{t('common.close')}</Text></Pressable></View></View>
       </Modal>
-      <Modal visible={Boolean(reportTarget)} transparent animationType="slide" onRequestClose={() => setReportTarget(null)}>
-        <View style={styles.modalOverlay}><View style={styles.modalCard}><Text style={styles.modalTitle}>{t('groups.reportTitle')}</Text><Text style={styles.modalSubtitle}>{reportTarget?.label}</Text><Text style={styles.modalLabel}>{t('groups.reportReason')}</Text>{REPORT_REASONS.map(reason => <Pressable key={reason} onPress={() => setReportReason(reason)} style={styles.reasonRow}><MaterialIcons name={reportReason === reason ? 'radio-button-checked' : 'radio-button-unchecked'} size={20} color={reportReason === reason ? colors.primary : colors.textTertiary} /><Text style={styles.reasonText}>{t(`groups.reason${reason === 'fake_study_time' ? 'FakeStudy' : reason === 'inappropriate_content' ? 'Inappropriate' : reason.charAt(0).toUpperCase() + reason.slice(1)}` as any)}</Text></Pressable>)}<TextInput value={reportDetails} onChangeText={setReportDetails} placeholder={t('groups.reportDetails')} placeholderTextColor={colors.textTertiary} style={[styles.detailsInput, styles.multiline]} maxLength={1000} multiline /><View style={styles.modalActions}><Pressable onPress={() => setReportTarget(null)} style={styles.cancelButton}><Text style={styles.cancelText}>{t('common.cancel')}</Text></Pressable><Pressable onPress={() => { void submitReport(); }} disabled={reporting} style={styles.modalSubmit}><Text style={styles.primaryText}>{reporting ? t('common.loading') : t('groups.reportSubmit')}</Text></Pressable></View></View></View>
+      <Modal visible={showGroupEditor} transparent animationType="slide" onRequestClose={() => setShowGroupEditor(false)}>
+        <View style={styles.modalOverlay}><View style={styles.modalCard}><Text style={styles.modalTitle}>{t('groups.permissionEditGroup')}</Text><TextInput value={editName} onChangeText={setEditName} placeholder={t('groups.groupName')} placeholderTextColor={colors.textTertiary} style={styles.editorInput} maxLength={60} /><TextInput value={editDescription} onChangeText={setEditDescription} placeholder={t('groups.description')} placeholderTextColor={colors.textTertiary} style={[styles.editorInput, styles.multiline]} maxLength={240} multiline textAlignVertical="top" /><TextInput value={editRules} onChangeText={setEditRules} placeholder={t('groups.rules')} placeholderTextColor={colors.textTertiary} style={[styles.editorInput, styles.multiline]} maxLength={2000} multiline textAlignVertical="top" /><TextInput value={editTargetExam} onChangeText={setEditTargetExam} placeholder={t('groups.targetExam')} placeholderTextColor={colors.textTertiary} style={styles.editorInput} maxLength={40} /><View style={styles.editorRow}><TextInput value={editDailyGoal} onChangeText={setEditDailyGoal} placeholder={t('groups.dailyGoal')} placeholderTextColor={colors.textTertiary} style={[styles.editorInput, styles.editorHalf]} keyboardType="number-pad" /><TextInput value={editMaxMembers} onChangeText={setEditMaxMembers} placeholder={t('groups.maxMembers')} placeholderTextColor={colors.textTertiary} style={[styles.editorInput, styles.editorHalf]} keyboardType="number-pad" /></View><View style={styles.modalActions}><Pressable onPress={() => setShowGroupEditor(false)} style={styles.cancelButton}><Text style={styles.cancelText}>{t('common.cancel')}</Text></Pressable><Pressable onPress={() => { void saveGroupDetails(); }} disabled={savingGroup} style={[styles.modalSubmit, savingGroup && styles.disabled]}><Text style={styles.primaryText}>{savingGroup ? t('common.loading') : t('groups.savePermissions')}</Text></Pressable></View></View></View>
+      </Modal>
+      <StudyGroupReportSheet visible={reportOpen} groupName={group?.name ?? ''} onClose={() => setReportOpen(false)} onSubmitted={submitReport} />
+      <Modal visible={Boolean(manageTarget)} transparent animationType="slide" onRequestClose={() => setManageTarget(null)}>
+        <View style={styles.modalOverlay}><View style={styles.modalCard}><Text style={styles.modalTitle}>{t('groups.permissionsTitle')}</Text><Text style={styles.modalSubtitle}>{manageTarget?.name}</Text><Text style={styles.body}>{t('groups.permissionsHint')}</Text>{PERMISSION_ITEMS.map(item => <View key={item.key} style={styles.permissionRow}><Text style={styles.reasonText}>{t(`groups.${item.labelKey}` as any)}</Text><Switch value={permissionDraft[item.key]} onValueChange={value => setPermissionDraft(current => ({ ...current, [item.key]: value }))} trackColor={{ false: colors.border, true: colors.primary + '88' }} thumbColor={permissionDraft[item.key] ? colors.primary : colors.textTertiary} /></View>)}<View style={styles.modalActions}><Pressable onPress={() => setManageTarget(null)} style={styles.cancelButton}><Text style={styles.cancelText}>{t('common.cancel')}</Text></Pressable><Pressable onPress={() => { void saveMemberPermissions(); }} disabled={managing} style={[styles.modalSubmit, managing && styles.disabled]}><Text style={styles.primaryText}>{managing ? t('common.loading') : manageTarget?.role === 'admin' ? t('groups.savePermissions') : t('groups.makeCoAdmin')}</Text></Pressable></View>{manageTarget?.role === 'admin' && canManageTargetAction('demote', 'demoteCoAdmin') ? <Pressable onPress={() => { void demoteMember(); }} disabled={managing} style={styles.demoteButton}><Text style={styles.demoteText}>{t('groups.demoteCoAdmin')}</Text></Pressable> : null}{canManageTargetAction('remove', 'removeMembers') ? <Pressable onPress={() => { void removeMember(); }} disabled={managing} style={styles.removeButton}><Text style={styles.removeText}>{t('groups.removeMember')}</Text></Pressable> : null}</View></View>
       </Modal>
       {thankYou ? <Animated.View style={[styles.thankYou, { opacity: thankYouOpacity }]}><MaterialIcons name="check-circle" size={27} color={colors.success} /><Text style={styles.thankYouText}>{noticeMessage}</Text></Animated.View> : null}
     </SafeAreaView>
@@ -328,7 +452,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   memberTimeBlock: { alignItems: 'flex-end' },
   memberTime: { color: colors.textPrimary, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   memberToday: { color: colors.textTertiary, fontSize: FontSize.xs, marginTop: 2 },
-  moreButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  memberManageHint: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   pendingCard: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center', backgroundColor: colors.warning + '16', borderWidth: 1, borderColor: colors.warning + '55', borderRadius: Radius.md, padding: Spacing.md },
   pendingText: { color: colors.textPrimary, flex: 1, lineHeight: 20 },
   adminCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.lg, padding: Spacing.md, gap: Spacing.sm, marginTop: Spacing.sm },
@@ -352,16 +476,25 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   emptyText: { color: colors.textSecondary, textAlign: 'center', padding: Spacing.md },
   error: { color: colors.danger, lineHeight: 20, marginTop: Spacing.sm },
   pressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
+  disabled: { opacity: 0.55 },
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: colors.overlay },
   modalCard: { backgroundColor: colors.surface, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.lg, gap: Spacing.sm, maxHeight: '92%' },
   modalTitle: { color: colors.textPrimary, fontSize: FontSize.xl, fontWeight: FontWeight.bold },
   modalSubtitle: { color: colors.textSecondary, fontSize: FontSize.sm, marginBottom: Spacing.sm },
   modalLabel: { color: colors.textPrimary, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
+  permissionRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
+  demoteButton: { paddingVertical: 11, alignItems: 'center' },
+  demoteText: { color: colors.warning, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
+  removeButton: { paddingVertical: 11, alignItems: 'center' },
+  removeText: { color: colors.danger, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
   reasonRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 6 },
   iconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   iconPickerChoice: { width: 42, height: 42, borderRadius: Radius.md, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
   reasonText: { color: colors.textSecondary, flex: 1, lineHeight: 19 },
   detailsInput: { borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, backgroundColor: colors.background, color: colors.textPrimary, minHeight: 84, padding: Spacing.sm, textAlignVertical: 'top' },
+  editorInput: { borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, backgroundColor: colors.background, color: colors.textPrimary, minHeight: 48, paddingHorizontal: Spacing.sm, paddingVertical: 10 },
+  editorRow: { flexDirection: 'row', gap: Spacing.sm },
+  editorHalf: { flex: 1 },
   multiline: { textAlignVertical: 'top' },
   modalActions: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm },
   cancelButton: { flex: 1, minHeight: 48, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },

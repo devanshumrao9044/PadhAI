@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { formatStudyDuration, PRESENCE_STALE_AFTER_MS, STUDY_GROUP_ICON_OPTIONS } from './studyGroupsPolicy.ts';
+import { canManageStudyGroupMember, formatStudyDuration, PRESENCE_STALE_AFTER_MS, STUDY_GROUP_ICON_OPTIONS, normalizeStudyGroupPermissions } from './studyGroupsPolicy.ts';
 
 test('formats group study duration without negative or fractional minutes', () => {
   assert.equal(formatStudyDuration(-5), '0m');
@@ -23,4 +23,24 @@ test('uses a bounded presence-stale window for offline fallback', () => {
   assert.equal(PRESENCE_STALE_AFTER_MS, 90_000);
   assert.ok(PRESENCE_STALE_AFTER_MS >= 60_000);
   assert.ok(PRESENCE_STALE_AFTER_MS <= 120_000);
+});
+
+test('co-admin hierarchy allows approved member promotion but never owner changes', () => {
+  assert.equal(canManageStudyGroupMember('owner', 'member', 'promote', true), true);
+  assert.equal(canManageStudyGroupMember('admin', 'member', 'promote', true), true);
+  assert.equal(canManageStudyGroupMember('admin', 'owner', 'promote', true), false);
+  assert.equal(canManageStudyGroupMember('member', 'member', 'promote', true), false);
+});
+
+test('co-admin cannot edit another co-admin without the saved permission', () => {
+  assert.equal(canManageStudyGroupMember('admin', 'admin', 'editPermissions', false), false);
+  assert.equal(canManageStudyGroupMember('admin', 'admin', 'editPermissions', true), true);
+  assert.equal(canManageStudyGroupMember('admin', 'admin', 'demote', true), true);
+});
+
+test('permission normalizer keeps boolean keys bounded and preserves the optional join-request default', () => {
+  const permissions = normalizeStudyGroupPermissions({ remove_members: false, unknown: true });
+  assert.equal(permissions.removeMembers, false);
+  assert.equal(permissions.manageJoinRequests, false);
+  assert.equal('unknown' in permissions, false);
 });

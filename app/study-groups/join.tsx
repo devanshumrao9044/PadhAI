@@ -11,10 +11,13 @@ import {
   getStudyGroupByInvite,
   joinStudyGroup,
   STUDY_GROUP_ICON_OPTIONS,
+  submitStudyGroupReport,
   updateStudyGroupIcon,
   type StudyGroup,
   type StudyGroupIconKey,
+  type StudyGroupReportReason,
 } from '@/features/study-groups/services/studyGroups';
+import StudyGroupReportSheet from '@/components/study-groups/StudyGroupReportSheet';
 
 function iconName(iconKey: string): string {
   return STUDY_GROUP_ICON_OPTIONS.find(option => option.key === iconKey)?.icon ?? 'menu-book';
@@ -34,6 +37,13 @@ export default function JoinStudyGroupScreen() {
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [reportOpen, setReportOpen] = useState(false);
+
+  const submitGroupReport = async (reasonCode: StudyGroupReportReason, details: string) => {
+    if (!group) return;
+    await submitStudyGroupReport({ groupId: group.id, inviteToken: token, reasonCode, details });
+    setMessage(t('groups.reportSubmitted'));
+  };
 
   const preview = async () => {
     if (!token.trim()) {
@@ -97,6 +107,9 @@ export default function JoinStudyGroupScreen() {
                 <Text style={styles.groupName}>{group.name}</Text>
                 <Text style={styles.groupMeta}>{group.targetExam} · {group.maxMembers} {t('groups.members')}</Text>
               </View>
+              <Pressable onPress={() => setReportOpen(true)} style={styles.moreButton} accessibilityLabel={t('groups.moreOptions')}>
+                <MaterialIcons name="more-vert" size={22} color={colors.textSecondary} />
+              </Pressable>
             </View>
             {group.description ? <Text style={styles.body}>{group.description}</Text> : null}
             <Text style={styles.sectionTitle}>{t('groups.rules')}</Text>
@@ -116,6 +129,7 @@ export default function JoinStudyGroupScreen() {
         ) : null}
         {message ? <View style={styles.successBox}><MaterialIcons name="check-circle" size={25} color={colors.success} /><Text style={styles.successText}>{message}</Text></View> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
+        <StudyGroupReportSheet visible={reportOpen} groupName={group?.name ?? ''} onClose={() => setReportOpen(false)} onSubmitted={submitGroupReport} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -134,7 +148,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   previewCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.lg, padding: Spacing.md, marginTop: Spacing.md, gap: Spacing.sm },
   groupHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   groupIcon: { width: 52, height: 52, borderRadius: Radius.md, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center' },
-  groupCopy: { flex: 1 },
+  groupCopy: { flex: 1, minWidth: 0 },
+  moreButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   groupName: { color: colors.textPrimary, fontSize: FontSize.xl, fontWeight: FontWeight.bold },
   groupMeta: { color: colors.textSecondary, fontSize: FontSize.sm, marginTop: 3 },
   sectionTitle: { color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.bold, marginTop: Spacing.sm },

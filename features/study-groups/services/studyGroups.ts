@@ -1,7 +1,21 @@
 import { supabase } from '@/features/core/services/supabase';
-import { formatStudyDuration, PRESENCE_STALE_AFTER_MS, STUDY_GROUP_ICON_OPTIONS } from './studyGroupsPolicy';
+import {
+  formatStudyDuration,
+  normalizeStudyGroupPermissions,
+  PRESENCE_STALE_AFTER_MS,
+  STUDY_GROUP_ICON_OPTIONS,
+  type StudyGroupPermissions,
+} from './studyGroupsPolicy';
 
-export { formatStudyDuration, PRESENCE_STALE_AFTER_MS, STUDY_GROUP_ICON_OPTIONS } from './studyGroupsPolicy';
+export {
+  canManageStudyGroupMember,
+  DEFAULT_STUDY_GROUP_PERMISSIONS,
+  formatStudyDuration,
+  normalizeStudyGroupPermissions,
+  PRESENCE_STALE_AFTER_MS,
+  STUDY_GROUP_ICON_OPTIONS,
+} from './studyGroupsPolicy';
+export type { StudyGroupPermissionKey, StudyGroupPermissions } from './studyGroupsPolicy';
 
 export type StudyGroupIconKey = typeof STUDY_GROUP_ICON_OPTIONS[number]['key'];
 export type StudyGroupVisibility = 'private' | 'public';
@@ -15,6 +29,8 @@ export type StudyGroupReportReason =
   | 'inappropriate_content'
   | 'harassment'
   | 'privacy'
+  | 'scam_or_fraud'
+  | 'unsafe_or_illegal_content'
   | 'other';
 export type StudyGroupReportStatus = 'pending' | 'reviewed' | 'actioned' | 'dismissed';
 export type StudyGroupTicketCategory = 'bug' | 'account' | 'study_group' | 'report_follow_up' | 'feature_request' | 'other';
@@ -44,6 +60,7 @@ export interface StudyGroupMember {
   name: string;
   avatarUrl: string | null;
   role: StudyGroupMemberRole;
+  permissions: StudyGroupPermissions;
   status: StudyGroupMemberStatus;
   iconKey: string;
   presenceStatus: StudyGroupPresenceStatus;
@@ -59,6 +76,7 @@ export interface StudyGroupMembership {
   groupId: string;
   userId: string;
   role: StudyGroupMemberRole;
+  permissions: StudyGroupPermissions;
   status: StudyGroupMemberStatus;
   iconKey: string;
   joinedAt: string;
@@ -157,6 +175,7 @@ function mapMembership(row: any): StudyGroupMembership {
     groupId: String(row.group_id),
     userId: String(row.user_id),
     role: row.role === 'owner' || row.role === 'admin' ? row.role : 'member',
+    permissions: normalizeStudyGroupPermissions(row.permissions),
     status: row.status === 'approved' || row.status === 'rejected' ? row.status : 'pending',
     iconKey: String(row.icon_key ?? 'books'),
     joinedAt: String(row.joined_at ?? row.created_at ?? new Date(0).toISOString()),
@@ -181,6 +200,7 @@ function mapMember(row: any, now = Date.now()): StudyGroupMember {
     name: String(row.name ?? 'Student'),
     avatarUrl: row.avatar_url ? String(row.avatar_url) : null,
     role: row.role === 'owner' || row.role === 'admin' ? row.role : 'member',
+    permissions: normalizeStudyGroupPermissions(row.permissions),
     status: 'approved',
     iconKey: String(row.icon_key ?? 'books'),
     presenceStatus,
@@ -299,14 +319,11 @@ export async function getStudyGroupByInvite(token: string): Promise<StudyGroup |
 }
 
 export async function getMyStudyGroupMemberships(userId: string): Promise<StudyGroupMembership[]> {
-  const { data, error } = await supabase
-    .from('study_group_members')
-    .select('id,group_id,user_id,role,status,icon_key,joined_at,approved_at,created_at')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(100);
+  const { data, error } = await supabase.rpc('get_my_study_group_memberships');
   throwIfError(error);
-  return (data ?? []).map(mapMembership);
+  return (data ?? [])
+    .filter((row: any) => String(row.user_id) === userId)
+    .map(mapMembership);
 }
 
 export async function joinStudyGroup(groupId: string, inviteToken?: string | null): Promise<StudyGroupMemberStatus> {
@@ -343,6 +360,53 @@ export async function reviewStudyGroupMember(membershipId: string, status: 'appr
     p_membership_id: membershipId,
     p_status: status,
   });
+  throwIfError(error);
+}
+
+export async function updateStudyGroupDetails(input: {
+  groupId: string;
+  name: string;
+  description: string;
+  rules: string;
+  targetExam: string;
+  dailyGoalMinutes: number;
+  maxMembers: number;
+}): Promise<void> {
+  const { error } = await supabase.rpc('update_study_group_details', {
+    p_group_id: input.groupId,
+    p_name: input.name.trim(),
+    p_description: input.description.trim(),
+    p_rules: input.rules.trim(),
+    p_target_exam: input.targetExam.trim(),
+    p_daily_goal_minutes: input.dailyGoalMinutes,
+    p_max_members: input.maxMembers,
+  });
+  throwIfError(error);
+}
+
+export async function updateStudyGroupMemberRole(input: {
+  membershipId: string;
+  role: 'admin' | 'member';
+  permissions: StudyGroupPermissions;
+}): Promise<void> {
+  const { error } = await supabase.rpc('update_study_group_member_role', {
+    p_membership_id: input.membershipId,
+    p_role: input.role,
+    p_permissions: {
+      manage_join_requests: input.permissions.manageJoinRequests,
+      remove_members: input.permissions.removeMembers,
+      manage_invites: input.permissions.manageInvites,
+      edit_group: input.permissions.editGroup,
+      assign_co_admin: input.permissions.assignCoAdmin,
+      edit_co_admin_permissions: input.permissions.editCoAdminPermissions,
+      demote_co_admin: input.permissions.demoteCoAdmin,
+    },
+  });
+  throwIfError(error);
+}
+
+export async function removeStudyGroupMember(membershipId: string): Promise<void> {
+  const { error } = await supabase.rpc('remove_study_group_member', { p_membership_id: membershipId });
   throwIfError(error);
 }
 
@@ -429,17 +493,15 @@ export async function recordStudyGroupSession(input: StudyGroupSessionInput): Pr
 
 export async function submitStudyGroupReport(input: {
   groupId: string;
-  reporterId: string;
-  reportedUserId?: string | null;
+  inviteToken?: string | null;
   reasonCode: StudyGroupReportReason;
   details?: string;
 }): Promise<void> {
-  const { error } = await supabase.from('study_group_reports').insert({
-    group_id: input.groupId,
-    reporter_id: input.reporterId,
-    reported_user_id: input.reportedUserId ?? null,
-    reason_code: input.reasonCode,
-    details: input.details?.trim() ?? '',
+  const { error } = await supabase.rpc('submit_study_group_report', {
+    p_group_id: input.groupId,
+    p_invite_token: input.inviteToken?.trim() || null,
+    p_reason_code: input.reasonCode,
+    p_details: input.details?.trim() ?? '',
   });
   throwIfError(error);
 }
