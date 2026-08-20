@@ -80,7 +80,7 @@ export default function OnboardingScreen() {
       }
       await setOnboarded(true);
       setLoading(false);
-      router.replace('/first-time-help');
+      router.replace('/first-time-help' as Parameters<typeof router.replace>[0]);
     } catch (error: any) {
       setLoading(false);
       Alert.alert(t('onboarding.saveErrorTitle'), error?.message || t('onboarding.saveErrorMessage'));
