@@ -1,4 +1,5 @@
 import * as ImageManipulator from 'expo-image-manipulator';
+import { chooseSmallerPdf, compressPdfBytes } from './pdfCompression.ts';
 import {
   formatAttachmentSize,
   NOTIFICATION_MAX_IMAGE_DIMENSION,
@@ -14,6 +15,7 @@ export {
   NOTIFICATION_MAX_IMAGE_DIMENSION,
   NOTIFICATION_MAX_IMAGE_OUTPUT_BYTES,
   NOTIFICATION_MAX_PDF_BYTES,
+  NOTIFICATION_MAX_PDF_SOURCE_BYTES,
   NOTIFICATION_MAX_SOURCE_BYTES,
 } from './notificationAttachmentsPolicy.ts';
 
@@ -61,14 +63,29 @@ export async function prepareNotificationImage(asset: FileAsset): Promise<Prepar
 
 export async function prepareNotificationPdf(asset: FileAsset): Promise<PreparedNotificationAttachment> {
   validateNotificationPdfAsset(asset);
-  const body = await readUri(asset.uri);
-  if (body.byteLength < 1 || body.byteLength > NOTIFICATION_MAX_PDF_BYTES) {
-    throw new Error(`PDF must be smaller than ${formatAttachmentSize(NOTIFICATION_MAX_PDF_BYTES)}.`);
+  const originalBody = await readUri(asset.uri);
+  if (originalBody.byteLength < 1) {
+    throw new Error('The selected PDF is empty.');
   }
+
+  let preparedBody = originalBody;
+  try {
+    const compressedBody = await compressPdfBytes(originalBody);
+    preparedBody = chooseSmallerPdf(preparedBody, compressedBody);
+  } catch {
+    if (originalBody.byteLength > NOTIFICATION_MAX_PDF_BYTES) {
+      throw new Error('This PDF could not be compressed safely. Please choose a simpler PDF under 3.0 MB.');
+    }
+  }
+
+  if (preparedBody.byteLength > NOTIFICATION_MAX_PDF_BYTES) {
+    throw new Error(`The compressed PDF is still ${formatAttachmentSize(preparedBody.byteLength)}. Choose a simpler PDF under ${formatAttachmentSize(NOTIFICATION_MAX_PDF_BYTES)}.`);
+  }
+
   return {
-    body,
+    body: preparedBody,
     mimeType: 'application/pdf',
-    sizeBytes: body.byteLength,
+    sizeBytes: preparedBody.byteLength,
     extension: 'pdf',
     displayName: asset.fileName ?? asset.name ?? 'notification-document.pdf',
   };

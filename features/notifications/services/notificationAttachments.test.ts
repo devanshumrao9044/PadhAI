@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   NOTIFICATION_MAX_PDF_BYTES,
+  NOTIFICATION_MAX_PDF_SOURCE_BYTES,
   NOTIFICATION_MAX_SOURCE_BYTES,
   validateNotificationImageAsset,
   validateNotificationPdfAsset,
@@ -40,13 +41,17 @@ test('notification PDF preparation rejects non-PDF MIME types', () => {
   );
 });
 
-test('notification PDF preparation rejects files above the 3 MiB limit before reading them', () => {
+test('notification PDF preparation rejects files above the source compression ceiling before reading them', () => {
   assert.throws(
     () => validateNotificationPdfAsset({
-      uri: 'file:///large.pdf',
+      uri: 'file:///huge.pdf',
       mimeType: 'application/pdf',
-      fileSize: NOTIFICATION_MAX_PDF_BYTES + 1,
+      fileSize: NOTIFICATION_MAX_PDF_SOURCE_BYTES + 1,
     }),
-    /3\.0 MB/i,
+    /before compression/i,
   );
+});
+
+test('notification PDF preparation policy keeps the final target at 3 MiB', () => {
+  assert.ok(NOTIFICATION_MAX_PDF_BYTES < NOTIFICATION_MAX_PDF_SOURCE_BYTES);
 });

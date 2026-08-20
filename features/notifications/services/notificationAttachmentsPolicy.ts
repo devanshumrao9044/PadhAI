@@ -1,4 +1,5 @@
 export const NOTIFICATION_MAX_SOURCE_BYTES = 8 * 1024 * 1024;
+export const NOTIFICATION_MAX_PDF_SOURCE_BYTES = 12 * 1024 * 1024;
 export const NOTIFICATION_MAX_PDF_BYTES = 3 * 1024 * 1024;
 export const NOTIFICATION_MAX_IMAGE_OUTPUT_BYTES = 512 * 1024;
 export const NOTIFICATION_MAX_IMAGE_DIMENSION = 1600;
@@ -38,8 +39,8 @@ export function validateNotificationPdfAsset(asset: NotificationFileAsset): void
     throw new Error('Please choose a PDF file.');
   }
   const sourceBytes = getKnownAssetSize(asset);
-  if (sourceBytes && sourceBytes > NOTIFICATION_MAX_PDF_BYTES) {
-    throw new Error(`PDF must be smaller than ${formatAttachmentSize(NOTIFICATION_MAX_PDF_BYTES)}.`);
+  if (sourceBytes && sourceBytes > NOTIFICATION_MAX_PDF_SOURCE_BYTES) {
+    throw new Error(`PDF must be smaller than ${formatAttachmentSize(NOTIFICATION_MAX_PDF_SOURCE_BYTES)} before compression.`);
   }
 }
 
