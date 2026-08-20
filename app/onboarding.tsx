@@ -156,7 +156,7 @@ export default function OnboardingScreen() {
               onPress={handleNext}
               disabled={!canProceed() || loading}
             >
-              {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.nextButtonText}>{step === TOTAL_STEPS ? t('onboarding.startNow') : t('onboarding.next')} →</Text>}
+              {loading ? <ActivityIndicator color={colors.background} /> : <Text style={styles.nextButtonText}>{step === TOTAL_STEPS ? t('onboarding.startNow') : t('onboarding.next')} →</Text>}
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -185,5 +185,5 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   nextButton: { flex: 1.7, minHeight: 52, backgroundColor: colors.primary, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 15, alignItems: 'center', justifyContent: 'center' },
   nextButtonFull: { flex: 1 },
   nextButtonDisabled: { opacity: 0.4 },
-  nextButtonText: { color: '#FFFFFF', fontSize: 15, lineHeight: 20, fontWeight: '700', textAlign: 'center' },
+  nextButtonText: { color: colors.background, fontSize: 15, lineHeight: 20, fontWeight: '700', textAlign: 'center' },
 });

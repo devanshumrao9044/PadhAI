@@ -83,7 +83,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.surfaceVariant,
     borderWidth: 1,
-    borderColor: 'rgba(124,92,252,0.4)',
+    borderColor: colors.primary + '66',
   },
   contactTitle: { color: colors.primary, fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8 },
   contactText: { color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginTop: 6 },

@@ -116,7 +116,7 @@ export default function ResetPasswordScreen() {
   if (checking) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator color="#7C5CFC" size="large" />
+        <ActivityIndicator color={colors.primary} size="large" />
       </SafeAreaView>
     );
   }
@@ -142,7 +142,7 @@ export default function ResetPasswordScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="New password"
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={colors.textTertiary}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
@@ -152,7 +152,7 @@ export default function ResetPasswordScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Confirm new password"
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={colors.textTertiary}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 secureTextEntry
@@ -164,7 +164,7 @@ export default function ResetPasswordScreen() {
                 onPress={handleSubmit}
                 disabled={saving}
               >
-                {saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Update password</Text>}
+                {saving ? <ActivityIndicator color={colors.background} /> : <Text style={styles.buttonText}>Update password</Text>}
               </Pressable>
             </View>
           ) : null}
@@ -182,16 +182,16 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, justifyContent: 'center' },
   flex: { flex: 1 },
   content: { flexGrow: 1, justifyContent: 'center', padding: 24 },
-  logo: { color: '#FFFFFF', fontSize: 52, fontWeight: '900', textAlign: 'center' },
+  logo: { color: colors.textPrimary, fontSize: 52, fontWeight: '900', textAlign: 'center' },
   logoAccent: { color: colors.primary },
   title: { color: colors.textPrimary, fontSize: 26, fontWeight: '800', textAlign: 'center', marginTop: 24 },
   subtitle: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 8, marginBottom: 24 },
-  card: { backgroundColor: '#0F0F1A', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: 'rgba(124,92,252,0.15)' },
+  card: { backgroundColor: colors.surface, borderRadius: 20, padding: 20, borderWidth: 1, borderColor: colors.border },
   input: { backgroundColor: colors.surfaceVariant, borderRadius: 12, borderWidth: 1, borderColor: colors.border, color: colors.textPrimary, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12 },
   button: { minHeight: 50, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-  error: { color: '#FF4757', textAlign: 'center', marginBottom: 16, lineHeight: 20 },
+  buttonText: { color: colors.background, fontSize: 15, fontWeight: '700' },
+  error: { color: colors.danger, textAlign: 'center', marginBottom: 16, lineHeight: 20 },
   backButton: { alignItems: 'center', paddingVertical: 18 },
   backText: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
 });

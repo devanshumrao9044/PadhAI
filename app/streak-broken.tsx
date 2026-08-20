@@ -245,7 +245,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   challengeCard: {
     width: '100%', backgroundColor: colors.surface,
     borderRadius: Radius.xl,
-    borderWidth: 1.5, borderColor: '#F97316' + '66',
+    borderWidth: 1.5, borderColor: colors.warning + '66',
     padding: Spacing.md, marginBottom: Spacing.sm,
     gap: Spacing.sm,
   },
@@ -254,15 +254,15 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   challengeIconBg: {
     width: 44, height: 44, borderRadius: 22,
-    backgroundColor: '#F97316' + '22',
+    backgroundColor: colors.warningDim,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: '#F97316' + '55',
+    borderWidth: 1, borderColor: colors.warning + '66',
   },
   challengeEmoji: { fontSize: 22 },
   challengeHeaderText: { flex: 1 },
   challengeTitle: {
     fontSize: FontSize.xs, fontWeight: FontWeight.extraBold,
-    color: '#F97316', letterSpacing: 1.5, textTransform: 'uppercase',
+    color: colors.warning, letterSpacing: 1.5, textTransform: 'uppercase',
   },
   challengeSub: { fontSize: FontSize.sm, color: colors.textSecondary, marginTop: 2 },
 
@@ -293,7 +293,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   // CTA
   challengeBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: '#F97316', borderRadius: Radius.md, paddingVertical: 15,
+    backgroundColor: colors.warning, borderRadius: Radius.md, paddingVertical: 15,
   },
   challengeBtnDisabled: { opacity: 0.55 },
   challengeBtnText: {

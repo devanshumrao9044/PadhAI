@@ -78,7 +78,7 @@ export default function FirstTimeHelpScreen() {
         </View>
 
         <Pressable style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]} onPress={finish} disabled={working}>
-          {working ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Start learning</Text>}
+          {working ? <ActivityIndicator color={colors.background} /> : <Text style={styles.primaryButtonText}>Start learning</Text>}
         </Pressable>
         <Pressable style={styles.skipButton} onPress={finish} disabled={working}>
           <Text style={styles.skipText}>Skip guide</Text>
@@ -104,7 +104,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   stepTitle: { color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.bold, marginBottom: 4 },
   stepBody: { color: colors.textSecondary, fontSize: FontSize.sm, lineHeight: 20 },
   primaryButton: { minHeight: 52, borderRadius: Radius.md, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.xl },
-  primaryButtonText: { color: '#FFFFFF', fontSize: FontSize.md, fontWeight: FontWeight.bold },
+  primaryButtonText: { color: colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
   pressed: { opacity: 0.88, transform: [{ scale: 0.98 }] },
   skipButton: { alignItems: 'center', paddingVertical: Spacing.md },
   skipText: { color: colors.textSecondary, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },

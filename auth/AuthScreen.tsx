@@ -188,7 +188,7 @@ export default function AuthScreen() {
             ) : null}
 
             <Pressable testID="auth-submit" style={({ pressed }) => [styles.primaryButton, busy && styles.disabled, pressed && !busy && styles.pressed]} onPress={submit} disabled={busy}>
-              {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>{buttonLabel}</Text>}
+              {busy ? <ActivityIndicator color={colors.background} /> : <Text style={styles.primaryText}>{buttonLabel}</Text>}
             </Pressable>
           </View>
 
@@ -225,7 +225,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   primaryButton: { minHeight: 52, borderRadius: 14, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   pressed: { transform: [{ scale: 0.98 }], opacity: 0.9 },
   disabled: { opacity: 0.6 },
-  primaryText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  primaryText: { color: colors.background, fontSize: 16, fontWeight: '800' },
   comingSoonText: { color: colors.textTertiary, fontSize: 12, textAlign: 'center', marginTop: 16 },
   secondaryAction: { alignItems: 'center', paddingVertical: 11 },
   secondaryText: { color: colors.primary, fontSize: 14, fontWeight: '700' },

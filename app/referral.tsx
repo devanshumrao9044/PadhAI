@@ -99,7 +99,7 @@ export default function ReferralScreen() {
   if (loading) {
     return (
       <View style={styles.loader}>
-        <ActivityIndicator color="#7C5CFC" size="large" />
+        <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
   }
@@ -303,18 +303,18 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   codeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
   codeText: { flex: 1, minWidth: 0, color: colors.textPrimary, fontSize: 22, lineHeight: 28, fontWeight: '900', letterSpacing: 2, includeFontPadding: false },
   copyBtn: {
-    backgroundColor: 'rgba(124, 92, 252, 0.15)', borderRadius: 8,
+    backgroundColor: colors.primaryDim + '66', borderRadius: 8,
     minWidth: 72, paddingHorizontal: 12, paddingVertical: 9,
-    borderWidth: 1, borderColor: 'rgba(124, 92, 252, 0.3)',
+    borderWidth: 1, borderColor: colors.primary + '88',
     alignItems: 'center',
   },
-  copyBtnDone: { backgroundColor: 'rgba(46, 213, 115, 0.15)', borderColor: 'rgba(46, 213, 115, 0.3)' },
+  copyBtnDone: { backgroundColor: colors.success + '22', borderColor: colors.success + '88' },
   copyBtnText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
   shareBtn: {
     backgroundColor: colors.primary, borderRadius: 12,
     paddingVertical: 13, alignItems: 'center',
   },
-  shareBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  shareBtnText: { color: colors.background, fontSize: 15, fontWeight: '700' },
 
   progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   progressCount: { fontSize: 16 },
@@ -336,20 +336,20 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingVertical: 13, alignItems: 'center', marginBottom: 10,
   },
   claimBtnEmail: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.borderStrong },
-  claimBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  claimBtnText: { color: colors.background, fontSize: 14, fontWeight: '700' },
   claimBtnEmailText: { color: colors.textSecondary },
 
   stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 14, minWidth: 0 },
   stepBadge: {
     width: 26, height: 26, borderRadius: 13,
-    backgroundColor: 'rgba(124, 92, 252, 0.2)',
+    backgroundColor: colors.primaryDim + '88',
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   stepNumber: { color: colors.primary, fontSize: 12, fontWeight: '800' },
   stepText: { flex: 1, minWidth: 0, color: colors.textSecondary, fontSize: 14, lineHeight: 21 },
 
   modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.75)',
+    flex: 1, backgroundColor: colors.overlay,
     justifyContent: 'center', alignItems: 'center', padding: 24,
   },
   modalCard: {
@@ -369,6 +369,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderColor: colors.borderStrong,
     paddingVertical: 14, width: '100%', alignItems: 'center', marginBottom: 16,
   },
-  modalBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  modalBtnText: { color: colors.background, fontSize: 15, fontWeight: '700' },
   modalDismiss: { color: colors.textTertiary, fontSize: 13 },
 });
