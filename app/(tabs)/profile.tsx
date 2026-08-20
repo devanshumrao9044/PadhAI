@@ -19,6 +19,7 @@ import { getRecentSessions } from '@/services/sessionHistory';
 import { loadTodoItems } from '@/services/productivity';
 import { fetchReferralStats } from '@/services/referralService';
 import { getWeeklyZone } from '@/services/weeklyXp';
+import { STUDY_GOALS, PROFILE_LEARNER_TYPES } from '@/constants/studyGoals';
 import {
   DEFAULT_NOTIFICATION_SETTINGS,
   loadNotificationSettings,
@@ -599,7 +600,7 @@ export default function ProfileScreen() {
 
               <Text style={styles.inputLabel}>{t('profile.targetExam')}</Text>
               <View style={styles.chipRow}>
-                {['JEE', 'NEET', 'BOARDS', 'UPSC', 'COLLEGE', 'SKILLS', 'OTHER'].map(exam => (
+                {STUDY_GOALS.map(({ id: exam }) => (
                   <TouchableOpacity
                     key={exam}
                     style={[styles.chip, editExam === exam && styles.chipActive]}
@@ -614,7 +615,7 @@ export default function ProfileScreen() {
 
               <Text style={styles.inputLabel}>{t('profile.classLabel')}</Text>
               <View style={styles.chipRow}>
-                {['11th', '12th', 'Dropper', 'SCHOOL', 'COLLEGE', 'PROFESSIONAL', 'SELF_STUDY'].map(cls => (
+                {PROFILE_LEARNER_TYPES.map(cls => (
                   <TouchableOpacity
                     key={cls}
                     style={[styles.chip, editClass === cls && styles.chipActive]}

@@ -4,37 +4,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors } from '@/constants/theme';
 import type { UserProfile } from '@/types/models';
-
-type TargetOption = {
-  id: UserProfile['targetExam'];
-  labelKey: 'targetJee' | 'targetNeet' | 'targetBoards' | 'targetUpsc' | 'targetCollege' | 'targetSkills' | 'targetOther';
-  subKey: 'targetJeeSub' | 'targetNeetSub' | 'targetBoardsSub' | 'targetUpscSub' | 'targetCollegeSub' | 'targetSkillsSub' | 'targetOtherSub';
-  emoji: string;
-};
-
-type LearnerOption = {
-  id: UserProfile['classLevel'];
-  labelKey: 'learnerSchool' | 'learnerCollege' | 'learnerDropper' | 'learnerProfessional' | 'learnerSelfStudy';
-  emoji: string;
-};
-
-const TARGETS: TargetOption[] = [
-  { id: 'JEE', labelKey: 'targetJee', subKey: 'targetJeeSub', emoji: '⚛️' },
-  { id: 'NEET', labelKey: 'targetNeet', subKey: 'targetNeetSub', emoji: '🩺' },
-  { id: 'BOARDS', labelKey: 'targetBoards', subKey: 'targetBoardsSub', emoji: '📚' },
-  { id: 'UPSC', labelKey: 'targetUpsc', subKey: 'targetUpscSub', emoji: '🏛️' },
-  { id: 'COLLEGE', labelKey: 'targetCollege', subKey: 'targetCollegeSub', emoji: '🎓' },
-  { id: 'SKILLS', labelKey: 'targetSkills', subKey: 'targetSkillsSub', emoji: '💡' },
-  { id: 'OTHER', labelKey: 'targetOther', subKey: 'targetOtherSub', emoji: '✨' },
-];
-
-const LEARNERS: LearnerOption[] = [
-  { id: 'SCHOOL', labelKey: 'learnerSchool', emoji: '🏫' },
-  { id: 'COLLEGE', labelKey: 'learnerCollege', emoji: '🎓' },
-  { id: 'Dropper', labelKey: 'learnerDropper', emoji: '🗓️' },
-  { id: 'PROFESSIONAL', labelKey: 'learnerProfessional', emoji: '💼' },
-  { id: 'SELF_STUDY', labelKey: 'learnerSelfStudy', emoji: '📖' },
-];
+import { STUDY_GOALS, LEARNER_TYPES } from '@/constants/studyGoals';
 
 interface Props {
   value: string;
@@ -54,7 +24,7 @@ export default function StepExam({ value, onChange, learnerType, onLearnerTypeCh
       <Text style={styles.heading}>{t('onboarding.targetTitle')}</Text>
       <Text style={styles.subtext}>{t('onboarding.targetSubtitle')}</Text>
       <View style={styles.list}>
-        {TARGETS.map(target => (
+        {STUDY_GOALS.map(target => (
           <TouchableOpacity
             key={target.id}
             style={[styles.card, value === target.id && styles.cardSelected]}
@@ -79,7 +49,7 @@ export default function StepExam({ value, onChange, learnerType, onLearnerTypeCh
       <Text style={styles.sectionHeading}>{t('onboarding.learnerTitle')}</Text>
       <Text style={styles.sectionSubtext}>{t('onboarding.learnerSubtitle')}</Text>
       <View style={styles.learnerGrid}>
-        {LEARNERS.map(learner => (
+        {LEARNER_TYPES.map(learner => (
           <TouchableOpacity
             key={learner.id}
             style={[styles.learnerCard, learnerType === learner.id && styles.cardSelected]}
