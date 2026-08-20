@@ -358,10 +358,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   ruleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   ruleText: { fontSize: FontSize.sm, lineHeight: 19, color: colors.textSecondary, flex: 1, minWidth: 0, flexShrink: 1 },
   lockInBtn: {
+    minHeight: 58,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.primary, borderRadius: Radius.md,
-    paddingVertical: 18, gap: 10,
+    backgroundColor: colors.primary, borderRadius: Radius.lg,
+    paddingHorizontal: Spacing.md, paddingVertical: 15, gap: 10,
+    shadowColor: colors.primary, shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3,
   },
-  lockInBtnDisabled: { opacity: 0.6 },
+  lockInBtnDisabled: { opacity: 0.55, shadowOpacity: 0 },
   lockInText: { color: colors.background, fontSize: FontSize.lg, lineHeight: 24, fontWeight: FontWeight.extraBold, letterSpacing: 0.5, textAlign: 'center', flexShrink: 1 },
 });

@@ -404,7 +404,12 @@ export default function LeaderboardScreen() {
           <View style={[styles.spotlight, { backgroundColor: currentLevel.color + '20' }]} />
 
           {/* Level badges row */}
-          <View style={styles.badgesRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.badgesScroll}
+            contentContainerStyle={styles.badgesRow}
+          >
             {carouselLevels.map(l => (
               <LevelBadge
                 key={l.rank}
@@ -413,7 +418,7 @@ export default function LeaderboardScreen() {
                 size={l.rank === currentLevel.rank ? 'lg' : 'sm'}
               />
             ))}
-          </View>
+          </ScrollView>
 
           {/* Center level title */}
           <View style={styles.levelLabel}>
@@ -427,12 +432,19 @@ export default function LeaderboardScreen() {
 
         {/* ── Section 2: Rank Status Card ───────────────────────────────── */}
         <View style={styles.rankCard}>
-          <View style={styles.weeklyUpdateCard}>
-            <View style={styles.weeklyUpdateCopy}>
-              <Text style={styles.weeklyUpdateLabel}>{t('leaderboard.updatesInLabel')}</Text>
-              <Text style={styles.weeklyUpdateValue}>{t('leaderboard.daysValue', { value: daysUntilReset })}</Text>
+          <View style={styles.rankSummaryRow}>
+            <View style={styles.rankSummaryCard}>
+              <Text style={styles.rankSummaryLabel}>{t('leaderboard.currentRank')}</Text>
+              <Text style={styles.rankSummaryValue}>#{myRank}</Text>
             </View>
-            <MaterialIcons name="info-outline" size={23} color={colors.textPrimary} />
+            <View style={styles.rankSummaryCard}>
+              <Text style={styles.rankSummaryLabel}>{t('home.weeklyXP')}</Text>
+              <Text style={[styles.rankSummaryValue, { color: colors.warning }]}>{user?.xpTotal ?? 0}</Text>
+            </View>
+            <View style={styles.rankSummaryCard}>
+              <Text style={styles.rankSummaryLabel}>{t('leaderboard.updatesInLabel')}</Text>
+              <Text style={styles.rankSummaryValue}>{daysUntilReset} {t('leaderboard.days')}</Text>
+            </View>
           </View>
 
           {/* Zone bar */}
@@ -554,10 +566,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   // ── Section 1 Hero ────────────────────────────────────────────────────────
   heroSection: {
     alignItems: 'center',
-    minHeight: 270,
-    paddingTop: 28,
-    paddingBottom: 28,
+    minHeight: 248,
+    paddingTop: 20,
+    paddingBottom: 22,
     overflow: 'hidden',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   spotlight: {
     position: 'absolute',
@@ -567,14 +581,15 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     top: 18,
     opacity: 0.28,
   },
+  badgesScroll: { width: '100%', zIndex: 2 },
   badgesRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    minHeight: 180,
+    gap: 8,
+    minHeight: 168,
+    paddingHorizontal: Spacing.lg,
     marginBottom: 2,
-    zIndex: 2,
   },
   badgeWrap: {
     alignItems: 'center',
@@ -656,32 +671,24 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   // ── Section 2 Rank Card ────────────────────────────────────────────────────
   rankCard: {
     backgroundColor: colors.surface,
-    borderRadius: 18,
+    borderRadius: Radius.lg,
     marginHorizontal: Spacing.md,
-    marginTop: -2,
+    marginTop: Spacing.md,
     marginBottom: Spacing.lg,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: colors.border,
-    padding: 14,
+    padding: Spacing.md,
     shadowColor: '#1C2D44',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 2,
   },
-  weeklyUpdateCard: {
-    minHeight: 112,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.lg,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceVariant,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
+  rankSummaryRow: { flexDirection: 'row', gap: 8, marginBottom: Spacing.md },
+  rankSummaryCard: { flex: 1, minWidth: 0, minHeight: 74, justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 10, borderRadius: Radius.md, backgroundColor: colors.surfaceVariant, borderWidth: 1, borderColor: colors.border },
+  rankSummaryLabel: { color: colors.textSecondary, fontSize: FontSize.xs, lineHeight: 16, fontWeight: FontWeight.semiBold, textAlign: 'center', flexShrink: 1 },
+  rankSummaryValue: { color: colors.textPrimary, fontSize: FontSize.lg, lineHeight: 24, fontWeight: FontWeight.extraBold, textAlign: 'center', marginTop: 2, flexShrink: 1 },
+  weeklyUpdateCard: { display: 'none' },
   weeklyUpdateCopy: {
     flex: 1,
     alignItems: 'center',
@@ -811,22 +818,22 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   liveText: { color: colors.success, fontSize: 10, lineHeight: 14, fontWeight: FontWeight.bold, letterSpacing: 0.6 },
   sectionTitle: { flex: 1, minWidth: 0, color: colors.textPrimary, fontSize: FontSize.lg, lineHeight: 24, fontWeight: FontWeight.bold, flexShrink: 1 },
   sectionSubtitle: { color: colors.textSecondary, fontSize: FontSize.sm, lineHeight: 18, marginBottom: 10, flexShrink: 1 },
-  promotionHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, marginBottom: 4 },
-  promotionHintText: { color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.bold },
+  promotionHint: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 8, borderRadius: Radius.md, backgroundColor: colors.success + '12', borderWidth: 1, borderColor: colors.success + '44' },
+  promotionHintText: { flex: 1, minWidth: 0, color: colors.textPrimary, fontSize: FontSize.sm, lineHeight: 19, fontWeight: FontWeight.semiBold, flexShrink: 1 },
   listContainer: { gap: 10, paddingBottom: Spacing.xl },
   boardRow: {
-    minHeight: 88,
+    minHeight: 76,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderWidth: 1.5,
+    borderRadius: Radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
   },
-  topThreeRow: { minHeight: 92, paddingVertical: 12 },
+  topThreeRow: { minHeight: 84, paddingVertical: 12 },
   firstPlaceRow: { borderColor: '#F2B60088', shadowColor: '#F2B600', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   secondPlaceRow: { borderColor: '#2D8FCE66' },
   thirdPlaceRow: { borderColor: '#4CA87866' },
@@ -835,14 +842,14 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderWidth: 2,
   },
   boardRankBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 11,
+    width: 40,
+    height: 40,
+    borderRadius: Radius.sm,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  medalBadge: { width: 50, height: 50, borderRadius: 13, gap: 1 },
+  medalBadge: { width: 44, height: 44, borderRadius: Radius.md },
   boardRankText: {
     fontSize: FontSize.xl,
     fontWeight: FontWeight.extraBold,
