@@ -51,8 +51,8 @@ export default function ProfileScreen() {
   } | null>(null);
 
   const [editName, setEditName] = useState('');
-  const [editExam, setEditExam] = useState('JEE');
-  const [editClass, setEditClass] = useState('12th');
+  const [editExam, setEditExam] = useState('OTHER');
+  const [editClass, setEditClass] = useState('SELF_STUDY');
   const [editGoal, setEditGoal] = useState('');
   const [editAvatarUrl, setEditAvatarUrl] = useState('');
   const [avatarError, setAvatarError] = useState<string | null>(null);
@@ -199,8 +199,8 @@ export default function ProfileScreen() {
 
   const openEditModal = () => {
     setEditName(user.fullName || '');
-    setEditExam(user.targetExam || 'JEE');
-    setEditClass(user.classLevel || '12th');
+    setEditExam(user.targetExam || 'OTHER');
+    setEditClass(user.classLevel || 'SELF_STUDY');
     setEditGoal(String(user.dailyGoalMinutes || 120));
     setEditAvatarUrl((user as any).avatarUrl || '');
     setAvatarError(null);
@@ -599,7 +599,7 @@ export default function ProfileScreen() {
 
               <Text style={styles.inputLabel}>{t('profile.targetExam')}</Text>
               <View style={styles.chipRow}>
-                {['JEE', 'NEET', 'BOARDS'].map(exam => (
+                {['JEE', 'NEET', 'BOARDS', 'UPSC', 'COLLEGE', 'SKILLS', 'OTHER'].map(exam => (
                   <TouchableOpacity
                     key={exam}
                     style={[styles.chip, editExam === exam && styles.chipActive]}
@@ -614,7 +614,7 @@ export default function ProfileScreen() {
 
               <Text style={styles.inputLabel}>{t('profile.classLabel')}</Text>
               <View style={styles.chipRow}>
-                {['11th', '12th', 'Dropper'].map(cls => (
+                {['11th', '12th', 'Dropper', 'SCHOOL', 'COLLEGE', 'PROFESSIONAL', 'SELF_STUDY'].map(cls => (
                   <TouchableOpacity
                     key={cls}
                     style={[styles.chip, editClass === cls && styles.chipActive]}
@@ -835,10 +835,10 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   cameraIconBadge: { position: 'absolute', bottom: 0, right: -4, backgroundColor: colors.primary, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface },
   inputLabel: { fontSize: FontSize.xs, lineHeight: 16, fontWeight: FontWeight.bold, color: colors.textSecondary, marginBottom: 6, marginTop: 10 },
   input: { backgroundColor: colors.surfaceVariant, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: Spacing.md, paddingVertical: 12, color: colors.textPrimary, fontSize: FontSize.md, marginBottom: 8 },
-  chipRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  chip: { flex: 1, backgroundColor: colors.surfaceVariant, paddingVertical: 10, borderRadius: Radius.md, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  chip: { flexGrow: 1, flexBasis: '28%', minWidth: 82, backgroundColor: colors.surfaceVariant, paddingHorizontal: 8, paddingVertical: 10, borderRadius: Radius.md, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
   chipActive: { backgroundColor: colors.primary + '22', borderColor: colors.primary },
-  chipText: { color: colors.textSecondary, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
+  chipText: { color: colors.textSecondary, fontSize: FontSize.xs, lineHeight: 16, fontWeight: FontWeight.semiBold, textAlign: 'center', flexShrink: 1 },
   chipTextActive: { color: colors.primary, fontWeight: FontWeight.bold },
   modalBtns: { flexDirection: 'row', gap: 10, marginTop: Spacing.xl },
   cancelBtn: { flex: 1, backgroundColor: colors.surfaceVariant, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center' },

@@ -2,8 +2,8 @@ export interface UserProfile {
   id: string;
   username: string;
   fullName: string;
-  targetExam: 'JEE' | 'NEET' | 'BOARDS' | 'OTHER';
-  classLevel: '11th' | '12th' | 'Dropper';
+  targetExam: 'JEE' | 'NEET' | 'BOARDS' | 'UPSC' | 'COLLEGE' | 'SKILLS' | 'OTHER';
+  classLevel: '11th' | '12th' | 'Dropper' | 'SCHOOL' | 'COLLEGE' | 'PROFESSIONAL' | 'SELF_STUDY';
   dailyGoalMinutes: number;
   xpTotal: number;
   /** Current week XP; reset to zero after Sunday settlement. */
