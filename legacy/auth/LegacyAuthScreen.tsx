@@ -1,4 +1,8 @@
 // Legacy auth screen archived and intentionally disabled. Active auth lives in auth/.
+// LEGACY AUTH FILE — NOT USED BY THE ACTIVE ROUTE TREE.
+// The active auth path is auth/AuthScreen.tsx + auth/AuthSessionProvider.tsx.
+// Do not add new authentication logic here.
+
 import { useState } from 'react';
 import {
   View, Text, KeyboardAvoidingView,
