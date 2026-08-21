@@ -11,7 +11,10 @@ function uuidv4(): string {
     return v.toString(16);
   });
 }
-import { getItem, setItem, removeItem, StorageKeys } from '@/features/core/services/storage';
+
+const PROCESS_INSTANCE_ID = uuidv4();
+
+import { getItem, setItem, removeItem, StorageKeys} from '@/features/core/services/storage';
 import { readUserCache, removeUserCache, writeUserCache } from '@/features/core/services/cache';
 import { supabase } from '@/features/core/services/supabase';
 import {
@@ -25,6 +28,13 @@ import { reconcileTrackerState } from '@/features/tracker/services/trackerState'
 import { getRecoveredStreak, isStreakRecoveryEligible } from '@/features/focus/services/streakRecovery';
 import { haptics } from '@/features/core/services/haptics';
 import { clearStudyGroupPresence, recordStudyGroupSession } from '@/features/study-groups/services/studyGroups';
+import {
+  enqueueOfflineFocusSession,
+  isNetworkReachable,
+  subscribeToOfflineFocusReconnect,
+  syncOfflineFocusQueue,
+  clearOfflineFocusQueue,
+} from '@/features/focus/services/offlineFocusSync';
 import {
   buildBaselineMarker,
   buildWeeklySettlement,
@@ -71,7 +81,9 @@ export type AppContextType = {
   last90Days: DailySummary[];
   activeSession: ActiveSession | null;
   startSession: (plannedMins: number, subjectId: string | null, chapterId: string | null, isRecoverySession?: boolean, recoveryLostStreak?: number, studyGroupId?: string | null) => Promise<string>;
-  completeSession: (sessionId: string, actualMins: number) => Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number; referralXpAwarded?: number }) | null>;
+  checkpointActiveSession: (elapsedSeconds: number, clockAnomaly?: boolean) => Promise<void>;
+  discardActiveSession: () => Promise<void>;
+  completeSession: (sessionId: string, actualMins: number, actualSeconds?: number) => Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number; referralXpAwarded?: number; syncPending?: boolean; clockAnomaly?: boolean }) | null>;
   breakSession: (sessionId: string, actualMins: number) => Promise<FocusSession | null>;
   getDailySummary: (date: string) => DailySummary | null;
   getLast7Days: () => DailySummary[];
@@ -279,10 +291,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
       for (const task of queue) {
         try {
           if (task.action === 'insert') {
-            const payload = task.table === 'focus_sessions'
-              ? toFocusSessionDbPayload(task.payload)
-              : task.payload;
-            const { error } = await supabase.from(task.table).insert(payload);
+            if (task.table === 'focus_sessions') {
+              const payload = toFocusSessionDbPayload(task.payload);
+              await enqueueOfflineFocusSession({
+                sessionId: payload.id,
+                userId: payload.user_id,
+                subjectId: payload.subject_id ?? null,
+                chapterId: payload.chapter_id ?? null,
+                studyGroupId: task.payload?.study_group_id ?? null,
+                plannedMinutes: Number(payload.planned_minutes ?? payload.actual_minutes ?? 0),
+                actualMinutes: Number(payload.actual_minutes ?? 0),
+                elapsedSeconds: Number(payload.actual_minutes ?? 0) * 60,
+                completed: payload.completed === true,
+                broken: payload.broken === true,
+                startedAt: payload.started_at,
+                endedAt: payload.ended_at ?? payload.started_at,
+                clockAnomaly: Boolean(task.payload?.clock_anomaly),
+                isRecovery: Boolean(task.payload?.is_recovery),
+                recoveryLostStreak: task.payload?.recovery_lost_streak ?? null,
+                comebackBonus: Number(payload.comeback_bonus ?? 0),
+              });
+              remainingQueue = remainingQueue.filter(t => t.id !== task.id);
+              continue;
+            }
+            const { error } = await supabase.from(task.table).insert(task.payload);
             if (error) throw error;
             if (
               task.table === 'focus_sessions' &&
@@ -404,6 +436,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       removeItem(StorageKeys.ONBOARDED),
       removeItem(StorageKeys.ACTIVE_SESSION),
       removeItem(OFFLINE_QUEUE_KEY),
+      userId ? clearOfflineFocusQueue(userId) : Promise.resolve(),
     ]);
   };
 
@@ -469,11 +502,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (sameAccount) {
           setTopics(cachedTracker.topics);
-          setActiveSession(savedActive ?? null);
+          const recoveredActive = savedActive && savedActive.processInstanceId !== PROCESS_INSTANCE_ID && savedActive.status === 'running'
+            ? { ...savedActive, status: 'interrupted' as const }
+            : savedActive;
+          if (recoveredActive && recoveredActive !== savedActive) {
+            await setItem(StorageKeys.ACTIVE_SESSION, recoveredActive);
+          }
+          setActiveSession(recoveredActive ?? null);
           setSessions(cachedSessions?.data ?? savedSessions ?? []);
           setDailySummaries(cachedSummaries?.data ?? savedSummaries ?? []);
           setXpLog(cachedXP?.data ?? savedXP ?? []);
           await processSyncQueue();
+          await syncOfflineFocusQueue(userId);
         } else {
           deletedChapterIdsRef.current.clear();
           deletedSubjectIdsRef.current.clear();
@@ -644,6 +684,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const appStateSub = AppState.addEventListener('change', nextState => {
       if (nextState === 'active') {
         void processSyncQueue();
+        const activeUserId = currentUserIdRef.current;
+        if (activeUserId) void syncOfflineFocusQueue(activeUserId);
         void reload();
       }
     });
@@ -684,6 +726,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       appStateSub.remove();
     };
   }, [load, reload]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    return subscribeToOfflineFocusReconnect(user.id, results => {
+      if (results.some(result => result.status === 'accepted' || result.status === 'duplicate')) {
+        void reload({ force: true });
+      }
+    });
+  }, [reload, user?.id]);
 
   // ── setUser: sync XP/streak fields to Supabase (profile fields saved separately in profile.tsx) ─────────────────────────────────────────────
   const setUser = async (u: UserProfile) => {
@@ -948,16 +999,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
       studyGroupId: studyGroupId ?? null,
       isRecovery: isRecoverySession ?? streakRecoveryPending,
       recoveryLostStreak: isRecoverySession ? (recoveryLostStreak ?? lostStreakCount) : undefined,
+      status: 'running',
+      checkpointElapsedSeconds: 0,
+      lastCheckpointAt: new Date().toISOString(),
+      lastWallClockAt: new Date().toISOString(),
+      clockAnomaly: false,
+      processInstanceId: PROCESS_INSTANCE_ID,
     };
     setActiveSession(active);
     await setItem(StorageKeys.ACTIVE_SESSION, active);
     return sessionId;
   };
 
+  const discardActiveSession = async () => {
+    setActiveSession(null);
+    await setItem(StorageKeys.ACTIVE_SESSION, null);
+  };
+
+  const checkpointActiveSession = async (elapsedSeconds: number, clockAnomaly = false) => {
+    if (!activeSession) return;
+    const now = new Date().toISOString();
+    const next: ActiveSession = {
+      ...activeSession,
+      status: clockAnomaly ? 'verification_required' : 'running',
+      checkpointElapsedSeconds: Math.max(0, Math.floor(elapsedSeconds)),
+      lastCheckpointAt: now,
+      lastWallClockAt: now,
+      clockAnomaly: Boolean(activeSession.clockAnomaly || clockAnomaly),
+    };
+    setActiveSession(next);
+    await setItem(StorageKeys.ACTIVE_SESSION, next);
+  };
+
   const COMEBACK_BONUS_XP = 50;
   const isStreakMilestone = (value: number) => value >= 3 && (value % 7 === 0 || [30, 60, 100].includes(value));
 
-  const completeSession = async (sessionId: string, actualMins: number): Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number; referralXpAwarded?: number }) | null> => {
+  const completeSession = async (sessionId: string, actualMins: number, actualSeconds = actualMins * 60): Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number; referralXpAwarded?: number; syncPending?: boolean; clockAnomaly?: boolean }) | null> => {
     const isRecoverySession = Boolean(activeSession?.isRecovery || streakRecoveryPending);
     if (!isStreakRecoveryEligible(isRecoverySession, actualMins)) return null;
 
@@ -988,10 +1065,54 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ended_at: new Date().toISOString(),
       };
 
+      const networkAvailable = await isNetworkReachable();
+      const clockAnomaly = Boolean(activeSession?.clockAnomaly);
+      const syncPending = !networkAvailable || clockAnomaly;
+      const localSessionPayload = syncPending
+        ? { ...sessionPayload, xp_earned: 0, xp_deducted: 0 }
+        : sessionPayload;
       const sessionObj = mapSession({
-        ...sessionPayload,
+        ...localSessionPayload,
         broken_at_percent: 100,
       });
+
+      if (syncPending) {
+        if (!activeUser?.id) return null;
+        const queuedSession = {
+          sessionId,
+          userId: activeUser.id,
+          subjectId: activeSession?.subjectId ?? null,
+          chapterId: activeSession?.chapterId ?? null,
+          studyGroupId,
+          plannedMinutes: activeSession?.plannedMins ?? actualMins,
+          actualMinutes: actualMins,
+          elapsedSeconds: Math.max(actualMins * 60, Math.floor(actualSeconds)),
+          completed: true,
+          broken: false,
+          startedAt,
+          endedAt: sessionPayload.ended_at,
+          clockAnomaly,
+          isRecovery: isRecoverySession,
+          recoveryLostStreak: activeSession?.recoveryLostStreak ?? lostStreakCount,
+          comebackBonus: bonusFromComeback,
+        };
+        await enqueueOfflineFocusSession(queuedSession);
+        const newSessions = [sessionObj, ...sessions];
+        setSessions(newSessions);
+        await setItem(StorageKeys.SESSIONS, newSessions);
+        void writeUserCache(activeUser.id, 'sessions', newSessions);
+        setActiveSession(null);
+        await setItem(StorageKeys.ACTIVE_SESSION, null);
+        return {
+          ...sessionObj,
+          leveledUp: false,
+          newLevelRank: getLevelForUser(activeUser).rank,
+          totalXP: activeUser.xpTotal,
+          referralXpAwarded: 0,
+          syncPending: true,
+          clockAnomaly,
+        };
+      }
       
       const newSessions = [sessionObj, ...sessions];
       setSessions(newSessions);
@@ -1093,10 +1214,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ended_at: new Date().toISOString(),
       };
 
+      const networkAvailable = await isNetworkReachable();
+      const clockAnomaly = Boolean(activeSession?.clockAnomaly);
+      const syncPending = !networkAvailable || clockAnomaly;
+      const localSessionPayload = syncPending
+        ? { ...sessionPayload, xp_earned: 0, xp_deducted: 0 }
+        : sessionPayload;
       const sessionObj = mapSession({
-        ...sessionPayload,
+        ...localSessionPayload,
         broken_at_percent: brokenAt,
       });
+
+      if (syncPending) {
+        if (!activeUser?.id) return null;
+        await enqueueOfflineFocusSession({
+          sessionId,
+          userId: activeUser.id,
+          subjectId: activeSession?.subjectId ?? null,
+          chapterId: activeSession?.chapterId ?? null,
+          studyGroupId,
+          plannedMinutes: planned,
+          actualMinutes: actualMins,
+          elapsedSeconds: Math.max(0, actualMins * 60),
+          completed: false,
+          broken: true,
+          startedAt,
+          endedAt: sessionPayload.ended_at,
+          clockAnomaly,
+          isRecovery: false,
+          recoveryLostStreak: null,
+          comebackBonus: 0,
+        });
+        const newSessions = [sessionObj, ...sessions];
+        setSessions(newSessions);
+        await setItem(StorageKeys.SESSIONS, newSessions);
+        void writeUserCache(activeUser.id, 'sessions', newSessions);
+        setActiveSession(null);
+        await setItem(StorageKeys.ACTIVE_SESSION, null);
+        return { ...sessionObj, syncPending: true, clockAnomaly } as FocusSession & { syncPending: boolean; clockAnomaly: boolean };
+      }
       
       const newSessions = [sessionObj, ...sessions];
       setSessions(newSessions);
@@ -1284,6 +1440,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const stableToggleTopic = useStableCallback(toggleTopic);
   const stableDeleteTopic = useStableCallback(deleteTopic);
   const stableStartSession = useStableCallback(startSession);
+  const stableCheckpointActiveSession = useStableCallback(checkpointActiveSession);
+  const stableDiscardActiveSession = useStableCallback(discardActiveSession);
   const stableCompleteSession = useStableCallback(completeSession);
   const stableBreakSession = useStableCallback(breakSession);
   const stableGetDailySummary = useStableCallback(getDailySummary);
@@ -1302,7 +1460,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateChapter: stableUpdateChapter, deleteChapter: stableDeleteChapter, bulkDeleteChapters: stableBulkDeleteChapters,
     topics, getTopicsForChapter: stableGetTopicsForChapter, addTopic: stableAddTopic,
     toggleTopic: stableToggleTopic, deleteTopic: stableDeleteTopic,
-    sessions, dailySummaries, last7Days, last30Days, last90Days, activeSession, startSession: stableStartSession, completeSession: stableCompleteSession, breakSession: stableBreakSession,
+    sessions, dailySummaries, last7Days, last30Days, last90Days, activeSession, startSession: stableStartSession, checkpointActiveSession: stableCheckpointActiveSession, discardActiveSession: stableDiscardActiveSession, completeSession: stableCompleteSession, breakSession: stableBreakSession,
     getDailySummary: stableGetDailySummary, getLast7Days: stableGetLast7Days, getLast30Days: stableGetLast30Days, getLast90Days: stableGetLast90Days,
     xpLog, awardXP: stableAwardXP, deductXP: stableDeductXP,
     comebackPending, setComebackPending: stableSetComebackPending,
@@ -1314,8 +1472,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     comebackPending, hasUnlockedReward, referralCount, streakRecoveryPending, lostStreakCount, isLoading,
     stableSetUser, stableSetOnboarded, stableAddSubject, stableUpdateSubject, stableDeleteSubject,
     stableGetChaptersForSubject, stableAddChapter, stableUpdateChapter, stableDeleteChapter, stableBulkDeleteChapters,
-    stableGetTopicsForChapter, stableAddTopic, stableToggleTopic, stableDeleteTopic, stableStartSession,
-    stableCompleteSession, stableBreakSession, stableGetDailySummary, stableGetLast7Days, stableGetLast30Days, stableGetLast90Days,
+        stableGetTopicsForChapter, stableAddTopic, stableToggleTopic, stableDeleteTopic, stableStartSession, stableCheckpointActiveSession, stableDiscardActiveSession,
+     stableCompleteSession, stableBreakSession, stableGetDailySummary, stableGetLast7Days, stableGetLast30Days, stableGetLast90Days,
     stableAwardXP, stableDeductXP, stableSetComebackPending, stableSetHasUnlockedReward, stableSetStreakRecoveryPending, reload,
   ]);
 

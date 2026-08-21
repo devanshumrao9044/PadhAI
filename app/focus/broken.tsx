@@ -13,10 +13,11 @@ export default function FocusBrokenScreen() {
   const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
-  const params = useLocalSearchParams<{ penalty: string }>();
+  const params = useLocalSearchParams<{ penalty: string; pending: string }>();
 
   // Safe parsing
   const penalty = parseInt(params.penalty ?? '0', 10);
+  const isPending = params.pending === '1';
 
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -50,25 +51,34 @@ export default function FocusBrokenScreen() {
         </Animated.View>
 
         <Animated.View style={[styles.messageSection, { opacity: fadeAnim }]}>
-           <Text style={styles.brokenTitle}>{t('focus.brokenTitle')}</Text>
-          <Text style={styles.rudeMessage}>{messageRef.current}</Text>
+           <Text style={[styles.brokenTitle, isPending && { color: colors.primary }]}>{isPending ? t('focus.syncPendingTitle') : t('focus.brokenTitle')}</Text>
+          <Text style={styles.rudeMessage}>{isPending ? t('focus.syncPendingMessage') : messageRef.current}</Text>
 
-          <View style={styles.consequences}>
-            <View style={styles.consequenceRow}>
-              <MaterialIcons name="remove-circle" size={18} color={colors.danger} />
-              <Text style={styles.consequenceText}>{penalty > 0 ? t('focus.xpDeducted', { value: penalty }) : t('focus.xpPenalized')}</Text>
+          {isPending ? (
+            <View style={[styles.consequences, { backgroundColor: colors.primary + '11', borderColor: colors.primary + '22' }]}>
+              <View style={styles.consequenceRow}>
+                <MaterialIcons name="cloud-upload" size={18} color={colors.primary} />
+                <Text style={styles.consequenceText}>{t('focus.syncPendingMessage')}</Text>
+              </View>
             </View>
-            <View style={styles.consequenceRow}>
-              <MaterialIcons name="remove-circle" size={18} color={colors.danger} />
-              <Text style={styles.consequenceText}>{t('focus.streakReset')}</Text>
+          ) : (
+            <View style={styles.consequences}>
+              <View style={styles.consequenceRow}>
+                <MaterialIcons name="remove-circle" size={18} color={colors.danger} />
+                <Text style={styles.consequenceText}>{penalty > 0 ? t('focus.xpDeducted', { value: penalty }) : t('focus.xpPenalized')}</Text>
+              </View>
+              <View style={styles.consequenceRow}>
+                <MaterialIcons name="remove-circle" size={18} color={colors.danger} />
+                <Text style={styles.consequenceText}>{t('focus.streakReset')}</Text>
+              </View>
+              <View style={styles.consequenceRow}>
+                <MaterialIcons name="remove-circle" size={18} color={colors.danger} />
+                <Text style={styles.consequenceText}>{t('focus.consistencyDamaged')}</Text>
+              </View>
             </View>
-            <View style={styles.consequenceRow}>
-              <MaterialIcons name="remove-circle" size={18} color={colors.danger} />
-              <Text style={styles.consequenceText}>{t('focus.consistencyDamaged')}</Text>
-            </View>
-          </View>
+          )}
 
-          {penalty > 0 && (
+          {!isPending && penalty > 0 && (
             <View style={styles.penaltyCard}>
               <Text style={styles.penaltyText}>-{penalty} XP</Text>
               <Text style={styles.penaltyLabel}>{t('focus.penalty')}</Text>

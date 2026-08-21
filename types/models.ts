@@ -105,6 +105,8 @@ export interface XPTransaction {
   createdAt: string;
 }
 
+export type ActiveSessionStatus = 'running' | 'interrupted' | 'verification_required';
+
 export interface ActiveSession {
   sessionId: string;
   startedAt: string;
@@ -114,6 +116,12 @@ export interface ActiveSession {
   studyGroupId?: string | null;
   isRecovery?: boolean;
   recoveryLostStreak?: number;
+  status?: ActiveSessionStatus;
+  checkpointElapsedSeconds?: number;
+  lastCheckpointAt?: string;
+  lastWallClockAt?: string;
+  clockAnomaly?: boolean;
+  processInstanceId?: string;
 }
 
 export interface Referral {

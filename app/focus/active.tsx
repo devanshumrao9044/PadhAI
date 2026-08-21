@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, BackHandler, AppState, Platform
+  View, Text, StyleSheet, TouchableOpacity, BackHandler, AppState, Platform, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import NetInfo from '@react-native-community/netinfo';
 import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -30,6 +31,8 @@ export default function FocusActiveScreen() {
     user,
     completeSession,
     breakSession,
+    checkpointActiveSession,
+    discardActiveSession,
     subjects,
     streakRecoveryPending,
     lostStreakCount,
@@ -41,11 +44,17 @@ export default function FocusActiveScreen() {
   const [tapCount, setTapCount] = useState(0);
   const [showExit, setShowExit] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
 
   const startTimeRef = useRef(
     activeSession?.startedAt ? new Date(activeSession.startedAt).getTime() : Date.now()
   );
-  const elapsedRef = useRef(0);
+  const elapsedRef = useRef(activeSession?.checkpointElapsedSeconds ?? 0);
+  const monotonicStartRef = useRef<number | null>(null);
+  const baseElapsedRef = useRef(activeSession?.checkpointElapsedSeconds ?? 0);
+  const clockSampleRef = useRef({ wallMs: Date.now(), monotonicMs: 0 });
+  const clockAnomalyRef = useRef(Boolean(activeSession?.clockAnomaly));
+  const recoveryPromptShownRef = useRef(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const appStateRef = useRef(AppState.currentState);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -53,6 +62,20 @@ export default function FocusActiveScreen() {
   const rtChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const rtChannelIdRef = useRef(0);
   const presenceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    void NetInfo.fetch().then(state => {
+      if (mounted) setIsOnline(state.isConnected === true && state.isInternetReachable !== false);
+    });
+    const unsubscribe = NetInfo.addEventListener(state => {
+      if (mounted) setIsOnline(state.isConnected === true && state.isInternetReachable !== false);
+    });
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
 
   // ✅ Store subscription objects in refs so cleanup always has latest reference
   const appStateSubRef = useRef<{ remove?: () => void } | null>(null);
@@ -65,6 +88,8 @@ export default function FocusActiveScreen() {
     activeSession,
     completeSession,
     breakSession,
+    checkpointActiveSession,
+    discardActiveSession,
     streakRecoveryPending,
     lostStreakCount,
     setStreakRecoveryPending,
@@ -75,6 +100,8 @@ export default function FocusActiveScreen() {
     activeSession,
     completeSession,
     breakSession,
+    checkpointActiveSession,
+    discardActiveSession,
     streakRecoveryPending,
     lostStreakCount,
     setStreakRecoveryPending,
@@ -118,7 +145,7 @@ export default function FocusActiveScreen() {
         return;
       }
 
-      const session = await complete(sessionToComplete.sessionId, actualMins);
+      const session = await complete(sessionToComplete.sessionId, actualMins, elapsedRef.current);
       if (!session) {
         if (isRecovery) {
           const brokenSession = await breakCurrent(sessionToComplete.sessionId, actualMins);
@@ -131,12 +158,20 @@ export default function FocusActiveScreen() {
         return;
       }
 
-      void haptics.focusComplete();
+      const syncPending = Boolean((session as any)?.syncPending);
+      const clockAnomaly = Boolean((session as any)?.clockAnomaly);
+      if (!syncPending) void haptics.focusComplete();
       const comebackParam = (session as any)?.comebackBonus > 0 ? '1' : '0';
         const xpEarned = session?.xpEarned ?? 0;
         const referralXpAwarded = session?.referralXpAwarded ?? 0;
 
         if (isRecovery) setRecovery(false, 0);
+
+      if (syncPending) {
+        if (isRecovery) setRecovery(false, 0);
+        currentRouter.replace(`/focus/complete?xp=0&referralXp=0&comeback=0&recovery=0&pending=1&clock=${clockAnomaly ? '1' : '0'}`);
+        return;
+      }
 
       if (session.leveledUp && session.newLevelRank) {
         const { LEVELS } = await import('@/constants/levels');
@@ -170,26 +205,45 @@ export default function FocusActiveScreen() {
     try {
       const actualMins = Math.max(0, Math.floor(elapsedRef.current / 60));
       const session = await breakSession(activeSession.sessionId, actualMins);
-      void haptics.focusBroken();
-      router.replace(`/focus/broken?penalty=${session?.xpDeducted || 0}`);
+      const syncPending = Boolean((session as any)?.syncPending);
+      if (!syncPending) void haptics.focusBroken();
+      router.replace(`/focus/broken?penalty=${session?.xpDeducted || 0}&pending=${syncPending ? '1' : '0'}`);
     } catch (error) {
       console.error("Silent Break Error:", error);
       router.replace('/focus/broken?penalty=0');
     }
   };
 
+  const monotonicNow = () => typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now();
+
   const tick = useCallback(() => {
-    if (isCompletingRef.current) return;
-    const currentElapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+    if (isCompletingRef.current || clockAnomalyRef.current) return;
+    const nowMonotonic = monotonicNow();
+    const nowWall = Date.now();
+    const previous = clockSampleRef.current;
+    const wallDelta = nowWall - previous.wallMs;
+    const monotonicDelta = nowMonotonic - previous.monotonicMs;
+    if (previous.monotonicMs > 0 && Math.abs(wallDelta - monotonicDelta) > 120_000) {
+      clockAnomalyRef.current = true;
+      void checkpointActiveSession(elapsedRef.current, true);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      intervalRef.current = null;
+      setElapsed(elapsedRef.current);
+      return;
+    }
+    const currentElapsed = baseElapsedRef.current + Math.max(0, Math.floor((nowMonotonic - (monotonicStartRef.current ?? nowMonotonic)) / 1000));
     const currentRemaining = Math.max(0, liveStateRef.current.plannedSecs - currentElapsed);
 
     elapsedRef.current = currentElapsed;
+    clockSampleRef.current = { wallMs: nowWall, monotonicMs: nowMonotonic };
     setElapsed(currentElapsed);
 
     if (currentRemaining <= 0) {
       handleComplete();
     }
-  }, [handleComplete]);
+  }, [checkpointActiveSession, handleComplete]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -203,22 +257,49 @@ export default function FocusActiveScreen() {
     startTimeRef.current = currentSession.startedAt
       ? new Date(currentSession.startedAt).getTime()
       : Date.now();
-    const alreadyElapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+    const alreadyElapsed = currentSession.checkpointElapsedSeconds ?? 0;
     elapsedRef.current = alreadyElapsed;
+    baseElapsedRef.current = alreadyElapsed;
+    monotonicStartRef.current = monotonicNow();
+    clockSampleRef.current = { wallMs: Date.now(), monotonicMs: monotonicStartRef.current };
+    clockAnomalyRef.current = Boolean(currentSession.clockAnomaly);
     setElapsed(alreadyElapsed);
     if (intervalRef.current) clearInterval(intervalRef.current);
-    intervalRef.current = setInterval(tick, 500);
+    if (!clockAnomalyRef.current) intervalRef.current = setInterval(tick, 500);
+
+    if (currentSession.status === 'interrupted' && !recoveryPromptShownRef.current) {
+      recoveryPromptShownRef.current = true;
+      setTimeout(() => {
+        Alert.alert(
+          t('focus.interruptedTitle'),
+          t('focus.interruptedMessage', { value: alreadyElapsed }),
+          [
+            { text: t('focus.discardInterrupted'), style: 'destructive', onPress: () => { void discardActiveSession(); currentRouter.replace('/(tabs)/focus'); } },
+            { text: t('focus.finishAndSync'), onPress: () => { void handleComplete(); } },
+            { text: t('focus.continueSession'), onPress: () => { void checkpointActiveSession(alreadyElapsed, false); } },
+          ],
+        );
+      }, 0);
+    }
+
+    const checkpointTimer = setInterval(() => {
+      void checkpointActiveSession(elapsedRef.current, clockAnomalyRef.current);
+    }, 10_000);
 
     // ✅ Bulletproof AppState listener setup
     try {
       const sub = AppState.addEventListener('change', next => {
         if (appStateRef.current === 'active' && next !== 'active') {
+          void checkpointActiveSession(elapsedRef.current, clockAnomalyRef.current);
           if (intervalRef.current) {
             clearInterval(intervalRef.current);
             intervalRef.current = null;
           }
         } else if (appStateRef.current !== 'active' && next === 'active') {
-          if (!intervalRef.current) intervalRef.current = setInterval(tick, 500);
+          baseElapsedRef.current = elapsedRef.current;
+          monotonicStartRef.current = monotonicNow();
+          clockSampleRef.current = { wallMs: Date.now(), monotonicMs: monotonicStartRef.current };
+          if (!clockAnomalyRef.current && !intervalRef.current) intervalRef.current = setInterval(tick, 500);
         }
         appStateRef.current = next;
       });
@@ -241,6 +322,7 @@ export default function FocusActiveScreen() {
     }
 
     return () => {
+      clearInterval(checkpointTimer);
       if (intervalRef.current) clearInterval(intervalRef.current);
       intervalRef.current = null;
       if (tapTimer.current) clearTimeout(tapTimer.current);
@@ -259,7 +341,7 @@ export default function FocusActiveScreen() {
       }
       backSubRef.current = null;
     };
-  }, [isLoading, activeSession?.sessionId, activeSession?.startedAt, plannedSecs, tick]);
+  }, [isLoading, activeSession?.sessionId, activeSession?.startedAt, activeSession?.status, plannedSecs, tick, t, checkpointActiveSession, discardActiveSession, handleComplete]);
 
   useEffect(() => {
     const groupId = activeSession?.studyGroupId;
@@ -386,6 +468,12 @@ export default function FocusActiveScreen() {
           <Text style={styles.timerLabel}>REMAINING</Text>
           <Text style={styles.timerText}>{formatTime(remaining)}</Text>
           <Text style={styles.timerSub}>of {plannedMins} min session</Text>
+          <View style={[styles.syncBadge, clockAnomalyRef.current && styles.syncBadgeWarning]}>
+            <MaterialIcons name={clockAnomalyRef.current ? 'schedule' : isOnline ? 'cloud-done' : 'cloud-off'} size={14} color={clockAnomalyRef.current ? colors.warning : isOnline ? colors.success : colors.primary} />
+            <Text style={[styles.syncBadgeText, clockAnomalyRef.current && { color: colors.warning }, !clockAnomalyRef.current && !isOnline && { color: colors.primary }]}>
+              {clockAnomalyRef.current ? t('focus.clockChangeDetected') : t('focus.syncReady')}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.progressContainer}>
@@ -442,6 +530,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   timerLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, color: colors.textTertiary, letterSpacing: 2, marginBottom: Spacing.sm, textTransform: 'uppercase' },
   timerText: { fontSize: 96, fontWeight: FontWeight.extraBold, color: colors.textPrimary, letterSpacing: -2, includeFontPadding: false },
   timerSub: { fontSize: FontSize.base, color: colors.textSecondary, marginTop: Spacing.sm },
+  syncBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.md, paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.full, backgroundColor: colors.success + '18', borderWidth: 1, borderColor: colors.success + '44' },
+  syncBadgeWarning: { backgroundColor: colors.warning + '18', borderColor: colors.warning + '44' },
+  syncBadgeText: { fontSize: FontSize.xs, color: colors.success, fontWeight: FontWeight.semiBold },
   progressContainer: { width: '100%', marginBottom: Spacing.md },
   progressTrack: { height: 6, backgroundColor: colors.surfaceVariant, borderRadius: Radius.full, overflow: 'hidden', marginBottom: 8 },
   progressFill: { height: '100%', backgroundColor: colors.primary, borderRadius: Radius.full },

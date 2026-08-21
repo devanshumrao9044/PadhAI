@@ -66,7 +66,7 @@ export default function FocusCompleteScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const params = useLocalSearchParams<{
-    xp: string; referralXp: string; comeback: string; recovery: string; lostStreak: string;
+    xp: string; referralXp: string; comeback: string; recovery: string; lostStreak: string; pending: string; clock: string;
   }>();
   const { user, setUser } = useApp();
 
@@ -75,6 +75,8 @@ export default function FocusCompleteScreen() {
   const isComeback = params.comeback === '1';
   const isRecovery = params.recovery === '1';
   const lostStreak = parseInt(params.lostStreak ?? '0', 10);
+  const isPending = params.pending === '1';
+  const clockAnomaly = params.clock === '1';
   const recoveredStreak = Math.max(1, Math.ceil(lostStreak / 2));
   const COMEBACK_BONUS = 50;
 
@@ -174,7 +176,7 @@ export default function FocusCompleteScreen() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const showConfetti = isComeback || isRecovery;
+  const showConfetti = !isPending && (isComeback || isRecovery);
   const confettiParticles = showConfetti
     ? Array.from({ length: 18 }, (_, i) => ({
         id: i,
@@ -184,20 +186,24 @@ export default function FocusCompleteScreen() {
       }))
     : [];
 
-  const screenTitle = isRecovery
+  const screenTitle = isPending
+    ? t('focus.syncPendingTitle')
+    : isRecovery
     ? t('focus.recovery')
     : isComeback
     ? t('focus.comeback')
     : t('focus.sessionComplete');
 
-  const screenMessage = isRecovery
+  const screenMessage = isPending
+    ? (clockAnomaly ? t('focus.syncPendingClockMessage') : t('focus.syncPendingMessage'))
+    : isRecovery
     ? t('focus.recoveryDetail', { lost: lostStreak, recovered: recoveredStreak })
     : isComeback
     ? t('focus.comebackDescription')
     : messageRef.current;
 
-  const heroIcon = isRecovery ? 'local-fire-department' : isComeback ? 'whatshot' : 'emoji-events';
-  const heroColor = isRecovery ? colors.success : isComeback ? '#F97316' : colors.warning;
+  const heroIcon = isPending ? 'cloud-upload' : isRecovery ? 'local-fire-department' : isComeback ? 'whatshot' : 'emoji-events';
+  const heroColor = isPending ? colors.primary : isRecovery ? colors.success : isComeback ? '#F97316' : colors.warning;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -236,13 +242,21 @@ export default function FocusCompleteScreen() {
           </Text>
           <Text style={styles.message}>{screenMessage}</Text>
 
+          {isPending ? (
+            <View style={[styles.xpCard, { backgroundColor: heroColor + '22', borderColor: heroColor + '55' }]}>
+              <MaterialIcons name="cloud-upload" size={28} color={heroColor} />
+              <Text style={[styles.xpAmount, { color: heroColor }]}>{t('focus.syncPendingTitle')}</Text>
+              <Text style={styles.xpLabel}>{t('focus.syncPendingMessage')}</Text>
+            </View>
+          ) : (
           <View style={[styles.xpCard, (isComeback || isRecovery) && { backgroundColor: heroColor + '22', borderColor: heroColor + '55' }]}>
             <MaterialIcons name="bolt" size={28} color={colors.warning} />
             <Text style={styles.xpAmount}>+{xp} XP</Text>
             <Text style={styles.xpLabel}>{t('focus.earned')}</Text>
           </View>
+          )}
 
-          {referralXpAwarded > 0 ? (
+          {!isPending && referralXpAwarded > 0 ? (
             <View style={styles.referralBonusBanner}>
               <View style={styles.referralBonusIcon}><MaterialIcons name="people" size={22} color={colors.success} /></View>
               <View style={styles.referralBonusText}>

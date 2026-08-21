@@ -17,6 +17,9 @@ importers:
       '@react-native-community/datetimepicker':
         specifier: ^8.2.0
         version: 8.3.0(expo@53.0.12(@babel/core@7.27.4(supports-color@8.1.1))(@expo/metro-runtime@5.0.4(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1)))(react-native-webview@13.13.5(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1))(react@19.0.0))(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1))(react@19.0.0)(supports-color@8.1.1))(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1))(react@19.0.0)
+      '@react-native-community/netinfo':
+        specifier: 11.4.1
+        version: 11.4.1(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1))
       '@supabase/supabase-js':
         specifier: ^2.50.0
         version: 2.50.0
@@ -935,6 +938,11 @@ packages:
         optional: true
       react-native-windows:
         optional: true
+
+  '@react-native-community/netinfo@11.4.1':
+    resolution: {integrity: sha512-B0BYAkghz3Q2V09BF88RA601XursIEA111tnc2JOaN7axJWmNefmfjZqw/KdSxKZp7CZUuPpjBmz/WCR9uaHYg==}
+    peerDependencies:
+      react-native: '>=0.59'
 
   '@react-native/assets-registry@0.79.3':
     resolution: {integrity: sha512-Vy8DQXCJ21YSAiHxrNBz35VqVlZPpRYm50xRTWRf660JwHuJkFQG8cUkrLzm7AUriqUXxwpkQHcY+b0ibw9ejQ==}
@@ -5352,6 +5360,10 @@ snapshots:
       react-native: 0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1)
     optionalDependencies:
       expo: 53.0.12(@babel/core@7.27.4(supports-color@8.1.1))(@expo/metro-runtime@5.0.4(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1)))(react-native-webview@13.13.5(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1))(react@19.0.0))(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1))(react@19.0.0)(supports-color@8.1.1)
+
+  '@react-native-community/netinfo@11.4.1(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1))':
+    dependencies:
+      react-native: 0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1)
 
   '@react-native/assets-registry@0.79.3': {}
 
