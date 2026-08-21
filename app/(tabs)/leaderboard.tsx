@@ -63,12 +63,12 @@ function LevelBadge({
       <View style={[styles.badgeAssembly, { width: badgeSize + 48, height: badgeSize + 30 }]}>
         <View style={[styles.badgeWing, { width: badgeSize * 0.48, height: wingHeight, backgroundColor: levelDef.color + '88', left: 0, transform: [{ rotate: '-18deg' }] }]} />
         <View style={[styles.badgeWing, { width: badgeSize * 0.48, height: wingHeight, backgroundColor: levelDef.color + '88', right: 0, transform: [{ rotate: '18deg' }] }]} />
-        <View style={[styles.badgeShield, { width: badgeSize, height: badgeSize, borderRadius: badgeSize * 0.24, backgroundColor: levelDef.color, borderColor: isCurrent ? '#FFFFFF' : levelDef.color + 'DD', borderWidth: isCurrent ? 3 : 2, transform: [{ rotate: '30deg' }] }]}>
-          <View style={[styles.badgeShieldInner, { borderColor: '#FFFFFF88' }]}>
-            <Text style={[styles.badgeNum, { fontSize, color: '#FFFFFF', transform: [{ rotate: '-30deg' }] }]}>{levelDef.rank}</Text>
+        <View style={[styles.badgeShield, { width: badgeSize, height: badgeSize, borderRadius: badgeSize * 0.24, backgroundColor: levelDef.color, borderColor: isCurrent ? colors.surface : levelDef.color + 'DD', borderWidth: isCurrent ? 3 : 2, transform: [{ rotate: '30deg' }] }]}>
+          <View style={[styles.badgeShieldInner, { borderColor: colors.surface + '88' }]}>
+            <Text style={[styles.badgeNum, { fontSize, color: colors.surface, transform: [{ rotate: '-30deg' }] }]}>{levelDef.rank}</Text>
           </View>
         </View>
-        <View style={[styles.badgeRibbon, { backgroundColor: isCurrent ? '#F7C948' : '#D9A441', bottom: 0, width: badgeSize * 0.46, height: size === 'lg' ? 18 : 12 }]} />
+        <View style={[styles.badgeRibbon, { backgroundColor: isCurrent ? colors.accent : colors.warning, bottom: 0, width: badgeSize * 0.46, height: size === 'lg' ? 18 : 12 }]} />
       </View>
       {isCurrent ? (
         <Text style={[styles.badgeLabelCurrent, { color: colors.textPrimary }]}>
@@ -151,7 +151,7 @@ function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
   const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const levelDef = LEVELS.find(l => l.rank === entry.level) ?? LEVELS[0];
-  const rankColors: Record<number, string> = { 1: '#F2B600', 2: '#2D8FCE', 3: '#4CA878' };
+  const rankColors: Record<number, string> = { 1: colors.levelLegend, 2: colors.levelGrinder, 3: colors.levelConsistent };
   const rankBg = rankColors[entry.rank] ?? levelDef.color;
   const medalIcons: Record<number, 'emoji-events' | 'military-tech' | 'workspace-premium'> = {
     1: 'emoji-events',
@@ -508,12 +508,12 @@ export default function LeaderboardScreen() {
           accessibilityLabel={`Top three achievement. You reached rank ${celebrationRank}.`}
           style={[styles.celebrationBanner, celebrationAnimatedStyle]}
         >
-          <MaterialIcons name="emoji-events" size={26} color="#FFD700" />
+          <MaterialIcons name="emoji-events" size={26} color={colors.levelLegend} />
           <View style={styles.celebrationCopy}>
             <Text style={styles.celebrationTitle}>{t('leaderboard.topThreeAchievement')}</Text>
             <Text style={styles.celebrationSubtitle}>{t('leaderboard.reachedRank', { value: celebrationRank })}</Text>
           </View>
-          <MaterialIcons name="star" size={20} color="#FFD700" />
+          <MaterialIcons name="star" size={20} color={colors.levelLegend} />
         </Animated.View>
       ) : null}
     </SafeAreaView>
@@ -534,11 +534,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingVertical: Spacing.sm,
     borderRadius: Radius.lg,
     borderWidth: 1,
-    borderColor: '#FFD70088',
+    borderColor: colors.levelLegend + '88',
     backgroundColor: colors.surface,
   },
   celebrationCopy: { flex: 1 },
-  celebrationTitle: { color: '#FFD700', fontSize: FontSize.sm, fontWeight: FontWeight.extraBold },
+  celebrationTitle: { color: colors.levelLegend, fontSize: FontSize.sm, fontWeight: FontWeight.extraBold },
   celebrationSubtitle: { color: colors.textSecondary, fontSize: FontSize.xs, marginTop: 2 },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 100 },
@@ -638,7 +638,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     position: 'absolute',
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#FFFFFF88',
+    borderColor: colors.surface + '88',
   },
   badgeNum: {
     fontWeight: FontWeight.extraBold,
@@ -883,9 +883,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     overflow: 'hidden',
   },
   topThreeRow: { minHeight: 96, paddingVertical: 16 },
-  firstPlaceRow: { borderColor: '#F2B60088', shadowColor: '#F2B600', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
-  secondPlaceRow: { borderColor: '#2D8FCE66' },
-  thirdPlaceRow: { borderColor: '#4CA87866' },
+  firstPlaceRow: { borderColor: colors.levelLegend + '88', shadowColor: colors.levelLegend, shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
+  secondPlaceRow: { borderColor: colors.levelGrinder + '66' },
+  thirdPlaceRow: { borderColor: colors.levelConsistent + '66' },
   boardRowMe: {
     borderColor: colors.primary,
     borderWidth: 2,
@@ -932,9 +932,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#DCEAF9',
+    backgroundColor: colors.surfaceVariant,
     borderWidth: 1.5,
-    borderColor: '#AFC8E3',
+    borderColor: colors.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
     transform: [{ rotate: '30deg' }],
@@ -955,7 +955,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   xpMiniText: {
     fontSize: 10,
     fontWeight: FontWeight.bold,
-    color: '#39526F',
+    color: colors.textSecondary,
     letterSpacing: 0.2,
   },
   separator: {

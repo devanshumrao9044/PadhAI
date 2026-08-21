@@ -226,7 +226,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   menuBtn: { gap: 5, padding: 4 },
   menuLine: {
     width: 22, height: 2,
-    backgroundColor: '#9CA3AF', borderRadius: 2,
+    backgroundColor: colors.textTertiary, borderRadius: 2,
   },
   headerTitleBlock: { flex: 1, minWidth: 0, marginLeft: 8 },
   appName: { fontSize: 26, lineHeight: 32, fontWeight: '900', color: colors.textPrimary, flexShrink: 1 },

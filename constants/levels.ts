@@ -10,11 +10,11 @@ export interface LevelDef {
 }
 
 export const LEVELS: LevelDef[] = [
-  { rank: 1, minXP: 0,    maxXP: 99,   realisticTitle: 'Beginner',    examTitle: 'Fresher',          color: '#8888AA' },
-  { rank: 2, minXP: 100,  maxXP: 499,  realisticTitle: 'Grinder',     examTitle: 'Class 11',         color: '#4FC3F7' },
-  { rank: 3, minXP: 500,  maxXP: 1499, realisticTitle: 'Consistent',  examTitle: 'Class 12',         color: '#4CAF7D' },
-  { rank: 4, minXP: 1500, maxXP: 3999, realisticTitle: 'Beast',       examTitle: 'Dropper',          color: '#FFB547' },
-  { rank: 5, minXP: 4000, maxXP: 9999, realisticTitle: 'Legend',      examTitle: 'IITian / Doctor',  color: '#FFD700' },
+  { rank: 1, minXP: 0,    maxXP: 99,   realisticTitle: 'Beginner',    examTitle: 'Fresher',          color: '#64748B' },
+  { rank: 2, minXP: 100,  maxXP: 499,  realisticTitle: 'Grinder',     examTitle: 'Class 11',         color: '#0E7490' },
+  { rank: 3, minXP: 500,  maxXP: 1499, realisticTitle: 'Consistent',  examTitle: 'Class 12',         color: '#166534' },
+  { rank: 4, minXP: 1500, maxXP: 3999, realisticTitle: 'Beast',       examTitle: 'Dropper',          color: '#A16207' },
+  { rank: 5, minXP: 4000, maxXP: 9999, realisticTitle: 'Legend',      examTitle: 'IITian / Doctor',  color: '#92400E' },
 ];
 
 export function getLevelForXP(xp: number): LevelDef {
@@ -62,8 +62,8 @@ export const XP_REWARDS = {
 };
 
 export const SUBJECT_COLORS = [
-  '#7C5CFC', '#4FC3F7', '#4CAF7D', '#FFB547', '#FF4757',
-  '#FF6B9D', '#00D4AA', '#A78BFA', '#FB923C', '#34D399',
+  '#0D9488', '#14B8A6', '#0F766E', '#EA580C', '#C2410C',
+  '#2DD4BF', '#0E7490', '#166534', '#A16207', '#92400E',
 ];
 
 export const SUBJECT_ICONS = [
