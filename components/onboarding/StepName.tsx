@@ -6,9 +6,10 @@ import { ThemeColors } from '@/constants/theme';
 interface Props {
   value: string;
   onChange: (val: string) => void;
+  error?: string;
 }
 
-export default function StepName({ value, onChange }: Props) {
+export default function StepName({ value, onChange, error }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
@@ -26,7 +27,8 @@ export default function StepName({ value, onChange }: Props) {
         onChangeText={onChange}
         autoFocus
         maxLength={30}
-      />
+        />
+      {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
   );
 }
@@ -54,6 +56,13 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     fontSize: 15,
     textAlign: 'center',
     marginBottom: 32,
+  },
+  error: {
+    color: colors.danger,
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: 'center',
+    marginTop: 7,
   },
   input: {
     backgroundColor: colors.surface,

@@ -43,7 +43,12 @@ export default function CalendarScreen() {
   const [title, setTitle] = useState('');
   const [isDayOff, setIsDayOff] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [titleError, setTitleError] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<CalendarEvent | null>(null);
+
+  useEffect(() => {
+    if (!modalVisible) setTitleError(false);
+  }, [modalVisible]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -74,7 +79,12 @@ export default function CalendarScreen() {
   };
 
   const addEvent = async () => {
-    if (!user?.id || (!title.trim() && !isDayOff)) return;
+    if (!user?.id) return;
+    if (!title.trim() && !isDayOff) {
+      setTitleError(true);
+      return;
+    }
+    setTitleError(false);
     setSaving(true);
     const event: CalendarEvent = {
       id: `${user.id}-calendar-${Date.now()}`,
@@ -207,21 +217,22 @@ export default function CalendarScreen() {
             <Text style={styles.selectedDateLabel}>{new Date(`${selectedDate}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
             <TextInput
               value={title}
-              onChangeText={setTitle}
+              onChangeText={value => { setTitle(value); if (value.trim()) setTitleError(false); }}
               placeholder={t('calendar.eventPlaceholder')}
               placeholderTextColor={colors.textTertiary}
-              style={styles.input}
+              style={[styles.input, titleError && styles.inputError]}
               autoFocus={!isDayOff}
               maxLength={80}
             />
+            {titleError ? <Text style={styles.fieldError}>{t('calendar.eventNameRequired')}</Text> : null}
             <View style={styles.switchRow}>
               <View style={styles.switchCopy}>
                 <Text style={styles.switchTitle}>{t('calendar.dayOff')}</Text>
                 <Text style={styles.switchHint}>{t('calendar.dayOffHint')}</Text>
               </View>
-              <Switch value={isDayOff} onValueChange={setIsDayOff} trackColor={{ false: colors.surfaceVariant, true: colors.primaryDim }} thumbColor={isDayOff ? colors.primary : colors.textTertiary} />
+              <Switch value={isDayOff} onValueChange={value => { setIsDayOff(value); if (value) setTitleError(false); }} trackColor={{ false: colors.surfaceVariant, true: colors.primaryDim }} thumbColor={isDayOff ? colors.primary : colors.textTertiary} />
             </View>
-            <TouchableOpacity style={[styles.saveButton, (!title.trim() && !isDayOff || saving) && styles.disabled]} disabled={(!title.trim() && !isDayOff) || saving} onPress={addEvent}>
+            <TouchableOpacity style={[styles.saveButton, saving && styles.disabled]} disabled={saving} onPress={addEvent}>
               {saving ? <ActivityIndicator color={colors.background} /> : <Text style={styles.saveButtonText}>{t('calendar.save')}</Text>}
             </TouchableOpacity>
           </View>
@@ -275,6 +286,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   sheetTitle: { flex: 1, minWidth: 0, color: colors.textPrimary, fontSize: FontSize.lg, lineHeight: 24, fontWeight: FontWeight.bold, flexShrink: 1 },
   selectedDateLabel: { color: colors.textSecondary, fontSize: FontSize.sm, lineHeight: 18, marginBottom: Spacing.md, flexShrink: 1 },
   input: { borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, backgroundColor: colors.surfaceVariant, color: colors.textPrimary, paddingHorizontal: Spacing.md, paddingVertical: 14, fontSize: FontSize.base },
+  inputError: { borderColor: colors.danger, backgroundColor: colors.dangerDim + '25' },
+  fieldError: { color: colors.danger, fontSize: FontSize.xs, lineHeight: 17, marginTop: 5 },
   switchRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: Spacing.md, paddingVertical: Spacing.lg },
   switchCopy: { flex: 1, minWidth: 0 },
   switchTitle: { color: colors.textPrimary, fontSize: FontSize.base, lineHeight: 20, fontWeight: FontWeight.semiBold, flexShrink: 1 },

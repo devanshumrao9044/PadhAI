@@ -61,7 +61,10 @@ export default function AuthScreen() {
     const normalizedEmail = email.trim().toLowerCase();
     const nextErrors: FieldErrors = {};
     if (!normalizedEmail || !normalizedEmail.includes('@')) nextErrors.email = 'Please enter a valid email address.';
-    if (mode !== 'forgot') {
+    if (mode === 'login' && password.length === 0) {
+      nextErrors.password = 'Please enter your password.';
+    }
+    if (mode === 'signup') {
       const passwordResult = validatePassword(password);
       if (!passwordResult.valid) nextErrors.password = passwordResult.error;
     }
@@ -172,11 +175,11 @@ export default function AuthScreen() {
               <View style={styles.fieldGroup}>
                 <Text style={styles.fieldLabel}>PASSWORD</Text>
                 <TextInput testID="auth-password" style={[styles.input, fieldErrors.password && styles.inputError]} placeholder="At least 6 characters" placeholderTextColor={colors.textTertiary} value={password} onChangeText={value => updateField('password', value)} secureTextEntry autoCapitalize="none" autoCorrect={false} />
-                {fieldErrors.password ? <Text style={styles.fieldError}>{fieldErrors.password}</Text> : passwordTouched && password.length > 0 && !validatePassword(password).valid ? (
+                {fieldErrors.password ? <Text style={styles.fieldError}>{fieldErrors.password}</Text> : mode === 'signup' && passwordTouched && password.length > 0 && !validatePassword(password).valid ? (
                   <Text style={styles.fieldError}>{validatePassword(password).error}</Text>
-                ) : (
+                ) : mode === 'signup' ? (
                   <Text style={styles.helperText}>Minimum 6 characters with uppercase, lowercase, number, and symbol.</Text>
-                )}
+                ) : null}
               </View>
             ) : null}
 

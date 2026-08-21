@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
+import { NotificationSkeletonList } from '@/components/ui/Skeleton';
 import {
   deleteUserNotification,
   getNotificationAttachmentUrl,
@@ -143,7 +144,7 @@ export default function NotificationsScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>
+        <NotificationSkeletonList />
       ) : (
         <ScrollView
           contentContainerStyle={styles.content}

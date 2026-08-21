@@ -22,6 +22,8 @@ export default function RaiseTicketScreen() {
   const [subject, setSubject] = useState('');
   const [details, setDetails] = useState('');
   const [error, setError] = useState('');
+  const [subjectError, setSubjectError] = useState('');
+  const [detailsError, setDetailsError] = useState('');
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const scale = useRef(new Animated.Value(0.92)).current;
@@ -33,10 +35,13 @@ export default function RaiseTicketScreen() {
 
   const submit = async () => {
     if (!user?.id) return;
-    if (subject.trim().length < 3) { setError('Subject must be at least 3 characters.'); return; }
-    if (details.trim().length < 5) { setError('Please add a little more detail.'); return; }
-    setSaving(true);
+    const nextSubjectError = subject.trim().length < 3 ? 'Subject must be at least 3 characters.' : '';
+    const nextDetailsError = details.trim().length < 5 ? 'Please add a little more detail.' : '';
+    setSubjectError(nextSubjectError);
+    setDetailsError(nextDetailsError);
     setError('');
+    if (nextSubjectError || nextDetailsError) return;
+    setSaving(true);
     try {
       await submitStudyGroupTicket({ userId: user.id, category, subject, details, groupId: typeof routeGroupId === 'string' ? routeGroupId : null, reportId: typeof routeReportId === 'string' ? routeReportId : null });
       setSubmitted(true);
@@ -60,9 +65,11 @@ export default function RaiseTicketScreen() {
         <Text style={styles.label}>{t('support.ticketCategory')}</Text>
         <View style={styles.chipGrid}>{CATEGORIES.map(item => { const selected = category === item; const key = item === 'study_group' ? 'categoryStudyGroup' : item === 'report_follow_up' ? 'categoryReportFollowUp' : item === 'feature_request' ? 'categoryFeature' : item === 'bug' ? 'categoryBug' : item === 'account' ? 'categoryAccount' : 'categoryOther'; return <Pressable key={item} onPress={() => setCategory(item)} style={[styles.chip, selected && styles.chipSelected]}><Text style={[styles.chipText, selected && styles.chipTextSelected]}>{t(`support.${key}` as any)}</Text></Pressable>; })}</View>
         <Text style={styles.label}>{t('support.ticketSubject')}</Text>
-        <TextInput value={subject} onChangeText={setSubject} placeholder={t('support.ticketSubjectPlaceholder')} placeholderTextColor={colors.textTertiary} style={styles.input} maxLength={100} />
+        <TextInput value={subject} onChangeText={value => { setSubject(value); if (value.trim().length >= 3) setSubjectError(''); }} placeholder={t('support.ticketSubjectPlaceholder')} placeholderTextColor={colors.textTertiary} style={[styles.input, subjectError && styles.inputError]} maxLength={100} />
+        {subjectError ? <Text style={styles.fieldError}>{subjectError}</Text> : null}
         <Text style={styles.label}>{t('support.ticketDetails')}</Text>
-        <TextInput value={details} onChangeText={setDetails} placeholder={t('support.ticketDetailsPlaceholder')} placeholderTextColor={colors.textTertiary} style={[styles.input, styles.multiline]} maxLength={2000} multiline textAlignVertical="top" />
+        <TextInput value={details} onChangeText={value => { setDetails(value); if (value.trim().length >= 5) setDetailsError(''); }} placeholder={t('support.ticketDetailsPlaceholder')} placeholderTextColor={colors.textTertiary} style={[styles.input, styles.multiline, detailsError && styles.inputError]} maxLength={2000} multiline textAlignVertical="top" />
+        {detailsError ? <Text style={styles.fieldError}>{detailsError}</Text> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <Pressable onPress={() => { void submit(); }} disabled={saving} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, saving && styles.disabled]}><Text style={styles.primaryText}>{saving ? t('common.loading') : t('support.sendTicket')}</Text></Pressable>
         <Text style={styles.footerHint}>Your ticket is visible to you and the PadhAI owner for resolution.</Text>
@@ -87,6 +94,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   chipTextSelected: { color: colors.primary },
   input: { minHeight: 50, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, backgroundColor: colors.surface, color: colors.textPrimary, paddingHorizontal: Spacing.md, paddingVertical: 12, fontSize: FontSize.md },
   multiline: { minHeight: 150 },
+  inputError: { borderColor: colors.danger, backgroundColor: colors.dangerDim + '25' },
+  fieldError: { color: colors.danger, fontSize: FontSize.xs, lineHeight: 18, marginTop: -4 },
   error: { color: colors.danger, lineHeight: 20 },
   primaryButton: { minHeight: 50, borderRadius: Radius.md, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.md },
   primaryText: { color: colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },

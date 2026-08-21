@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { ReferralSkeleton } from '@/components/ui/Skeleton';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors } from '@/constants/theme';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Share, ScrollView, ActivityIndicator,
+  Share, ScrollView,
   Linking, Modal, Pressable
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
@@ -110,11 +111,7 @@ export default function ReferralScreen() {
   }
 
   if (loading) {
-    return (
-      <View style={styles.loader}>
-        <ActivityIndicator color={colors.primary} size="large" />
-      </View>
-    );
+    return <ReferralSkeleton />;
   }
 
   const progress = Math.min(completed / REWARD_THRESHOLD, 1);

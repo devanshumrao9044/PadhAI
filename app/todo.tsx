@@ -45,7 +45,12 @@ export default function TodoScreen() {
   const [title, setTitle] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [titleError, setTitleError] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<TodoItem | null>(null);
+
+  useEffect(() => {
+    if (!modalVisible) setTitleError(false);
+  }, [modalVisible]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -88,7 +93,12 @@ export default function TodoScreen() {
   };
 
   const addItem = async () => {
-    if (!user?.id || !title.trim()) return;
+    if (!user?.id) return;
+    if (!title.trim()) {
+      setTitleError(true);
+      return;
+    }
+    setTitleError(false);
     setSaving(true);
     const item: TodoItem = {
       id: `${user.id}-todo-${Date.now()}`,
@@ -233,13 +243,14 @@ export default function TodoScreen() {
             </View>
             <TextInput
               value={title}
-              onChangeText={setTitle}
+              onChangeText={value => { setTitle(value); if (value.trim()) setTitleError(false); }}
               placeholder={t('todo.taskPlaceholder')}
               placeholderTextColor={colors.textTertiary}
-              style={styles.input}
+              style={[styles.input, titleError && styles.inputError]}
               autoFocus
               maxLength={80}
             />
+            {titleError ? <Text style={styles.fieldError}>{t('todo.taskNameRequired')}</Text> : null}
             <Text style={styles.fieldLabel}>{t('todo.subject')}</Text>
             <View style={styles.subjectOptions}>
               <Pressable style={[styles.subjectChip, selectedSubjectId === null && styles.subjectChipActive]} onPress={() => setSelectedSubjectId(null)}>
@@ -251,7 +262,7 @@ export default function TodoScreen() {
                 </Pressable>
               ))}
             </View>
-            <TouchableOpacity style={[styles.saveButton, (!title.trim() || saving) && styles.disabled]} disabled={!title.trim() || saving} onPress={addItem}>
+            <TouchableOpacity style={[styles.saveButton, saving && styles.disabled]} disabled={saving} onPress={addItem}>
               {saving ? <ActivityIndicator color={colors.background} /> : <Text style={styles.saveButtonText}>{t('todo.save')}</Text>}
             </TouchableOpacity>
           </View>
@@ -300,6 +311,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   sheetHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: Spacing.md },
   sheetTitle: { flex: 1, minWidth: 0, color: colors.textPrimary, fontSize: FontSize.lg, lineHeight: 24, fontWeight: FontWeight.bold, flexShrink: 1 },
   input: { borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, backgroundColor: colors.surfaceVariant, color: colors.textPrimary, paddingHorizontal: Spacing.md, paddingVertical: 14, fontSize: FontSize.base },
+  inputError: { borderColor: colors.danger, backgroundColor: colors.dangerDim + '25' },
+  fieldError: { color: colors.danger, fontSize: FontSize.xs, lineHeight: 17, marginTop: 5 },
   fieldLabel: { color: colors.textSecondary, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, marginTop: Spacing.md, marginBottom: Spacing.sm },
   subjectOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   subjectChip: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceVariant, borderRadius: Radius.full, paddingHorizontal: 12, paddingVertical: 8 },

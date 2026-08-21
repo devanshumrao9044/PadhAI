@@ -14,9 +14,10 @@ const GOALS = [
 interface Props {
   value: number;
   onChange: (val: number) => void;
+  error?: string;
 }
 
-export default function StepGoal({ value, onChange }: Props) {
+export default function StepGoal({ value, onChange, error }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
@@ -53,6 +54,7 @@ export default function StepGoal({ value, onChange }: Props) {
           </TouchableOpacity>
         ))}
       </View>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
   );
 }
@@ -82,6 +84,13 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   list: {
     gap: 10,
+  },
+  error: {
+    color: colors.danger,
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: 'center',
+    marginTop: 8,
   },
   card: {
     flexDirection: 'row',

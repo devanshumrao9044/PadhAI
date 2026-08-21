@@ -31,6 +31,7 @@ export default function OnboardingScreen() {
   const [learnerType, setLearnerType] = useState<LearnerType>('SELF_STUDY');
   const [goalMinutes, setGoalMinutes] = useState(120);
   const [loading, setLoading] = useState(false);
+  const [stepError, setStepError] = useState('');
 
   const canSkip = Boolean(appUser?.fullName && appUser.fullName !== 'Student');
 
@@ -94,6 +95,11 @@ export default function OnboardingScreen() {
   }
 
   function handleNext() {
+    if (!canProceed()) {
+      setStepError(step === 1 ? t('onboarding.nameRequired') : step === 3 ? t('onboarding.goalRequired') : t('onboarding.selectionRequired'));
+      return;
+    }
+    setStepError('');
     if (step < TOTAL_STEPS) {
       setStep(current => current + 1);
     } else {
@@ -132,7 +138,7 @@ export default function OnboardingScreen() {
               exiting={SlideOutLeft.duration(200)}
               style={styles.animatedStep}
             >
-              {step === 1 ? <StepName value={name} onChange={setName} /> : null}
+              {step === 1 ? <StepName value={name} onChange={value => { setName(value); if (value.trim().length >= 2) setStepError(''); }} error={stepError} /> : null}
               {step === 2 ? (
                 <StepExam
                   value={exam}
@@ -141,7 +147,7 @@ export default function OnboardingScreen() {
                   onLearnerTypeChange={setLearnerType}
                 />
               ) : null}
-              {step === 3 ? <StepGoal value={goalMinutes} onChange={setGoalMinutes} /> : null}
+              {step === 3 ? <StepGoal value={goalMinutes} onChange={value => { setGoalMinutes(value); setStepError(''); }} error={stepError} /> : null}
             </Animated.View>
           </View>
 
@@ -152,9 +158,9 @@ export default function OnboardingScreen() {
               </TouchableOpacity>
             ) : null}
             <TouchableOpacity
-              style={[styles.nextButton, step === 1 && styles.nextButtonFull, !canProceed() && styles.nextButtonDisabled]}
+              style={[styles.nextButton, step === 1 && styles.nextButtonFull, loading && styles.nextButtonDisabled]}
               onPress={handleNext}
-              disabled={!canProceed() || loading}
+              disabled={loading}
             >
               {loading ? <ActivityIndicator color={colors.background} /> : <Text style={styles.nextButtonText}>{step === TOTAL_STEPS ? t('onboarding.startNow') : t('onboarding.next')} →</Text>}
             </TouchableOpacity>

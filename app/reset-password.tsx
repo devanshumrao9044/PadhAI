@@ -28,6 +28,8 @@ export default function ResetPasswordScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState('');
+  const [confirmError, setConfirmError] = useState('');
   const [success, setSuccess] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -92,14 +94,11 @@ export default function ResetPasswordScreen() {
 
   const handleSubmit = async () => {
     setError(null);
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
+    const nextPasswordError = password.length < 6 ? 'Password must be at least 6 characters.' : '';
+    const nextConfirmError = password !== confirmPassword ? 'Passwords do not match.' : '';
+    setPasswordError(nextPasswordError);
+    setConfirmError(nextConfirmError);
+    if (nextPasswordError || nextConfirmError) return;
 
     setSaving(true);
     const { error: updateError } = await supabase.auth.updateUser({ password });
@@ -140,25 +139,27 @@ export default function ResetPasswordScreen() {
           {success ? null : ready ? (
             <View style={styles.card}>
               <TextInput
-                style={styles.input}
+                style={[styles.input, passwordError && styles.inputError]}
                 placeholder="New password"
                 placeholderTextColor={colors.textTertiary}
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={value => { setPassword(value); if (value.length >= 6) setPasswordError(''); }}
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
               />
+              {passwordError ? <Text style={styles.fieldError}>{passwordError}</Text> : null}
               <TextInput
-                style={styles.input}
+                style={[styles.input, confirmError && styles.inputError]}
                 placeholder="Confirm new password"
                 placeholderTextColor={colors.textTertiary}
                 value={confirmPassword}
-                onChangeText={setConfirmPassword}
+                onChangeText={value => { setConfirmPassword(value); if (value === password) setConfirmError(''); }}
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
               />
+              {confirmError ? <Text style={styles.fieldError}>{confirmError}</Text> : null}
               <Pressable
                 style={[styles.button, saving && styles.buttonDisabled]}
                 onPress={handleSubmit}
@@ -188,6 +189,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   subtitle: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 8, marginBottom: 24 },
   card: { backgroundColor: colors.surface, borderRadius: 20, padding: 20, borderWidth: 1, borderColor: colors.border },
   input: { backgroundColor: colors.surfaceVariant, borderRadius: 12, borderWidth: 1, borderColor: colors.border, color: colors.textPrimary, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12 },
+  inputError: { borderColor: colors.danger, backgroundColor: colors.dangerDim + '25' },
+  fieldError: { color: colors.danger, fontSize: 12, lineHeight: 17, marginTop: -7, marginBottom: 10 },
   button: { minHeight: 50, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: colors.background, fontSize: 15, fontWeight: '700' },
