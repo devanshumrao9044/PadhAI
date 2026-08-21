@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable,
-  TextInput, Alert,
+  TextInput, Alert, Platform, AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -11,6 +11,12 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { calculateSessionXP } from '@/constants/levels';
+import {
+  getFocusGuardStatus,
+  openOverlayPermissionSettings,
+  openUsageStatsPermissionSettings,
+  type FocusGuardStatus,
+} from '@/features/focus/services/focusGuard';
 
 const DURATIONS = [15, 25, 45, 60, 90];
 const CUSTOM_KEY = -1;
@@ -31,11 +37,21 @@ export default function FocusScreen() {
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(initialSubjectId);
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(initialChapterId);
   const [starting, setStarting] = useState(false);
+  const [guardStatus, setGuardStatus] = useState<FocusGuardStatus>(() => getFocusGuardStatus());
   const inputRef = useRef<TextInput>(null);
   const autofocusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
     if (autofocusTimerRef.current) clearTimeout(autofocusTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    const refresh = () => setGuardStatus(getFocusGuardStatus());
+    refresh();
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') refresh();
+    });
+    return () => subscription.remove();
   }, []);
 
   const handleDurationSelect = (d: number) => {
@@ -234,6 +250,33 @@ export default function FocusScreen() {
           <Text style={styles.trackerHint}>{t('focus.selectTracker')}</Text>
         )}
 
+        {/* Focus Guard permissions */}
+        <View style={styles.rulesCard}>
+          <Text style={styles.rulesTitle}>{t('focus.guardTitle')}</Text>
+          {Platform.OS === 'android' ? (
+            <>
+              <Text style={styles.ruleText}>
+                {guardStatus.overlay && guardStatus.usageStats ? t('focus.guardPermissionReady') : t('focus.guardAndroidHint')}
+              </Text>
+              {!guardStatus.overlay ? (
+                <TouchableOpacity style={styles.guardButton} onPress={openOverlayPermissionSettings} activeOpacity={0.85}>
+                  <Text style={styles.guardButtonText}>{t('focus.guardOverlayPermission')}</Text>
+                </TouchableOpacity>
+              ) : null}
+              {!guardStatus.usageStats ? (
+                <TouchableOpacity style={styles.guardButton} onPress={openUsageStatsPermissionSettings} activeOpacity={0.85}>
+                  <Text style={styles.guardButtonText}>{t('focus.guardUsagePermission')}</Text>
+                </TouchableOpacity>
+              ) : null}
+              {!guardStatus.overlay || !guardStatus.usageStats ? (
+                <Text style={styles.guardHint}>{t('focus.guardPermissionNeeded')}</Text>
+              ) : null}
+            </>
+          ) : Platform.OS === 'ios' ? (
+            <Text style={styles.ruleText}>{t('focus.guardIosHint')}</Text>
+          ) : null}
+        </View>
+
         {/* Rules reminder */}
         <View style={styles.rulesCard}>
           <Text style={styles.rulesTitle}>{t('focus.focusRules')}</Text>
@@ -369,6 +412,26 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   rulesTitle: { fontSize: FontSize.base, fontWeight: FontWeight.semiBold, color: colors.textPrimary, marginBottom: 4 },
   ruleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  guardButton: {
+    marginTop: 10,
+    borderRadius: Radius.sm,
+    backgroundColor: colors.primary + '18',
+    borderWidth: 1,
+    borderColor: colors.primary + '55',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  guardButtonText: {
+    color: colors.primary,
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semiBold,
+    textAlign: 'center',
+  },
+  guardHint: {
+    color: colors.textTertiary,
+    fontSize: FontSize.xs,
+    marginTop: 8,
+  },
   ruleText: { fontSize: FontSize.sm, lineHeight: 19, color: colors.textSecondary, flex: 1, minWidth: 0, flexShrink: 1 },
   lockInBtn: {
     minHeight: 58,

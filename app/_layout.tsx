@@ -13,7 +13,7 @@ import { configureNotificationHandler, loadNotificationSettings } from '@/featur
 import { registerNotificationDevice } from '@/features/notifications/services/adminNotifications';
 import SwipeNavigationShell from '@/components/navigation/SwipeNavigationShell';
 
-void SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 function AppNavigation() {
   const { mode, colors } = useTheme();
@@ -22,7 +22,11 @@ function AppNavigation() {
   const { ready: languageReady } = useLanguage();
 
   useEffect(() => {
-    configureNotificationHandler();
+    try {
+      configureNotificationHandler();
+    } catch {
+      // Notification setup must never prevent the app shell from rendering.
+    }
     if (!authReady || appLoading || !user?.id) return;
     let active = true;
     void loadNotificationSettings(user.id).then(settings => {

@@ -14,6 +14,7 @@ import { supabase } from '@/features/core/services/supabase';
 import { isStreakRecoveryEligible, STREAK_RECOVERY_MINUTES } from '@/features/focus/services/streakRecovery';
 import { haptics } from '@/features/core/services/haptics';
 import { clearStudyGroupPresence, updateStudyGroupPresence } from '@/features/study-groups/services/studyGroups';
+import { consumeFocusBreakRequest, startFocusGuard, stopFocusGuard } from '@/features/focus/services/focusGuard';
 
 function formatTime(secs: number): string {
   const m = Math.floor(secs / 60);
@@ -62,6 +63,7 @@ export default function FocusActiveScreen() {
   const rtChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const rtChannelIdRef = useRef(0);
   const presenceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const focusGuardBreakHandledRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -116,6 +118,24 @@ export default function FocusActiveScreen() {
   const subjectColor = activeSession?.subjectId
     ? subjects.find(s => s.id === activeSession.subjectId)?.colorHex ?? colors.primary
     : colors.primary;
+
+  const handleFocusGuardBreak = useCallback(async () => {
+    if (focusGuardBreakHandledRef.current || isCompletingRef.current || !consumeFocusBreakRequest()) return;
+    const current = liveStateRef.current.activeSession;
+    if (!current) return;
+    focusGuardBreakHandledRef.current = true;
+    isCompletingRef.current = true;
+    setIsProcessing(true);
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    try {
+      const actualMins = Math.max(0, Math.floor(elapsedRef.current / 60));
+      const broken = await liveStateRef.current.breakSession(current.sessionId, actualMins);
+      void haptics.focusBroken();
+      liveStateRef.current.router.replace(`/focus/broken?penalty=${broken?.xpDeducted ?? 0}&guard=1`);
+    } catch {
+      liveStateRef.current.router.replace('/focus/broken?penalty=0&guard=1');
+    }
+  }, []);
 
   const handleComplete = useCallback(async () => {
     const {
@@ -296,6 +316,7 @@ export default function FocusActiveScreen() {
             intervalRef.current = null;
           }
         } else if (appStateRef.current !== 'active' && next === 'active') {
+          void handleFocusGuardBreak();
           baseElapsedRef.current = elapsedRef.current;
           monotonicStartRef.current = monotonicNow();
           clockSampleRef.current = { wallMs: Date.now(), monotonicMs: monotonicStartRef.current };
@@ -341,7 +362,16 @@ export default function FocusActiveScreen() {
       }
       backSubRef.current = null;
     };
-  }, [isLoading, activeSession?.sessionId, activeSession?.startedAt, activeSession?.status, plannedSecs, tick, t, checkpointActiveSession, discardActiveSession, handleComplete]);
+  }, [isLoading, activeSession?.sessionId, activeSession?.startedAt, activeSession?.status, plannedSecs, tick, t, checkpointActiveSession, discardActiveSession, handleComplete, handleFocusGuardBreak]);
+
+  useEffect(() => {
+    if (!activeSession?.sessionId) return;
+    focusGuardBreakHandledRef.current = false;
+    void startFocusGuard();
+    return () => {
+      stopFocusGuard();
+    };
+  }, [activeSession?.sessionId]);
 
   useEffect(() => {
     const groupId = activeSession?.studyGroupId;

@@ -22,6 +22,7 @@ import {
   FocusSession, ChapterAnalytics, DailySummary, XPTransaction, ActiveSession
 } from '@/types/models';
 import { calculateSessionXP, XP_REWARDS, getLevelForUser } from '@/constants/levels';
+import { calculateCompletedSessionXP, mergeFocusSessions, mergeXPTransactions } from '@/features/focus/services/sessionPersistence';
 import { processReferralOnFirstSession } from '@/features/referrals/services/referralService';
 import { normalizeChapterAnalyticsRows } from '@/features/analytics/services/chapterAnalytics';
 import { reconcileTrackerState } from '@/features/tracker/services/trackerState';
@@ -600,9 +601,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         void writeUserCache(userId, 'topics', reconciledTracker.topics);
         if (sessRes.data) {
           const cloudSess = sessRes.data.map(mapSession);
-          setSessions(cloudSess);
-          setItem(StorageKeys.SESSIONS, cloudSess);
-          void writeUserCache(userId, 'sessions', cloudSess);
+          const localSess = cachedSessions?.data ?? savedSessions ?? [];
+          const mergedSess = mergeFocusSessions(cloudSess, localSess);
+          setSessions(mergedSess);
+          await setItem(StorageKeys.SESSIONS, mergedSess);
+          void writeUserCache(userId, 'sessions', mergedSess);
         }
         if (sumRes.data) {
           const cloudSum = sumRes.data.map(mapSummary);
@@ -623,9 +626,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         let loadedXP = cachedXP?.data ?? savedXP ?? [];
         if (xpRes.data) {
-          loadedXP = xpRes.data.map(mapXP);
+          const cloudXP = xpRes.data.map(mapXP);
+          loadedXP = mergeXPTransactions(cloudXP, cachedXP?.data ?? savedXP ?? []);
           setXpLog(loadedXP);
-          setItem(StorageKeys.XP_LOG, loadedXP);
+          await setItem(StorageKeys.XP_LOG, loadedXP);
           void writeUserCache(userId, 'xpLog', loadedXP);
         }
         if (loadedProfile) {
@@ -1041,7 +1045,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const activeUser = user ?? await getItem<UserProfile>(StorageKeys.USER);
       const bonusFromComeback = comebackPending ? COMEBACK_BONUS_XP : 0;
-      const xp = calculateSessionXP(actualMins) + bonusFromComeback;
+      const xp = calculateCompletedSessionXP(actualMins, bonusFromComeback);
       const studyGroupId = activeSession?.studyGroupId ?? null;
       const startedAt = activeSession?.startedAt ?? new Date().toISOString();
       if (comebackPending) setComebackPendingState(false);

@@ -37,6 +37,7 @@ const KEYS = {
   ONBOARDED: 'padhai_onboarded',
   ACTIVE_SESSION: 'padhai_active_session',
   LANGUAGE: 'padhai_language_v1',
+  FOCUS_GUARD_ALLOWED_APPS: 'padhai_focus_guard_allowed_apps_v1',
 };
 
 export async function getItem<T>(key: string): Promise<T | null> {

@@ -11,6 +11,9 @@ importers:
       '@expo/vector-icons':
         specifier: ^14.1.0
         version: 14.1.0(expo-font@13.3.1(expo@53.0.12(@babel/core@7.27.4(supports-color@8.1.1))(@expo/metro-runtime@5.0.4(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1)))(react-native-webview@13.13.5(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1))(react@19.0.0))(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1))(react@19.0.0)(supports-color@8.1.1))(react@19.0.0))(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1))(react@19.0.0)
+      '@padhai/focus-guard':
+        specifier: workspace:*
+        version: link:modules/padhai-focus-guard
       '@react-native-async-storage/async-storage':
         specifier: 2.1.2
         version: 2.1.2(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1))
@@ -38,6 +41,9 @@ importers:
       expo-document-picker:
         specifier: ~13.1.6
         version: 13.1.6(expo@53.0.12(@babel/core@7.27.4(supports-color@8.1.1))(@expo/metro-runtime@5.0.4(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1)))(react-native-webview@13.13.5(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1))(react@19.0.0))(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1))(react@19.0.0)(supports-color@8.1.1))
+      expo-font:
+        specifier: ~13.3.1
+        version: 13.3.1(expo@53.0.12(@babel/core@7.27.4(supports-color@8.1.1))(@expo/metro-runtime@5.0.4(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1)))(react-native-webview@13.13.5(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1))(react@19.0.0))(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1))(react@19.0.0)(supports-color@8.1.1))(react@19.0.0)
       expo-haptics:
         specifier: ~14.1.4
         version: 14.1.4(expo@53.0.12(@babel/core@7.27.4(supports-color@8.1.1))(@expo/metro-runtime@5.0.4(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1)))(react-native-webview@13.13.5(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1))(react@19.0.0))(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1))(react@19.0.0)(supports-color@8.1.1))
@@ -126,6 +132,18 @@ importers:
       typescript:
         specifier: ~5.8.3
         version: 5.8.3
+
+  modules/padhai-focus-guard:
+    dependencies:
+      expo:
+        specifier: '*'
+        version: 53.0.12(@babel/core@7.27.4(supports-color@8.1.1))(@expo/metro-runtime@5.0.4(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1)))(react-native-webview@13.13.5(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1))(react@19.0.0))(react-native@0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1))(react@19.0.0)(supports-color@8.1.1)
+      react:
+        specifier: '*'
+        version: 19.0.0
+      react-native:
+        specifier: '*'
+        version: 0.79.3(@babel/core@7.27.4(supports-color@8.1.1))(@types/react@19.0.14)(react@19.0.0)(supports-color@8.1.1)
 
 packages:
 
