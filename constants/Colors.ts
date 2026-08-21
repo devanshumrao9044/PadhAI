@@ -1,24 +1,26 @@
 /**
- * Legacy colour adapter for components that still use useThemeColor.
- * Keep these values aligned with constants/theme.ts so older screens do not
- * drift away from the current PadhAI visual system.
+ * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
+ * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
  */
+
+const tintColorLight = '#0a7ea4';
+const tintColorDark = '#fff';
 
 export const Colors = {
   light: {
-    text: '#134E4A',
-    background: '#F0FDFA',
-    tint: '#0F766E',
-    icon: '#475569',
-    tabIconDefault: '#64748B',
-    tabIconSelected: '#0F766E',
+    text: '#11181C',
+    background: '#fff',
+    tint: tintColorLight,
+    icon: '#687076',
+    tabIconDefault: '#687076',
+    tabIconSelected: tintColorLight,
   },
   dark: {
-    text: '#E6FFFB',
-    background: '#071A1B',
-    tint: '#2DD4BF',
-    icon: '#A7C7C3',
-    tabIconDefault: '#7F9E99',
-    tabIconSelected: '#2DD4BF',
+    text: '#ECEDEE',
+    background: '#151718',
+    tint: tintColorDark,
+    icon: '#9BA1A6',
+    tabIconDefault: '#9BA1A6',
+    tabIconSelected: tintColorDark,
   },
 };
