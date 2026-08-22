@@ -19,7 +19,18 @@ type NativeFocusGuard = {
   openUsageStatsSettings(): void;
 };
 
-const nativeFocusGuard = requireOptionalNativeModule<NativeFocusGuard>('PadhAIFocusGuard');
+let nativeFocusGuard: NativeFocusGuard | null | undefined;
+
+function getNativeFocusGuard(): NativeFocusGuard | null {
+  if (Platform.OS !== 'android') return null;
+  if (nativeFocusGuard !== undefined) return nativeFocusGuard;
+  try {
+    nativeFocusGuard = requireOptionalNativeModule<NativeFocusGuard>('PadhAIFocusGuard');
+  } catch {
+    nativeFocusGuard = null;
+  }
+  return nativeFocusGuard;
+}
 
 export const YOUTUBE_PACKAGE = 'com.google.android.youtube';
 export const DEFAULT_BLOCKED_PACKAGES = [YOUTUBE_PACKAGE];
@@ -33,7 +44,7 @@ export const DEFAULT_ALLOWED_PACKAGES = [
 ];
 
 export function isAndroidFocusGuardAvailable(): boolean {
-  return Platform.OS === 'android' && nativeFocusGuard !== null;
+  return Platform.OS === 'android' && getNativeFocusGuard() !== null;
 }
 
 export function getFallbackStatus(): FocusGuardStatus {
@@ -48,7 +59,7 @@ export function getFallbackStatus(): FocusGuardStatus {
 export function getFocusGuardStatus(): FocusGuardStatus {
   if (!isAndroidFocusGuardAvailable()) return getFallbackStatus();
   try {
-    return nativeFocusGuard?.getStatus() ?? getFallbackStatus();
+    return getNativeFocusGuard()?.getStatus() ?? getFallbackStatus();
   } catch {
     return getFallbackStatus();
   }
@@ -66,7 +77,7 @@ export async function saveApprovedStudyApps(packageNames: string[]): Promise<voi
   const cleaned = Array.from(new Set(packageNames.filter(value => /^[A-Za-z][A-Za-z0-9_.]+$/.test(value))));
   await setItem(StorageKeys.FOCUS_GUARD_ALLOWED_APPS, cleaned);
   if (isAndroidFocusGuardAvailable()) {
-    nativeFocusGuard?.configure(DEFAULT_BLOCKED_PACKAGES, ['com.padhai.app', ...cleaned]);
+    getNativeFocusGuard()?.configure(DEFAULT_BLOCKED_PACKAGES, ['com.padhai.app', ...cleaned]);
   }
 }
 
@@ -74,8 +85,8 @@ export async function startFocusGuard(): Promise<FocusGuardStatus> {
   if (!isAndroidFocusGuardAvailable()) return getFallbackStatus();
   const approved = await getApprovedStudyApps();
   try {
-    nativeFocusGuard?.configure(DEFAULT_BLOCKED_PACKAGES, ['com.padhai.app', ...approved]);
-    const started = nativeFocusGuard?.start() ?? false;
+    getNativeFocusGuard()?.configure(DEFAULT_BLOCKED_PACKAGES, ['com.padhai.app', ...approved]);
+    const started = getNativeFocusGuard()?.start() ?? false;
     return { ...getFocusGuardStatus(), enabled: started };
   } catch {
     return getFocusGuardStatus();
@@ -84,13 +95,13 @@ export async function startFocusGuard(): Promise<FocusGuardStatus> {
 
 export function stopFocusGuard(): void {
   try {
-    nativeFocusGuard?.stop();
+    getNativeFocusGuard()?.stop();
   } catch {}
 }
 
 export function consumeFocusBreakRequest(): boolean {
   try {
-    return Boolean(nativeFocusGuard?.consumeBreakRequest());
+    return Boolean(getNativeFocusGuard()?.consumeBreakRequest());
   } catch {
     return false;
   }
@@ -98,12 +109,12 @@ export function consumeFocusBreakRequest(): boolean {
 
 export function openOverlayPermissionSettings(): void {
   try {
-    nativeFocusGuard?.openOverlaySettings();
+    getNativeFocusGuard()?.openOverlaySettings();
   } catch {}
 }
 
 export function openUsageStatsPermissionSettings(): void {
   try {
-    nativeFocusGuard?.openUsageStatsSettings();
+    getNativeFocusGuard()?.openUsageStatsSettings();
   } catch {}
 }
