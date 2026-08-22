@@ -80,6 +80,10 @@ An authenticated interactive test-account flow was not run because no dedicated 
 
 Password strength and leaked-password protection were not enabled or modified. The Supabase advisor warning remains by explicit instruction. The public avatar bucket was not converted to private signed URLs because that would require a coordinated UI/data migration and device verification. Unused indexes were not dropped because advisor inactivity alone is insufficient workload evidence. This report does not claim that every possible bug was found; it records verified findings, verified fixes, tested surfaces, and remaining unavailable environments.
 
+## GitHub synchronization
+
+The verified hardening changes were committed as `a0a8aac` with commit message `security: enforce server-authoritative progression` and pushed successfully to `origin/main`. The intentional crash-isolation changes, offline-focus notes, and raw audit inventory files remain uncommitted and were not included in this security commit.
+
 ## References
 
 [1]: https://supabase.com/docs/guides/database/postgres/row-level-security "Supabase Row Level Security documentation"
