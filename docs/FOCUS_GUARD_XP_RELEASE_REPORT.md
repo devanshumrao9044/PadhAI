@@ -1,15 +1,15 @@
 # PadhAI Focus Guard and General Study XP Release Report
 
-**Release commit:** `16dc640` on GitHub `main`
-**Android build:** EAS build `0a4b530e-04d4-4a2f-a2a4-04ff3e54d489`
+**Release commits:** `16dc640` and `a8f7deb` on GitHub `main`
+**Android build:** EAS build `cfa22969-4fbc-4bd3-94d5-d8eab0262de4`
 **App package:** `com.padhai.app`
-**App version:** `1.0.0`
+**App version:** `1.0.1`
 
 ## Release result
 
 The launch-crash hardening, General Study session persistence, and Focus Guard changes were implemented and pushed to GitHub `main`. A new Android preview APK compiled successfully on EAS. The APK contains the compiled `PadhAIFocusGuard` native bridge and passes ZIP/package integrity validation.
 
-The launch fix keeps the original purple/blue palette and existing password-protection decision unchanged. It includes the lower-case deep-link scheme, the missing Expo font peer dependency, and guarded notification/splash startup initialization. These changes are intended to prevent the immediate standalone-app force-close that previously displayed the clear-cache/force-stop message.
+The launch fix keeps the original purple/blue palette and existing password-protection decision unchanged. It includes the lower-case deep-link scheme, the missing Expo font peer dependency, guarded notification/splash startup initialization, and lazy crash-safe loading of the optional Focus Guard native module. These changes are intended to prevent the immediate standalone-app force-close that previously displayed the clear-cache/force-stop message.
 
 ## General Study XP fix
 
@@ -40,7 +40,7 @@ The current iPhone implementation intentionally uses an honest fallback: the Foc
 | EAS Android preview build | Finished successfully |
 | APK package integrity | Passed |
 | Compiled native bridge symbol | `PadhAIFocusGuard` present in DEX |
-| GitHub push | `16dc640` pushed to `main` |
+| GitHub push | `a8f7deb` pushed to `main` |
 
 ## Required manual checks on the device
 
@@ -52,7 +52,7 @@ Before Play Store submission, complete Google Play’s AccessibilityService disc
 
 ## Logo note
 
-No logo asset was changed in this release because “logo/person” did not identify whether the problem is cropping, resolution, color, splash sizing, or the in-app profile image. A screenshot or a precise location is still needed before changing the existing branding asset.
+No logo asset was changed in this release because the recording shows the existing dark circular star logo, but does not identify whether the requested “person” change means cropping, resolution, color, splash sizing, or the in-app profile image. A screenshot or a precise location is still needed before changing the existing branding asset.
 
 ## References
 
