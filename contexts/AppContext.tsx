@@ -21,20 +21,20 @@ import {
   UserProfile, Subject, Chapter, Topic,
   FocusSession, ChapterAnalytics, DailySummary, XPTransaction, ActiveSession
 } from '@/types/models';
-import { calculateSessionXP, XP_REWARDS, getLevelForUser } from '@/constants/levels';
-import { calculateCompletedSessionXP, mergeFocusSessions, mergeXPTransactions } from '@/features/focus/services/sessionPersistence';
-import { processReferralOnFirstSession } from '@/features/referrals/services/referralService';
+import { getLevelForUser } from '@/constants/levels';
+import { mergeFocusSessions, mergeXPTransactions } from '@/features/focus/services/sessionPersistence';
 import { normalizeChapterAnalyticsRows } from '@/features/analytics/services/chapterAnalytics';
 import { reconcileTrackerState } from '@/features/tracker/services/trackerState';
 import { getRecoveredStreak, isStreakRecoveryEligible } from '@/features/focus/services/streakRecovery';
 import { haptics } from '@/features/core/services/haptics';
-import { clearStudyGroupPresence, recordStudyGroupSession } from '@/features/study-groups/services/studyGroups';
+import { clearStudyGroupPresence } from '@/features/study-groups/services/studyGroups';
 import {
   enqueueOfflineFocusSession,
   isNetworkReachable,
   subscribeToOfflineFocusReconnect,
   syncOfflineFocusQueue,
   clearOfflineFocusQueue,
+  submitOfflineFocusSession,
 } from '@/features/focus/services/offlineFocusSync';
 import {
   buildBaselineMarker,
@@ -237,11 +237,13 @@ const createWeeklyMarkerTransaction = (userId: string, marker: WeeklySettlementR
 const OFFLINE_QUEUE_KEY = '@app_offline_sync_queue';
 type SyncTask = {
   id: string;
-  table: string;
-  action: 'insert' | 'upsert' | 'update';
-  payload: any;
+  table?: string;
+  action: 'insert' | 'upsert' | 'update' | 'rpc';
+  payload?: any;
   matchKey?: string;
   matchValue?: any;
+  rpcName?: string;
+  rpcArgs?: Record<string, unknown>;
 };
 
 function useStableCallback<T extends (...args: any[]) => any>(callback: T): T {
@@ -291,7 +293,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       let remainingQueue = [...queue];
       for (const task of queue) {
         try {
-          if (task.action === 'insert') {
+          if (task.action === 'rpc') {
+            if (task.rpcName !== 'record_weekly_xp_marker') throw new Error('Unsupported sync operation.');
+            const { error } = await supabase.rpc(task.rpcName, task.rpcArgs ?? {});
+            if (error) throw error;
+          } else if (task.action === 'insert') {
+            if (!task.table) throw new Error('Sync table is missing.');
             if (task.table === 'focus_sessions') {
               const payload = toFocusSessionDbPayload(task.payload);
               await enqueueOfflineFocusSession({
@@ -315,24 +322,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
               remainingQueue = remainingQueue.filter(t => t.id !== task.id);
               continue;
             }
+            if (['users', 'daily_summary', 'xp_transactions'].includes(task.table)) {
+              console.warn(`[Sync] Dropping legacy direct ${task.table} write; progression is RPC-only.`);
+              remainingQueue = remainingQueue.filter(t => t.id !== task.id);
+              continue;
+            }
             const { error } = await supabase.from(task.table).insert(task.payload);
             if (error) throw error;
-            if (
-              task.table === 'focus_sessions' &&
-              task.payload?.broken === false &&
-              task.payload?.user_id
-            ) {
-              try {
-                await processReferralOnFirstSession(task.payload.user_id);
-              } catch (referralError) {
-                console.warn('[Referral] Sync processing failed:', referralError);
-              }
-            }
           } else if (task.action === 'upsert') {
+            if (!task.table) throw new Error('Sync table is missing.');
+            if (['users', 'daily_summary', 'xp_transactions'].includes(task.table)) {
+              console.warn(`[Sync] Dropping legacy direct ${task.table} upsert; progression is RPC-only.`);
+              remainingQueue = remainingQueue.filter(t => t.id !== task.id);
+              continue;
+            }
             const conflictKey = task.table === 'daily_summary' ? 'user_id,date' : 'id';
             const { error } = await supabase.from(task.table).upsert(task.payload, { onConflict: conflictKey });
             if (error) throw error;
           } else if (task.action === 'update' && task.matchKey) {
+            if (!task.table) throw new Error('Sync table is missing.');
+            if (['users', 'daily_summary', 'xp_transactions'].includes(task.table)) {
+              console.warn(`[Sync] Dropping legacy direct ${task.table} update; progression is RPC-only.`);
+              remainingQueue = remainingQueue.filter(t => t.id !== task.id);
+              continue;
+            }
             const { error } = await supabase.from(task.table).update(task.payload).eq(task.matchKey, task.matchValue);
             if (error) throw error;
           }
@@ -352,14 +365,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const persistWeeklyMarker = async (userId: string, marker: WeeklySettlementResult) => {
     const txPayload = createWeeklyMarkerTransaction(userId, marker);
     try {
-      const { error } = await supabase
-        .from('xp_transactions')
-        .upsert([txPayload], { onConflict: 'id', ignoreDuplicates: true });
+      const { data, error } = await supabase.rpc('record_weekly_xp_marker', {
+        p_week_start: marker.weekStart,
+      });
       if (error) throw error;
+      const serverMarker: WeeklySettlementResult = {
+        ...marker,
+        markerId: String(data?.marker_id ?? marker.markerId),
+        kind: data?.kind === 'settlement' ? 'settlement' : marker.kind,
+        zone: data?.zone === 'promotion' || data?.zone === 'safety' || data?.zone === 'demotion' ? data.zone : marker.zone,
+        fromLevelRank: Number.isFinite(Number(data?.from_level_rank)) ? Number(data.from_level_rank) : marker.fromLevelRank,
+        toLevelRank: Number.isFinite(Number(data?.to_level_rank)) ? Number(data.to_level_rank) : marker.toLevelRank,
+        xpAfterReset: 0,
+      };
+      return mapXP(createWeeklyMarkerTransaction(userId, serverMarker));
     } catch {
-      await addToSyncQueue({ table: 'xp_transactions', action: 'upsert', payload: txPayload });
+      await addToSyncQueue({
+        action: 'rpc',
+        rpcName: 'record_weekly_xp_marker',
+        rpcArgs: { p_week_start: marker.weekStart },
+        payload: txPayload,
+      });
+      return mapXP(txPayload);
     }
-    return mapXP(txPayload);
   };
 
   const settleWeeklyXPIfNeeded = async (
@@ -740,35 +768,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [reload, user?.id]);
 
-  // ── setUser: sync XP/streak fields to Supabase (profile fields saved separately in profile.tsx) ─────────────────────────────────────────────
+  // ── setUser: local cache/state only. Server-controlled progression fields are
+  // settled by authenticated RPCs and reloaded from Supabase. ────────────────
   const setUser = async (u: UserProfile) => {
     setUserState(u);
     setIsOnboardedState(Boolean(u.fullName && u.fullName !== 'Student'));
     await setItem(StorageKeys.USER, u);
     void writeUserCache(u.id, 'user', u);
-    try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) return;
-      // Sync XP, streak, and goal fields — profile fields (name/exam/class/avatar)
-      // are already persisted by the caller (profile.tsx handleSaveProfile)
-      const payload: any = {
-        xp: u.xpTotal,
-        streak: u.streakCurrent,
-        longest_streak: u.streakLongest,
-        last_study_date: u.lastStudyDate,
-        daily_goal_minutes: u.dailyGoalMinutes,
-      };
-      const { error } = await supabase.from('users').update(payload).eq('id', authUser.id);
-      if (error) throw error;
-    } catch {
-      if (u.id) {
-        await addToSyncQueue({
-          table: 'users', action: 'update',
-          payload: { xp: u.xpTotal, streak: u.streakCurrent, longest_streak: u.streakLongest, last_study_date: u.lastStudyDate, daily_goal_minutes: u.dailyGoalMinutes },
-          matchKey: 'id', matchValue: u.id,
-        });
-      }
-    }
   };
 
   const setOnboarded = async (v: boolean) => {
@@ -958,37 +964,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // ── XP ────────────────────────────────────────────────────────────────────
-  const awardXP = async (amount: number, reason: string) => {
-    if (!user) return;
-    if (amount > 0) void haptics.xpGain();
-    const txPayload = { id: uuidv4(), user_id: user.id, amount, reason, created_at: new Date().toISOString() };
-    const newXPLog = [mapXP(txPayload), ...xpLog];
-    setXpLog(newXPLog);
-    await setItem(StorageKeys.XP_LOG, newXPLog);
-    void writeUserCache(user.id, 'xpLog', newXPLog);
-    await setUser({ ...user, xpTotal: user.xpTotal + amount });
-    try {
-      const { error } = await supabase.from('xp_transactions').insert([txPayload]);
-      if (error) throw error;
-    } catch {
-      await addToSyncQueue({ table: 'xp_transactions', action: 'insert', payload: txPayload });
-    }
+  // XP is granted or deducted only by the server-authoritative focus settlement
+  // RPC. Keeping these methods in the context preserves the public contract for
+  // older screens while making accidental client-side mutation impossible.
+  const awardXP = async (_amount: number, _reason: string) => {
+    throw new Error('XP can only be granted by a verified focus session.');
   };
 
-  const deductXP = async (amount: number, reason: string) => {
-    if (!user) return;
-    const txPayload = { id: uuidv4(), user_id: user.id, amount: -amount, reason, created_at: new Date().toISOString() };
-    const newXPLog = [mapXP(txPayload), ...xpLog];
-    setXpLog(newXPLog);
-    await setItem(StorageKeys.XP_LOG, newXPLog);
-    void writeUserCache(user.id, 'xpLog', newXPLog);
-    await setUser({ ...user, xpTotal: Math.max(0, user.xpTotal - amount) });
-    try {
-      const { error } = await supabase.from('xp_transactions').insert([txPayload]);
-      if (error) throw error;
-    } catch {
-      await addToSyncQueue({ table: 'xp_transactions', action: 'insert', payload: txPayload });
-    }
+  const deductXP = async (_amount: number, _reason: string) => {
+    throw new Error('XP can only be deducted by a verified focus session.');
   };
 
   // ── Sessions ──────────────────────────────────────────────────────────────
@@ -1044,71 +1028,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     try {
       const activeUser = user ?? await getItem<UserProfile>(StorageKeys.USER);
+      if (!activeUser?.id) return null;
       const bonusFromComeback = comebackPending ? COMEBACK_BONUS_XP : 0;
-      const xp = calculateCompletedSessionXP(actualMins, bonusFromComeback);
       const studyGroupId = activeSession?.studyGroupId ?? null;
       const startedAt = activeSession?.startedAt ?? new Date().toISOString();
-      if (comebackPending) setComebackPendingState(false);
-
-      let newXPTotal = activeUser?.xpTotal ?? 0;
-      let referralXpAwarded = 0;
-
-      const sessionPayload = {
-        id: sessionId,
-        user_id: activeUser?.id ?? '',
-        subject_id: activeSession?.subjectId ?? null,
-        chapter_id: activeSession?.chapterId ?? null,
-        planned_minutes: activeSession?.plannedMins ?? actualMins,
-        actual_minutes: actualMins,
+      const endedAt = new Date().toISOString();
+      const clockAnomaly = Boolean(activeSession?.clockAnomaly);
+      const settlement = {
+        sessionId,
+        userId: activeUser.id,
+        subjectId: activeSession?.subjectId ?? null,
+        chapterId: activeSession?.chapterId ?? null,
+        studyGroupId,
+        plannedMinutes: activeSession?.plannedMins ?? actualMins,
+        actualMinutes: Math.max(0, Math.floor(actualMins)),
+        elapsedSeconds: Math.max(actualMins * 60, Math.floor(actualSeconds)),
         completed: true,
         broken: false,
-        xp_earned: xp,
-        xp_deducted: 0,
-        comeback_bonus: bonusFromComeback,
-        started_at: startedAt,
-        ended_at: new Date().toISOString(),
+        startedAt,
+        endedAt,
+        clockAnomaly,
+        isRecovery: isRecoverySession,
+        recoveryLostStreak: activeSession?.recoveryLostStreak ?? lostStreakCount,
+        comebackBonus: bonusFromComeback,
       };
 
+      if (comebackPending) setComebackPendingState(false);
       const networkAvailable = await isNetworkReachable();
-      const clockAnomaly = Boolean(activeSession?.clockAnomaly);
       const syncPending = !networkAvailable || clockAnomaly;
-      const localSessionPayload = syncPending
-        ? { ...sessionPayload, xp_earned: 0, xp_deducted: 0 }
-        : sessionPayload;
-      const sessionObj = mapSession({
-        ...localSessionPayload,
-        broken_at_percent: 100,
-      });
-
       if (syncPending) {
-        if (!activeUser?.id) return null;
-        const queuedSession = {
-          sessionId,
-          userId: activeUser.id,
-          subjectId: activeSession?.subjectId ?? null,
-          chapterId: activeSession?.chapterId ?? null,
-          studyGroupId,
-          plannedMinutes: activeSession?.plannedMins ?? actualMins,
-          actualMinutes: actualMins,
-          elapsedSeconds: Math.max(actualMins * 60, Math.floor(actualSeconds)),
+        await enqueueOfflineFocusSession(settlement);
+        const localSession = mapSession({
+          id: sessionId,
+          user_id: activeUser.id,
+          subject_id: settlement.subjectId,
+          chapter_id: settlement.chapterId,
+          planned_minutes: settlement.plannedMinutes,
+          actual_minutes: settlement.actualMinutes,
           completed: true,
           broken: false,
-          startedAt,
-          endedAt: sessionPayload.ended_at,
-          clockAnomaly,
-          isRecovery: isRecoverySession,
-          recoveryLostStreak: activeSession?.recoveryLostStreak ?? lostStreakCount,
-          comebackBonus: bonusFromComeback,
-        };
-        await enqueueOfflineFocusSession(queuedSession);
-        const newSessions = [sessionObj, ...sessions];
+          xp_earned: 0,
+          xp_deducted: 0,
+          comeback_bonus: bonusFromComeback,
+          started_at: startedAt,
+          ended_at: endedAt,
+          broken_at_percent: 100,
+        });
+        const newSessions = [localSession, ...sessions];
         setSessions(newSessions);
         await setItem(StorageKeys.SESSIONS, newSessions);
         void writeUserCache(activeUser.id, 'sessions', newSessions);
         setActiveSession(null);
         await setItem(StorageKeys.ACTIVE_SESSION, null);
         return {
-          ...sessionObj,
+          ...localSession,
           leveledUp: false,
           newLevelRank: getLevelForUser(activeUser).rank,
           totalXP: activeUser.xpTotal,
@@ -1117,77 +1090,66 @@ export function AppProvider({ children }: { children: ReactNode }) {
           clockAnomaly,
         };
       }
-      
+
+      const { data, error } = await submitOfflineFocusSession(settlement);
+      if (error) throw error;
+      if (data?.accepted !== true) {
+        throw new Error(data?.message ?? 'The focus session could not be verified.');
+      }
+
+      const verifiedMinutes = Number(data.verified_minutes ?? settlement.actualMinutes);
+      const verifiedXp = Number(data.xp_earned ?? 0);
+      const referralXpAwarded = Number(data.referral_xp_awarded ?? 0);
+      const sessionObj = mapSession({
+        id: sessionId,
+        user_id: activeUser.id,
+        subject_id: settlement.subjectId,
+        chapter_id: settlement.chapterId,
+        planned_minutes: settlement.plannedMinutes,
+        actual_minutes: verifiedMinutes,
+        completed: true,
+        broken: false,
+        xp_earned: verifiedXp,
+        xp_deducted: 0,
+        comeback_bonus: bonusFromComeback,
+        started_at: startedAt,
+        ended_at: endedAt,
+        broken_at_percent: 100,
+      });
       const newSessions = [sessionObj, ...sessions];
       setSessions(newSessions);
       await setItem(StorageKeys.SESSIONS, newSessions);
-      if (activeUser?.id) void writeUserCache(activeUser.id, 'sessions', newSessions);
+      void writeUserCache(activeUser.id, 'sessions', newSessions);
       setActiveSession(null);
       await setItem(StorageKeys.ACTIVE_SESSION, null);
-      if (activeUser) {
-        const recoveryStreak = isRecoverySession
-          ? getRecoveredStreak(activeSession?.recoveryLostStreak ?? lostStreakCount)
-          : undefined;
-        const postSessionResult = await processPostSessionData(actualMins, xp, true, activeUser, recoveryStreak);
-        newXPTotal = postSessionResult.newXPTotal;
-        let sessionSaved = false;
+
+      const recoveryStreak = isRecoverySession
+        ? getRecoveredStreak(activeSession?.recoveryLostStreak ?? lostStreakCount)
+        : undefined;
+      const postSessionResult = await processPostSessionData(
+        verifiedMinutes,
+        verifiedXp,
+        true,
+        activeUser,
+        recoveryStreak,
+        {
+          newXpTotal: Number(data.new_xp_total),
+          newStreak: Number(data.new_streak),
+        },
+        sessionId,
+      );
+      const oldLevelRank = getLevelForUser(activeUser).rank;
+      const newLevelRank = getLevelForUser({ ...activeUser, xpTotal: postSessionResult.newXPTotal }).rank;
+      const leveledUp = newLevelRank > oldLevelRank;
+      if (studyGroupId) {
         try {
-          const { error } = await supabase.from('focus_sessions').insert([sessionPayload]);
-          if (error) throw error;
-          sessionSaved = true;
+          await clearStudyGroupPresence(studyGroupId, activeUser.id);
         } catch {
-          await addToSyncQueue({ table: 'focus_sessions', action: 'insert', payload: sessionPayload });
-        }
-        if (sessionSaved) {
-          try {
-            const referralResult = await processReferralOnFirstSession(activeUser.id);
-            referralXpAwarded = referralResult?.refereeXpAdded ?? 0;
-            newXPTotal += referralXpAwarded;
-          } catch (referralError) {
-            console.warn('[Referral] Processing failed:', referralError);
-          }
-        }
-        if (studyGroupId) {
-          const groupSessionPayload = {
-            group_id: studyGroupId,
-            user_id: activeUser.id,
-            focus_session_id: sessionId,
-            started_at: startedAt,
-            ended_at: sessionPayload.ended_at,
-            actual_minutes: actualMins,
-            completed: true,
-            broken: false,
-          };
-          try {
-            if (sessionSaved) {
-              await recordStudyGroupSession({
-                groupId: studyGroupId,
-                userId: activeUser.id,
-                focusSessionId: sessionId,
-                startedAt,
-                endedAt: sessionPayload.ended_at,
-                actualMinutes: actualMins,
-                completed: true,
-                broken: false,
-              });
-            } else {
-              await addToSyncQueue({ table: 'study_group_sessions', action: 'insert', payload: groupSessionPayload });
-            }
-          } catch {
-            await addToSyncQueue({ table: 'study_group_sessions', action: 'insert', payload: groupSessionPayload });
-          }
-          try {
-            await clearStudyGroupPresence(studyGroupId, activeUser.id);
-          } catch {
-            // Stale presence is treated as offline by the secure member-summary RPC.
-          }
+          // Stale presence is treated as offline by the secure member-summary RPC.
         }
       }
-      const oldLevelRank = activeUser ? getLevelForUser(activeUser).rank : 1;
-      const newLevelRank = activeUser ? getLevelForUser({ ...activeUser, xpTotal: newXPTotal }).rank : 1;
-      const leveledUp = newLevelRank > oldLevelRank;
-      processSyncQueue();
-      return { ...sessionObj, leveledUp, newLevelRank, totalXP: newXPTotal, referralXpAwarded };
+      void reload({ force: true });
+      return { ...sessionObj, leveledUp, newLevelRank, totalXP: postSessionResult.newXPTotal, referralXpAwarded };
     } catch {
       return null;
     }
@@ -1196,121 +1158,108 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const breakSession = async (sessionId: string, actualMins: number): Promise<FocusSession | null> => {
     try {
       const activeUser = user ?? await getItem<UserProfile>(StorageKeys.USER);
+      if (!activeUser?.id) return null;
       const planned = activeSession?.plannedMins ?? 1;
-      const brokenAt = Math.floor((actualMins / planned) * 100);
-      const penalty = Math.floor(calculateSessionXP(planned) * XP_REWARDS.sessionBrokenMultiplier);
       const studyGroupId = activeSession?.studyGroupId ?? null;
       const startedAt = activeSession?.startedAt ?? new Date().toISOString();
-      
-      const sessionPayload = {
-        id: sessionId,
-        user_id: activeUser?.id ?? '',
-        subject_id: activeSession?.subjectId ?? null,
-        chapter_id: activeSession?.chapterId ?? null,
-        planned_minutes: planned,
-        actual_minutes: actualMins,
+      const endedAt = new Date().toISOString();
+      const clockAnomaly = Boolean(activeSession?.clockAnomaly);
+      const settlement = {
+        sessionId,
+        userId: activeUser.id,
+        subjectId: activeSession?.subjectId ?? null,
+        chapterId: activeSession?.chapterId ?? null,
+        studyGroupId,
+        plannedMinutes: planned,
+        actualMinutes: Math.max(0, Math.floor(actualMins)),
+        elapsedSeconds: Math.max(0, Math.floor(actualMins * 60)),
         completed: false,
         broken: true,
-        xp_earned: 0,
-        xp_deducted: penalty,
-        break_reason: 'user_abandoned',
-        started_at: startedAt,
-        ended_at: new Date().toISOString(),
+        startedAt,
+        endedAt,
+        clockAnomaly,
+        isRecovery: false,
+        recoveryLostStreak: null,
+        comebackBonus: 0,
       };
-
       const networkAvailable = await isNetworkReachable();
-      const clockAnomaly = Boolean(activeSession?.clockAnomaly);
       const syncPending = !networkAvailable || clockAnomaly;
-      const localSessionPayload = syncPending
-        ? { ...sessionPayload, xp_earned: 0, xp_deducted: 0 }
-        : sessionPayload;
-      const sessionObj = mapSession({
-        ...localSessionPayload,
-        broken_at_percent: brokenAt,
-      });
-
       if (syncPending) {
-        if (!activeUser?.id) return null;
-        await enqueueOfflineFocusSession({
-          sessionId,
-          userId: activeUser.id,
-          subjectId: activeSession?.subjectId ?? null,
-          chapterId: activeSession?.chapterId ?? null,
-          studyGroupId,
-          plannedMinutes: planned,
-          actualMinutes: actualMins,
-          elapsedSeconds: Math.max(0, actualMins * 60),
+        await enqueueOfflineFocusSession(settlement);
+        const localSession = mapSession({
+          id: sessionId,
+          user_id: activeUser.id,
+          subject_id: settlement.subjectId,
+          chapter_id: settlement.chapterId,
+          planned_minutes: planned,
+          actual_minutes: settlement.actualMinutes,
           completed: false,
           broken: true,
-          startedAt,
-          endedAt: sessionPayload.ended_at,
-          clockAnomaly,
-          isRecovery: false,
-          recoveryLostStreak: null,
-          comebackBonus: 0,
+          xp_earned: 0,
+          xp_deducted: 0,
+          break_reason: 'user_abandoned',
+          started_at: startedAt,
+          ended_at: endedAt,
+          broken_at_percent: Math.floor((settlement.actualMinutes / Math.max(1, planned)) * 100),
         });
-        const newSessions = [sessionObj, ...sessions];
+        const newSessions = [localSession, ...sessions];
         setSessions(newSessions);
         await setItem(StorageKeys.SESSIONS, newSessions);
         void writeUserCache(activeUser.id, 'sessions', newSessions);
         setActiveSession(null);
         await setItem(StorageKeys.ACTIVE_SESSION, null);
-        return { ...sessionObj, syncPending: true, clockAnomaly } as FocusSession & { syncPending: boolean; clockAnomaly: boolean };
+        return { ...localSession, syncPending: true, clockAnomaly } as FocusSession & { syncPending: boolean; clockAnomaly: boolean };
       }
-      
+
+      const { data, error } = await submitOfflineFocusSession(settlement);
+      if (error) throw error;
+      if (data?.accepted !== true) {
+        throw new Error(data?.message ?? 'The broken session could not be verified.');
+      }
+      const verifiedMinutes = Number(data.verified_minutes ?? settlement.actualMinutes);
+      const verifiedPenalty = Number(data.xp_deducted ?? 0);
+      const sessionObj = mapSession({
+        id: sessionId,
+        user_id: activeUser.id,
+        subject_id: settlement.subjectId,
+        chapter_id: settlement.chapterId,
+        planned_minutes: planned,
+        actual_minutes: verifiedMinutes,
+        completed: false,
+        broken: true,
+        xp_earned: 0,
+        xp_deducted: verifiedPenalty,
+        break_reason: 'user_abandoned',
+        started_at: startedAt,
+        ended_at: endedAt,
+        broken_at_percent: Math.floor((verifiedMinutes / Math.max(1, planned)) * 100),
+      });
       const newSessions = [sessionObj, ...sessions];
       setSessions(newSessions);
       await setItem(StorageKeys.SESSIONS, newSessions);
-      if (activeUser?.id) void writeUserCache(activeUser.id, 'sessions', newSessions);
+      void writeUserCache(activeUser.id, 'sessions', newSessions);
       setActiveSession(null);
       await setItem(StorageKeys.ACTIVE_SESSION, null);
-      if (activeUser) {
-        await processPostSessionData(actualMins, -penalty, false, activeUser);
-        let sessionSaved = false;
+      await processPostSessionData(
+        verifiedMinutes,
+        -verifiedPenalty,
+        false,
+        activeUser,
+        undefined,
+        {
+          newXpTotal: Number(data.new_xp_total),
+          newStreak: Number(data.new_streak),
+        },
+        sessionId,
+      );
+      if (studyGroupId) {
         try {
-          const { error } = await supabase.from('focus_sessions').insert([sessionPayload]);
-          if (error) throw error;
-          sessionSaved = true;
+          await clearStudyGroupPresence(studyGroupId, activeUser.id);
         } catch {
-          await addToSyncQueue({ table: 'focus_sessions', action: 'insert', payload: sessionPayload });
-        }
-        if (studyGroupId) {
-          const groupSessionPayload = {
-            group_id: studyGroupId,
-            user_id: activeUser.id,
-            focus_session_id: sessionId,
-            started_at: startedAt,
-            ended_at: sessionPayload.ended_at,
-            actual_minutes: actualMins,
-            completed: false,
-            broken: true,
-          };
-          try {
-            if (sessionSaved) {
-              await recordStudyGroupSession({
-                groupId: studyGroupId,
-                userId: activeUser.id,
-                focusSessionId: sessionId,
-                startedAt,
-                endedAt: sessionPayload.ended_at,
-                actualMinutes: actualMins,
-                completed: false,
-                broken: true,
-              });
-            } else {
-              await addToSyncQueue({ table: 'study_group_sessions', action: 'insert', payload: groupSessionPayload });
-            }
-          } catch {
-            await addToSyncQueue({ table: 'study_group_sessions', action: 'insert', payload: groupSessionPayload });
-          }
-          try {
-            await clearStudyGroupPresence(studyGroupId, activeUser.id);
-          } catch {
-            // Stale presence is treated as offline by the secure member-summary RPC.
-          }
+          // Stale presence is treated as offline by the secure member-summary RPC.
         }
       }
-      processSyncQueue();
+      void reload({ force: true });
       return sessionObj;
     } catch {
       return null;
@@ -1330,58 +1279,54 @@ export function AppProvider({ children }: { children: ReactNode }) {
     isCompleted: boolean,
     activeUser: UserProfile,
     recoveredStreak?: number,
+    serverState?: { newXpTotal?: number; newStreak?: number },
+    transactionId?: string,
   ): Promise<{ finalXP: number; newXPTotal: number }> => {
     try {
       const today = todayStr();
       const existingSummary = dailySummaries.find(s => s.date === today);
-      const summaryId = existingSummary?.id || uuidv4();
       const newTotalMins = (existingSummary?.totalMinutes || 0) + mins;
       const goalMet = newTotalMins >= activeUser.dailyGoalMinutes;
-      let bonusXP = 0;
-      if (!existingSummary?.goalMet && goalMet) bonusXP = XP_REWARDS.dailyGoalBonus;
-      const finalXP = xpDelta + bonusXP;
+      const finalXP = xpDelta;
       const summaryPayload = {
-        id: summaryId, user_id: activeUser.id, date: today,
+        id: existingSummary?.id || uuidv4(),
+        user_id: activeUser.id,
+        date: today,
         total_focus_minutes: newTotalMins,
         sessions_completed: (existingSummary?.sessionsCompleted || 0) + (isCompleted ? 1 : 0),
         sessions_broken: (existingSummary?.sessionsBroken || 0) + (isCompleted ? 0 : 1),
-        goal_minutes: activeUser.dailyGoalMinutes, goal_met: goalMet,
+        goal_minutes: activeUser.dailyGoalMinutes,
+        goal_met: goalMet,
         xp_earned: (existingSummary?.xpEarned || 0) + (finalXP > 0 ? finalXP : 0),
       };
       const newDaily = [mapSummary(summaryPayload), ...dailySummaries.filter(s => s.date !== today)];
       setDailySummaries(newDaily);
       await setItem(StorageKeys.DAILY_SUMMARY, newDaily);
       void writeUserCache(activeUser.id, 'dailySummaries', newDaily);
-      try {
-        const { error } = await supabase.from('daily_summary').upsert([summaryPayload], { onConflict: 'user_id,date' });
-        if (error) throw error;
-      } catch {
-        await addToSyncQueue({ table: 'daily_summary', action: 'upsert', payload: summaryPayload });
-      }
+
       if (finalXP !== 0) {
-        const txPayload = { id: uuidv4(), user_id: activeUser.id, amount: finalXP, reason: isCompleted ? 'session_complete' : 'session_broken', created_at: new Date().toISOString() };
-        const newXPLog = [mapXP(txPayload), ...xpLog];
+        const txPayload = {
+          id: transactionId || uuidv4(),
+          user_id: activeUser.id,
+          amount: finalXP,
+          reason: isCompleted ? 'session_complete' : 'session_broken',
+          created_at: new Date().toISOString(),
+        };
+        const newXPLog = [mapXP(txPayload), ...xpLog.filter(transaction => transaction.id !== txPayload.id)];
         setXpLog(newXPLog);
         await setItem(StorageKeys.XP_LOG, newXPLog);
         void writeUserCache(activeUser.id, 'xpLog', newXPLog);
-        try {
-          const { error } = await supabase.from('xp_transactions').insert([txPayload]);
-          if (error) throw error;
-        } catch {
-          await addToSyncQueue({ table: 'xp_transactions', action: 'insert', payload: txPayload });
-        }
       }
+
       const yesterday = daysAgoStr(1);
-      let newStreak = activeUser.streakCurrent;
-      if (isCompleted && recoveredStreak !== undefined) {
-        newStreak = recoveredStreak;
-      } else if (isCompleted && activeUser.lastStudyDate !== today) {
-        newStreak = (activeUser.lastStudyDate === yesterday || activeUser.lastStudyDate === null) ? newStreak + 1 : 1;
-      } else if (!isCompleted) {
-        newStreak = 0;
-      }
-      
-      const newXPTotal = Math.max(0, activeUser.xpTotal + finalXP);
+      const fallbackStreak = isCompleted && recoveredStreak !== undefined
+        ? recoveredStreak
+        : isCompleted && activeUser.lastStudyDate !== today
+          ? (activeUser.lastStudyDate === yesterday || activeUser.lastStudyDate === null ? activeUser.streakCurrent + 1 : 1)
+          : isCompleted ? activeUser.streakCurrent : 0;
+      const newStreak = Number.isFinite(serverState?.newStreak) ? Number(serverState?.newStreak) : fallbackStreak;
+      const fallbackXP = Math.max(0, activeUser.xpTotal + finalXP);
+      const newXPTotal = Number.isFinite(serverState?.newXpTotal) ? Number(serverState?.newXpTotal) : fallbackXP;
       if (finalXP > 0) void haptics.xpGain();
       if (isCompleted && newStreak > activeUser.streakCurrent && isStreakMilestone(newStreak)) {
         void haptics.streakMilestone();
@@ -1395,7 +1340,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
       return { finalXP, newXPTotal };
     } catch (e) {
-      console.error('Failed to process post session data', e);
+      console.error('Failed to process local post session data', e);
       return {
         finalXP: xpDelta,
         newXPTotal: Math.max(0, activeUser.xpTotal + xpDelta),

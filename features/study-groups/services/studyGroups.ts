@@ -135,17 +135,6 @@ export interface CreateStudyGroupResult extends StudyGroup {
   inviteToken: string;
 }
 
-export interface StudyGroupSessionInput {
-  groupId: string;
-  userId: string;
-  focusSessionId: string;
-  startedAt: string;
-  endedAt: string | null;
-  actualMinutes: number;
-  completed: boolean;
-  broken: boolean;
-}
-
 function throwIfError(error: { message?: string } | null): void {
   if (error) throw new Error(error.message || 'Study Group request failed.');
 }
@@ -455,39 +444,17 @@ export async function updateStudyGroupPresence(input: {
   status: StudyGroupPresenceStatus;
   startedAt?: string;
 }): Promise<void> {
-  const timestamp = new Date().toISOString();
-  const { error } = await supabase.from('study_group_presence').upsert({
-    group_id: input.groupId,
-    user_id: input.userId,
-    session_id: input.sessionId,
-    status: input.status,
-    started_at: input.startedAt ?? timestamp,
-    last_seen_at: timestamp,
-    updated_at: timestamp,
-  }, { onConflict: 'group_id,user_id' });
-  throwIfError(error);
-}
-
-export async function clearStudyGroupPresence(groupId: string, userId: string): Promise<void> {
-  const { error } = await supabase
-    .from('study_group_presence')
-    .delete()
-    .eq('group_id', groupId)
-    .eq('user_id', userId);
-  throwIfError(error);
-}
-
-export async function recordStudyGroupSession(input: StudyGroupSessionInput): Promise<void> {
-  const { error } = await supabase.from('study_group_sessions').insert({
-    group_id: input.groupId,
-    user_id: input.userId,
-    focus_session_id: input.focusSessionId,
-    started_at: input.startedAt,
-    ended_at: input.endedAt,
-    actual_minutes: input.actualMinutes,
-    completed: input.completed,
-    broken: input.broken,
+  const { error } = await supabase.rpc('update_study_group_presence', {
+    p_group_id: input.groupId,
+    p_session_id: input.sessionId,
+    p_status: input.status,
+    p_started_at: input.startedAt ?? null,
   });
+  throwIfError(error);
+}
+
+export async function clearStudyGroupPresence(groupId: string, _userId: string): Promise<void> {
+  const { error } = await supabase.rpc('clear_study_group_presence', { p_group_id: groupId });
   throwIfError(error);
 }
 

@@ -95,11 +95,14 @@ export default function AuthRouteGuard() {
           if (lastStudy) lastStudy.setHours(0, 0, 0, 0);
 
           if (!lastStudy || lastStudy < yesterday) {
-            await supabase.from('users').update({ streak: 0 }).eq('id', userId);
+            const { data } = await supabase.rpc('mark_streak_broken');
             if (cancelled) return;
-            appContext?.setComebackPending(true);
-            router.replace({ pathname: '/streak-broken', params: { lost: profile.streakCurrent } });
-            return;
+            if (data?.broken) {
+              const lostStreak = Number(data.lost_streak ?? profile.streakCurrent);
+              appContext?.setComebackPending(true);
+              router.replace({ pathname: '/streak-broken', params: { lost: lostStreak } });
+              return;
+            }
           }
         }
 

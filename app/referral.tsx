@@ -63,10 +63,7 @@ export default function ReferralScreen() {
       if (!mountedRef.current) return;
       if (!userData?.reward_popup_seen) {
         setShowReward(true);
-        await supabase
-          .from('users')
-          .update({ reward_popup_seen: true })
-          .eq('id', user.id);
+        await supabase.rpc('mark_reward_popup_seen');
       }
     }
   }, []);
