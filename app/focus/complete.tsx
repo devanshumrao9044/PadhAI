@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -41,7 +42,7 @@ function ConfettiDot({
     );
     anim.start();
     return () => anim.stop();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [delay, opacity, rotate, startX, translateX, translateY]);
 
   const spin = rotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
@@ -191,7 +192,7 @@ export default function FocusCompleteScreen() {
       recoveryOpacity.stopAnimation();
       recoveryScale.stopAnimation();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [comebackOpacity, comebackScale, comebackSlide, fadeAnim, glowAnim, isComeback, isRecovery, recoveryOpacity, recoveryScale, recoverySlide, scaleAnim, shimmerAnim]);
 
   const showConfetti = !resolvedPending && !isRejected && (isComeback || isRecovery);
   const confettiParticles = showConfetti
