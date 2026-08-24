@@ -112,6 +112,14 @@ export default function FocusScreen() {
     }
   };
 
+  const handleSetupGuard = () => {
+    if (!guardStatus.overlay) {
+      openOverlayPermissionSettings();
+    } else if (!guardStatus.usageStats) {
+      openUsageStatsPermissionSettings();
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
@@ -250,33 +258,6 @@ export default function FocusScreen() {
           <Text style={styles.trackerHint}>{t('focus.selectTracker')}</Text>
         )}
 
-        {/* Focus Guard permissions */}
-        <View style={styles.rulesCard}>
-          <Text style={styles.rulesTitle}>{t('focus.guardTitle')}</Text>
-          {Platform.OS === 'android' ? (
-            <>
-              <Text style={styles.ruleText}>
-                {guardStatus.overlay && guardStatus.usageStats ? t('focus.guardPermissionReady') : t('focus.guardAndroidHint')}
-              </Text>
-              {!guardStatus.overlay ? (
-                <TouchableOpacity style={styles.guardButton} onPress={openOverlayPermissionSettings} activeOpacity={0.85}>
-                  <Text style={styles.guardButtonText}>{t('focus.guardOverlayPermission')}</Text>
-                </TouchableOpacity>
-              ) : null}
-              {!guardStatus.usageStats ? (
-                <TouchableOpacity style={styles.guardButton} onPress={openUsageStatsPermissionSettings} activeOpacity={0.85}>
-                  <Text style={styles.guardButtonText}>{t('focus.guardUsagePermission')}</Text>
-                </TouchableOpacity>
-              ) : null}
-              {!guardStatus.overlay || !guardStatus.usageStats ? (
-                <Text style={styles.guardHint}>{t('focus.guardPermissionNeeded')}</Text>
-              ) : null}
-            </>
-          ) : Platform.OS === 'ios' ? (
-            <Text style={styles.ruleText}>{t('focus.guardIosHint')}</Text>
-          ) : null}
-        </View>
-
         {/* Rules reminder */}
         <View style={styles.rulesCard}>
           <Text style={styles.rulesTitle}>{t('focus.focusRules')}</Text>
@@ -306,6 +287,28 @@ export default function FocusScreen() {
             {starting ? t('focus.starting') : (isCustomSelected && effectiveMins > 0 ? t('focus.lockInMinutes', { value: effectiveMins }) : t('focus.lockIn'))}
           </Text>
         </TouchableOpacity>
+
+        {/* Focus Guard permissions: intentionally below Lock In and never opened automatically. */}
+        <View style={styles.rulesCard}>
+          <Text style={styles.rulesTitle}>{t('focus.guardTitle')}</Text>
+          {Platform.OS === 'android' ? (
+            <>
+              <Text style={styles.ruleText}>
+                {guardStatus.overlay && guardStatus.usageStats ? t('focus.guardPermissionReady') : t('focus.guardAndroidHint')}
+              </Text>
+              {!guardStatus.overlay || !guardStatus.usageStats ? (
+                <TouchableOpacity style={styles.guardButton} onPress={handleSetupGuard} activeOpacity={0.85}>
+                  <Text style={styles.guardButtonText}>{t('focus.guardSetup')}</Text>
+                </TouchableOpacity>
+              ) : null}
+              {!guardStatus.overlay || !guardStatus.usageStats ? (
+                <Text style={styles.guardHint}>{t('focus.guardSetupHint')}</Text>
+              ) : null}
+            </>
+          ) : Platform.OS === 'ios' ? (
+            <Text style={styles.ruleText}>{t('focus.guardIosHint')}</Text>
+          ) : null}
+        </View>
 
       </ScrollView>
     </SafeAreaView>

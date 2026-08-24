@@ -9,9 +9,9 @@ import AuthRouteGuard from '@/auth/AuthRouteGuard';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { LanguageProvider, useLanguage } from '@/contexts/LanguageContext';
 import { useApp } from '@/hooks/useApp';
+import SwipeNavigationShell from '@/components/navigation/SwipeNavigationShell';
 import { configureNotificationHandler, loadNotificationSettings } from '@/features/notifications/services/localNotifications';
 import { registerNotificationDevice } from '@/features/notifications/services/adminNotifications';
-import SwipeNavigationShell from '@/components/navigation/SwipeNavigationShell';
 
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
@@ -22,16 +22,25 @@ function AppNavigation() {
   const { ready: languageReady } = useLanguage();
 
   useEffect(() => {
+    let active = true;
+    if (!authReady || appLoading) return () => { active = false; };
+
     try {
       configureNotificationHandler();
     } catch {
       // Notification setup must never prevent the app shell from rendering.
     }
-    if (!authReady || appLoading || !user?.id) return;
-    let active = true;
-    void loadNotificationSettings(user.id).then(settings => {
-      if (active && settings.enabled) void registerNotificationDevice(user.id);
-    }).catch(() => undefined);
+
+    if (user?.id) {
+      void loadNotificationSettings(user.id)
+        .then(async settings => {
+          if (active && settings.enabled) {
+            await registerNotificationDevice(user.id);
+          }
+        })
+        .catch(() => undefined);
+    }
+
     return () => { active = false; };
   }, [appLoading, authReady, user?.id]);
 
@@ -50,6 +59,7 @@ function AppNavigation() {
         <Stack.Screen name="streak-broken" options={{ animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
         <Stack.Screen name="focus/active" options={{ animation: 'slide_from_bottom', gestureEnabled: false }} />
+        <Stack.Screen name="focus/allowed-apps" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="focus/complete" options={{ animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="focus/levelup" options={{ animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="focus/broken" options={{ animation: 'fade', gestureEnabled: false }} />

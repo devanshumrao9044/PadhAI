@@ -1,6 +1,8 @@
 import NetInfo from '@react-native-community/netinfo';
 import { getItem, removeItem, setItem } from '@/features/core/services/storage';
 import { supabase } from '@/features/core/services/supabase';
+import { getSafeErrorMessage } from '@/features/core/services/safeError';
+export { reconcileOfflineFocusProgress } from './offlineFocusReconciliation';
 
 export type OfflineFocusQueueStatus = 'ready_to_sync' | 'syncing' | 'failed' | 'conflict';
 
@@ -140,12 +142,18 @@ export async function syncOfflineFocusQueue(userId: string): Promise<OfflineFocu
       const { data, error } = await submitOfflineFocusSession(item);
 
       if (error) {
+        const safeMessage = getSafeErrorMessage(error, {
+          fallback: 'Session sync failed. We will try again later.',
+          network: 'Connection unavailable. We will try again later.',
+          permission: 'This session could not be synced because it is not authorized.',
+          rateLimit: 'Sync is temporarily limited. We will try again later.',
+        });
         const latest = await readQueue(userId);
         await writeQueue(userId, latest.map(entry => entry.sessionId === item.sessionId
-          ? { ...entry, status: 'failed', lastError: error.message }
+          ? { ...entry, status: 'failed', lastError: safeMessage }
           : entry,
         ));
-        results.push({ sessionId: item.sessionId, status: 'failed', message: error.message });
+        results.push({ sessionId: item.sessionId, status: 'failed', message: safeMessage });
         break;
       }
 

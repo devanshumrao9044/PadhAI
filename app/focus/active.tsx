@@ -46,7 +46,6 @@ export default function FocusActiveScreen() {
   const [showExit, setShowExit] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
-
   const startTimeRef = useRef(
     activeSession?.startedAt ? new Date(activeSession.startedAt).getTime() : Date.now()
   );
@@ -174,10 +173,15 @@ export default function FocusActiveScreen() {
           currentRouter.replace(`/focus/broken?penalty=${brokenSession?.xpDeducted ?? 0}&recovery=1&required=${STREAK_RECOVERY_MINUTES}`);
           return;
         }
-        currentRouter.replace('/focus/complete?xp=0&comeback=0');
+        currentRouter.replace('/focus/complete?xp=0&comeback=0&rejected=1');
         return;
       }
 
+      if ((session as any)?.syncRejected) {
+        const reason = encodeURIComponent(String((session as any)?.syncError ?? 'verification_failed'));
+        currentRouter.replace(`/focus/complete?xp=0&referralXp=0&comeback=0&recovery=0&rejected=1&reason=${reason}`);
+        return;
+      }
       const syncPending = Boolean((session as any)?.syncPending);
       const clockAnomaly = Boolean((session as any)?.clockAnomaly);
       if (!syncPending) void haptics.focusComplete();
@@ -210,7 +214,7 @@ export default function FocusActiveScreen() {
         setRecovery(false, 0);
         currentRouter.replace(`/focus/broken?penalty=0&recovery=1&required=${STREAK_RECOVERY_MINUTES}`);
       } else {
-        currentRouter.replace('/focus/complete?xp=0&comeback=0');
+        currentRouter.replace('/focus/complete?xp=0&comeback=0&rejected=1');
       }
     }
   }, []);
@@ -310,16 +314,43 @@ export default function FocusActiveScreen() {
     try {
       const sub = AppState.addEventListener('change', next => {
         if (appStateRef.current === 'active' && next !== 'active') {
-          void checkpointActiveSession(elapsedRef.current, clockAnomalyRef.current);
-          if (intervalRef.current) {
+          // On Android, Focus Guard keeps the session alive while a verified study
+          // app is foreground. Capture monotonic time before the JS timer is
+          // background-throttled so the external study time is not lost.
+          const nowMonotonic = monotonicNow();
+          const currentElapsed = Platform.OS === 'android'
+            ? baseElapsedRef.current + Math.max(0, Math.floor((nowMonotonic - (monotonicStartRef.current ?? nowMonotonic)) / 1000))
+            : elapsedRef.current;
+          elapsedRef.current = currentElapsed;
+          clockSampleRef.current = { wallMs: Date.now(), monotonicMs: nowMonotonic };
+          setElapsed(currentElapsed);
+          void checkpointActiveSession(currentElapsed, clockAnomalyRef.current);
+          if (Platform.OS !== 'android' && intervalRef.current) {
             clearInterval(intervalRef.current);
             intervalRef.current = null;
           }
         } else if (appStateRef.current !== 'active' && next === 'active') {
+          const nowMonotonic = monotonicNow();
+          const previous = clockSampleRef.current;
+          const wallDelta = Date.now() - previous.wallMs;
+          const monotonicDelta = nowMonotonic - previous.monotonicMs;
+          if (previous.monotonicMs > 0 && Math.abs(wallDelta - monotonicDelta) > 120_000) {
+            clockAnomalyRef.current = true;
+            void checkpointActiveSession(elapsedRef.current, true);
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+          if (Platform.OS === 'android' && !clockAnomalyRef.current) {
+            const currentElapsed = baseElapsedRef.current + Math.max(0, Math.floor((nowMonotonic - (monotonicStartRef.current ?? nowMonotonic)) / 1000));
+            elapsedRef.current = currentElapsed;
+            setElapsed(currentElapsed);
+          }
           void handleFocusGuardBreak();
-          baseElapsedRef.current = elapsedRef.current;
-          monotonicStartRef.current = monotonicNow();
-          clockSampleRef.current = { wallMs: Date.now(), monotonicMs: monotonicStartRef.current };
+          if (Platform.OS !== 'android') {
+            baseElapsedRef.current = elapsedRef.current;
+            monotonicStartRef.current = nowMonotonic;
+          }
+          clockSampleRef.current = { wallMs: Date.now(), monotonicMs: nowMonotonic };
           if (!clockAnomalyRef.current && !intervalRef.current) intervalRef.current = setInterval(tick, 500);
         }
         appStateRef.current = next;
@@ -426,25 +457,6 @@ export default function FocusActiveScreen() {
           if (isCompletingRef.current) return;
           const updated = payload.new;
 
-          if (updated?.broken === false && updated?.ended_at) {
-            const currentSession = liveStateRef.current.activeSession;
-            const isRecovery = Boolean(currentSession?.isRecovery || liveStateRef.current.streakRecoveryPending);
-            const actualMins = Math.floor(elapsedRef.current / 60);
-            if (!isStreakRecoveryEligible(isRecovery, actualMins)) {
-              isCompletingRef.current = true;
-              if (intervalRef.current) clearInterval(intervalRef.current);
-              liveStateRef.current.setStreakRecoveryPending(false, 0);
-              void haptics.focusBroken();
-              currentRouter.replace(`/focus/broken?penalty=0&recovery=1&required=${STREAK_RECOVERY_MINUTES}`);
-              return;
-            }
-            isCompletingRef.current = true;
-            if (intervalRef.current) clearInterval(intervalRef.current);
-            void haptics.focusComplete();
-            currentRouter.replace(`/focus/complete?xp=${updated.xp_earned ?? 0}`);
-            return;
-          }
-
           if (updated?.broken === true) {
             isCompletingRef.current = true;
             if (intervalRef.current) clearInterval(intervalRef.current);
@@ -513,7 +525,17 @@ export default function FocusActiveScreen() {
           <Text style={styles.progressPct}>{t('focus.percentComplete', { value: Math.round(progress * 100) })}</Text>
         </View>
 
-          <Text style={styles.hint}>
+        {Platform.OS === 'android' ? (
+          <>
+            <TouchableOpacity style={styles.allowedAppsButton} onPress={() => router.push('/focus/allowed-apps' as Parameters<typeof router.push>[0])} activeOpacity={0.85}>
+              <MaterialIcons name="apps" size={18} color={colors.primary} />
+              <Text style={styles.allowedAppsButtonText}>{t('focus.allowedAppsTitle')}</Text>
+              <MaterialIcons name="chevron-right" size={18} color={colors.primary} />
+            </TouchableOpacity>
+          </>
+        ) : null}
+
+        <Text style={styles.hint}>
           {tapCount > 0 ? t('focus.moreTaps', { value: 3 - tapCount }) : t('focus.tripleTapExit')}
         </Text>
 
@@ -522,6 +544,7 @@ export default function FocusActiveScreen() {
           <Text style={styles.motivationText}>{t('focus.lockedIn')}</Text>
         </View>
       </TouchableOpacity>
+
 
       {showExit && (
         <View style={styles.exitOverlay}>
@@ -567,6 +590,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   progressTrack: { height: 6, backgroundColor: colors.surfaceVariant, borderRadius: Radius.full, overflow: 'hidden', marginBottom: 8 },
   progressFill: { height: '100%', backgroundColor: colors.primary, borderRadius: Radius.full },
   progressPct: { fontSize: FontSize.sm, color: colors.textTertiary, textAlign: 'center' },
+  allowedAppsButton: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.sm, backgroundColor: colors.surface, borderRadius: Radius.full, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 8 },
+  allowedAppsButtonText: { flex: 1, color: colors.textSecondary, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
   hint: { fontSize: FontSize.xs, color: colors.textTertiary, marginTop: Spacing.xl, textAlign: 'center' },
   motivationStrip: { position: 'absolute', bottom: Spacing.xl, flexDirection: 'row', alignItems: 'center', gap: 6 },
   motivationText: { fontSize: FontSize.xs, color: colors.primary, fontWeight: FontWeight.medium, letterSpacing: 0.5 },

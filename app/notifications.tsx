@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -10,7 +11,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { WebView } from 'react-native-webview';
 import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,6 +18,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { NotificationSkeletonList } from '@/components/ui/Skeleton';
+import { getSafeErrorMessage } from '@/features/core/services/safeError';
 import {
   deleteUserNotification,
   getNotificationAttachmentUrl,
@@ -56,7 +57,12 @@ export default function NotificationsScreen() {
       setItems(nextItems);
       setAttachmentUrls({});
     } catch (error: any) {
-      if (mountedRef.current) Alert.alert(t('notifications.title'), error?.message ?? t('notifications.loadFailed'));
+      if (mountedRef.current) Alert.alert(t('notifications.title'), getSafeErrorMessage(error, {
+        fallback: t('notifications.loadFailed'),
+        network: t('common.networkError'),
+        permission: t('common.permissionError'),
+        rateLimit: t('common.rateLimitError'),
+      }));
     } finally {
       if (mountedRef.current) {
         if (isRefresh) setRefreshing(false); else setLoading(false);
@@ -97,6 +103,14 @@ export default function NotificationsScreen() {
     }
   };
 
+  const openAttachment = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch {
+      if (mountedRef.current) Alert.alert(t('notifications.title'), t('notifications.attachmentFailed'));
+    }
+  };
+
   const remove = (item: UserNotification) => {
     Alert.alert(
       t('notifications.deleteTitle'),
@@ -118,7 +132,12 @@ export default function NotificationsScreen() {
                 return next;
               });
             } catch (error: any) {
-              if (mountedRef.current) Alert.alert(t('notifications.title'), error?.message ?? t('notifications.deleteFailed'));
+              if (mountedRef.current) Alert.alert(t('notifications.title'), getSafeErrorMessage(error, {
+                fallback: t('notifications.deleteFailed'),
+                network: t('common.networkError'),
+                permission: t('common.permissionError'),
+                rateLimit: t('common.rateLimitError'),
+              }));
             } finally {
               if (mountedRef.current) setBusyId(null);
             }
@@ -193,7 +212,10 @@ export default function NotificationsScreen() {
                       <Image source={{ uri: attachmentUrl }} style={styles.imagePreview} resizeMode="contain" accessibilityLabel={attachmentLabel} />
                     ) : null}
                     {attachmentUrl && item.attachmentMimeType === 'application/pdf' ? (
-                      <WebView source={{ uri: attachmentUrl }} style={styles.pdfPreview} originWhitelist={['*']} startInLoadingState />
+                      <TouchableOpacity style={styles.pdfButton} onPress={() => void openAttachment(attachmentUrl)} activeOpacity={0.8} accessibilityLabel={t('notifications.openAttachment')}>
+                        <MaterialIcons name="open-in-new" size={17} color={colors.primary} />
+                        <Text style={styles.pdfButtonText}>{t('notifications.openAttachment')}</Text>
+                      </TouchableOpacity>
                     ) : null}
                   </View>
                 ) : null}
@@ -239,6 +261,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   attachmentHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 5 },
   attachmentTitle: { flex: 1, minWidth: 0, color: colors.primary, fontSize: FontSize.xs, lineHeight: 17, fontWeight: FontWeight.semiBold, flexShrink: 1 },
   imagePreview: { width: '100%', height: 210, borderRadius: Radius.md, backgroundColor: colors.background },
-  pdfPreview: { width: '100%', height: 300, borderRadius: Radius.md, backgroundColor: colors.background },
+  pdfButton: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, marginTop: 2, paddingHorizontal: 10, paddingVertical: 8, borderRadius: Radius.md, backgroundColor: colors.primary + '12' },
+  pdfButtonText: { color: colors.primary, fontSize: FontSize.xs, lineHeight: 17, fontWeight: FontWeight.semiBold },
   deleteButton: { position: 'absolute', top: Spacing.sm, right: Spacing.sm, width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surfaceVariant, alignItems: 'center', justifyContent: 'center' },
 });

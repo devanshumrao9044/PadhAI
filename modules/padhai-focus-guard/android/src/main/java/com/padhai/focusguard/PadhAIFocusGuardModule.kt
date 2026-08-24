@@ -25,14 +25,23 @@ class PadhAIFocusGuardModule : Module() {
       )
     }
 
-    Function("configure") { blockedPackages: List<String>, allowedPackages: List<String> ->
-      FocusGuardPrefs.setPackages(context, blockedPackages, allowedPackages)
+    Function("configure") { blockedPackages: List<String>, ignoredAllowedPackages: List<String> ->
+      // The legacy second parameter is intentionally ignored. User-managed
+      // allowlisting was removed; native policy is now zero-trust and automatic.
+      FocusGuardPrefs.setBlockedPackages(context, blockedPackages)
+    }
+
+    Function("refreshAppDecisionCache") {
+      FocusGuardAppPolicy.warmInstalledCache(context, force = true)
+      true
     }
 
     Function("start") {
       val canStart = canDrawOverlay() && hasUsageStatsAccess()
       if (canStart) {
+        FocusGuardAppPolicy.warmInstalledCache(context)
         FocusGuardPrefs.setEnabled(context, true)
+        FocusGuardPrefs.setStartedAt(context, System.currentTimeMillis())
         PadhAIFocusGuardService.start(context)
       }
       canStart
@@ -40,11 +49,26 @@ class PadhAIFocusGuardModule : Module() {
 
     Function("stop") {
       FocusGuardPrefs.setEnabled(context, false)
+      FocusGuardPrefs.setStartedAt(context, 0L)
       PadhAIFocusGuardService.stop(context)
     }
 
     Function("consumeBreakRequest") {
       FocusGuardPrefs.consumeBreak(context)
+    }
+
+    Function("getInstalledApps") {
+      FocusGuardAppPolicy.listInstalledApps(context)
+    }
+
+    Function("launchStudyApp") { packageName: String ->
+      val decision = FocusGuardAppPolicy.decide(context, packageName)
+      if (!decision.allowed || packageName == context.packageName) return@Function false
+      val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+        ?: return@Function false
+      launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      context.startActivity(launchIntent)
+      true
     }
 
     Function("openOverlaySettings") {

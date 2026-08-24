@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -9,6 +9,7 @@ import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/
 import { useApp } from '@/hooks/useApp';
 import { getLevelForUser } from '@/constants/levels';
 import { COMPLETION_MESSAGES } from '@/constants/messages';
+import { subscribeToOfflineFocusReconnect, syncOfflineFocusQueue } from '@/features/focus/services/offlineFocusSync';
 
 function ConfettiDot({
   color, delay, startX,
@@ -66,9 +67,9 @@ export default function FocusCompleteScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const params = useLocalSearchParams<{
-    xp: string; referralXp: string; comeback: string; recovery: string; lostStreak: string; pending: string; clock: string;
+    xp: string; referralXp: string; comeback: string; recovery: string; lostStreak: string; pending: string; clock: string; rejected: string;
   }>();
-  const { user, setUser } = useApp();
+  const { user, reload } = useApp();
 
   const xp = parseInt(params.xp ?? '0', 10);
   const referralXpAwarded = parseInt(params.referralXp ?? '0', 10);
@@ -76,7 +77,9 @@ export default function FocusCompleteScreen() {
   const isRecovery = params.recovery === '1';
   const lostStreak = parseInt(params.lostStreak ?? '0', 10);
   const isPending = params.pending === '1';
+  const isRejected = params.rejected === '1';
   const clockAnomaly = params.clock === '1';
+  const [syncedXP, setSyncedXP] = useState<number | null>(null);
   const recoveredStreak = Math.max(1, Math.ceil(lostStreak / 2));
   const COMEBACK_BONUS = 50;
 
@@ -96,18 +99,32 @@ export default function FocusCompleteScreen() {
     COMPLETION_MESSAGES[Math.floor(Math.random() * COMPLETION_MESSAGES.length)]
   );
   const level = user ? getLevelForUser(user) : null;
-  const referralAppliedRef = useRef(false);
+  const resolvedPending = !isRejected && isPending && syncedXP === null;
+  const displayedXP = syncedXP ?? xp;
+
+  useEffect(() => {
+    if (!isPending || !user?.id) return;
+    let mounted = true;
+    const applyResults = (results: Awaited<ReturnType<typeof syncOfflineFocusQueue>>) => {
+      const accepted = results.find(result => result.status === 'accepted' || result.status === 'duplicate');
+      if (mounted && accepted) {
+        setSyncedXP(accepted.xpEarned ?? 0);
+        void reload({ force: true });
+      }
+    };
+    void syncOfflineFocusQueue(user.id).then(applyResults);
+    const unsubscribe = subscribeToOfflineFocusReconnect(user.id, applyResults);
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, [isPending, reload, user?.id]);
 
   // AppContext applies streak recovery only after the full recovery session passes
   // the 30-minute policy. This screen only renders the confirmed result.
 
-  // AppContext awards the referral bonus once, during the completed-session write.
-  // This effect only hydrates the returned amount into the local user state.
-  useEffect(() => {
-    if (referralAppliedRef.current || referralXpAwarded <= 0 || !user) return;
-    referralAppliedRef.current = true;
-    void setUser({ ...user, xpTotal: user.xpTotal + referralXpAwarded });
-  }, [referralXpAwarded, setUser, user]);
+  // AppContext already applies the server-returned total, including any referral
+  // bonus. Do not add referral XP again on the completion screen.
 
   // Animation refs are stable and route params are immutable for this mounted screen.
   useEffect(() => {
@@ -176,7 +193,7 @@ export default function FocusCompleteScreen() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const showConfetti = !isPending && (isComeback || isRecovery);
+  const showConfetti = !resolvedPending && !isRejected && (isComeback || isRecovery);
   const confettiParticles = showConfetti
     ? Array.from({ length: 18 }, (_, i) => ({
         id: i,
@@ -186,7 +203,9 @@ export default function FocusCompleteScreen() {
       }))
     : [];
 
-  const screenTitle = isPending
+  const screenTitle = isRejected
+    ? t('focus.syncRejectedTitle')
+    : resolvedPending
     ? t('focus.syncPendingTitle')
     : isRecovery
     ? t('focus.recovery')
@@ -194,7 +213,9 @@ export default function FocusCompleteScreen() {
     ? t('focus.comeback')
     : t('focus.sessionComplete');
 
-  const screenMessage = isPending
+  const screenMessage = isRejected
+    ? t('focus.syncRejectedMessage')
+    : resolvedPending
     ? (clockAnomaly ? t('focus.syncPendingClockMessage') : t('focus.syncPendingMessage'))
     : isRecovery
     ? t('focus.recoveryDetail', { lost: lostStreak, recovered: recoveredStreak })
@@ -202,8 +223,8 @@ export default function FocusCompleteScreen() {
     ? t('focus.comebackDescription')
     : messageRef.current;
 
-  const heroIcon = isPending ? 'cloud-upload' : isRecovery ? 'local-fire-department' : isComeback ? 'whatshot' : 'emoji-events';
-  const heroColor = isPending ? colors.primary : isRecovery ? colors.success : isComeback ? '#F97316' : colors.warning;
+  const heroIcon = isRejected ? 'error-outline' : resolvedPending ? 'cloud-upload' : isRecovery ? 'local-fire-department' : isComeback ? 'whatshot' : 'emoji-events';
+  const heroColor = isRejected ? colors.danger : resolvedPending ? colors.primary : isRecovery ? colors.success : isComeback ? '#F97316' : colors.warning;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -242,7 +263,13 @@ export default function FocusCompleteScreen() {
           </Text>
           <Text style={styles.message}>{screenMessage}</Text>
 
-          {isPending ? (
+          {isRejected ? (
+            <View style={[styles.xpCard, { backgroundColor: heroColor + '18', borderColor: heroColor + '55' }]}>
+              <MaterialIcons name="error-outline" size={28} color={heroColor} />
+              <Text style={[styles.xpAmount, { color: heroColor }]}>{t('focus.syncRejectedNoXP')}</Text>
+              <Text style={styles.xpLabel}>{t('focus.syncRejectedMessage')}</Text>
+            </View>
+          ) : resolvedPending ? (
             <View style={[styles.xpCard, { backgroundColor: heroColor + '22', borderColor: heroColor + '55' }]}>
               <MaterialIcons name="cloud-upload" size={28} color={heroColor} />
               <Text style={[styles.xpAmount, { color: heroColor }]}>{t('focus.syncPendingTitle')}</Text>
@@ -251,7 +278,7 @@ export default function FocusCompleteScreen() {
           ) : (
           <View style={[styles.xpCard, (isComeback || isRecovery) && { backgroundColor: heroColor + '22', borderColor: heroColor + '55' }]}>
             <MaterialIcons name="bolt" size={28} color={colors.warning} />
-            <Text style={styles.xpAmount}>+{xp} XP</Text>
+            <Text style={styles.xpAmount}>+{displayedXP} XP</Text>
             <Text style={styles.xpLabel}>{t('focus.earned')}</Text>
           </View>
           )}

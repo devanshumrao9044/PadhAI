@@ -35,6 +35,7 @@ import {
   syncOfflineFocusQueue,
   clearOfflineFocusQueue,
   submitOfflineFocusSession,
+  reconcileOfflineFocusProgress,
 } from '@/features/focus/services/offlineFocusSync';
 import {
   buildBaselineMarker,
@@ -649,7 +650,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setChapterAnalytics(visibleAnalytics);
           void writeUserCache(userId, 'chapterAnalytics', visibleAnalytics);
         } else if (chapterAnalyticsRes.error) {
-          console.warn('[Analytics] Chapter analytics load failed:', chapterAnalyticsRes.error.message);
+          console.warn('[Analytics] Chapter analytics load failed');
           if (!cachedAnalytics) setChapterAnalytics([]);
         }
         let loadedXP = cachedXP?.data ?? savedXP ?? [];
@@ -762,9 +763,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user?.id) return;
     return subscribeToOfflineFocusReconnect(user.id, results => {
-      if (results.some(result => result.status === 'accepted' || result.status === 'duplicate')) {
-        void reload({ force: true });
-      }
+      const accepted = results.find(result => result.status === 'accepted' || result.status === 'duplicate');
+      if (!accepted) return;
+      void (async () => {
+        const cachedUser = await getItem<UserProfile>(StorageKeys.USER);
+        if (!cachedUser || cachedUser.id !== user.id) return;
+        const reconciledUser = reconcileOfflineFocusProgress(cachedUser, accepted);
+        if (reconciledUser !== cachedUser) {
+          setUserState(reconciledUser);
+          await setItem(StorageKeys.USER, reconciledUser);
+          void writeUserCache(user.id, 'user', reconciledUser);
+        }
+        await reload({ force: true });
+      })();
     });
   }, [reload, user?.id]);
 
@@ -1022,7 +1033,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const COMEBACK_BONUS_XP = 50;
   const isStreakMilestone = (value: number) => value >= 3 && (value % 7 === 0 || [30, 60, 100].includes(value));
 
-  const completeSession = async (sessionId: string, actualMins: number, actualSeconds = actualMins * 60): Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number; referralXpAwarded?: number; syncPending?: boolean; clockAnomaly?: boolean }) | null> => {
+  const completeSession = async (sessionId: string, actualMins: number, actualSeconds = actualMins * 60): Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number; referralXpAwarded?: number; syncPending?: boolean; syncRejected?: boolean; syncError?: string; clockAnomaly?: boolean }) | null> => {
     const isRecoverySession = Boolean(activeSession?.isRecovery || streakRecoveryPending);
     if (!isStreakRecoveryEligible(isRecoverySession, actualMins)) return null;
 
@@ -1092,9 +1103,69 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       const { data, error } = await submitOfflineFocusSession(settlement);
-      if (error) throw error;
+      if (error) {
+        await enqueueOfflineFocusSession(settlement);
+        const localSession = mapSession({
+          id: sessionId,
+          user_id: activeUser.id,
+          subject_id: settlement.subjectId,
+          chapter_id: settlement.chapterId,
+          planned_minutes: settlement.plannedMinutes,
+          actual_minutes: settlement.actualMinutes,
+          completed: true,
+          broken: false,
+          xp_earned: 0,
+          xp_deducted: 0,
+          comeback_bonus: bonusFromComeback,
+          started_at: startedAt,
+          ended_at: endedAt,
+          broken_at_percent: 100,
+        });
+        const newSessions = [localSession, ...sessions];
+        setSessions(newSessions);
+        await setItem(StorageKeys.SESSIONS, newSessions);
+        void writeUserCache(activeUser.id, 'sessions', newSessions);
+        setActiveSession(null);
+        await setItem(StorageKeys.ACTIVE_SESSION, null);
+        return {
+          ...localSession,
+          leveledUp: false,
+          newLevelRank: getLevelForUser(activeUser).rank,
+          totalXP: activeUser.xpTotal,
+          referralXpAwarded: 0,
+          syncPending: true,
+          clockAnomaly: false,
+        };
+      }
       if (data?.accepted !== true) {
-        throw new Error(data?.message ?? 'The focus session could not be verified.');
+        const rejectedSession = mapSession({
+          id: sessionId,
+          user_id: activeUser.id,
+          subject_id: settlement.subjectId,
+          chapter_id: settlement.chapterId,
+          planned_minutes: settlement.plannedMinutes,
+          actual_minutes: settlement.actualMinutes,
+          completed: true,
+          broken: false,
+          xp_earned: 0,
+          xp_deducted: 0,
+          comeback_bonus: bonusFromComeback,
+          started_at: startedAt,
+          ended_at: endedAt,
+          broken_at_percent: 100,
+        });
+        setActiveSession(null);
+        await setItem(StorageKeys.ACTIVE_SESSION, null);
+        return {
+          ...rejectedSession,
+          leveledUp: false,
+          newLevelRank: getLevelForUser(activeUser).rank,
+          totalXP: activeUser.xpTotal,
+          referralXpAwarded: 0,
+          syncRejected: true,
+          syncError: data?.conflict_code ?? 'verification_failed',
+          clockAnomaly: false,
+        };
       }
 
       const verifiedMinutes = Number(data.verified_minutes ?? settlement.actualMinutes);
@@ -1116,6 +1187,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ended_at: endedAt,
         broken_at_percent: 100,
       });
+      if (data.duplicate === true) {
+        // The server already settled this session. Reconcile by reload only;
+        // never replay the returned XP locally.
+        setActiveSession(null);
+        await setItem(StorageKeys.ACTIVE_SESSION, null);
+        void reload({ force: true });
+        return {
+          ...sessionObj,
+          leveledUp: false,
+          newLevelRank: getLevelForUser(activeUser).rank,
+          totalXP: activeUser.xpTotal,
+          referralXpAwarded: 0,
+        };
+      }
       const newSessions = [sessionObj, ...sessions];
       setSessions(newSessions);
       await setItem(StorageKeys.SESSIONS, newSessions);

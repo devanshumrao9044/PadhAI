@@ -12,11 +12,11 @@
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
+    "@padhai/focus-guard": "workspace:*",
     "@react-native-async-storage/async-storage": "2.1.2",
     "@react-native-community/datetimepicker": "^8.2.0",
     "@react-native-community/netinfo": "11.4.1",
     "@supabase/supabase-js": "^2.50.0",
-    "@padhai/focus-guard": "workspace:*",
     "expo": "~53.0.9",
     "expo-blur": "~14.1.5",
     "expo-clipboard": "~7.1.4",
@@ -44,15 +44,14 @@
     "react-native-screens": "~4.11.1",
     "react-native-svg": "15.11.2",
     "react-native-url-polyfill": "^2.0.0",
-    "react-native-web": "~0.19.13",
-    "react-native-webview": "13.13.5"
+    "react-native-web": "~0.19.13"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/react": "~19.0.10",
-    "expo-modules-autolinking": "2.1.12",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~9.2.0",
+    "expo-modules-autolinking": "2.1.12",
     "typescript": "~5.8.3"
   },
   "private": true,
@@ -60,7 +59,8 @@
     "autolinking": {
       "nativeModulesDir": "./modules",
       "android": {
-        "onlyProjectDeps": false
+        "onlyProjectDeps": false,
+        "exclude": []
       }
     }
   }

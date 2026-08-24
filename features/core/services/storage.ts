@@ -1,30 +1,54 @@
 import { Platform } from 'react-native';
 
-function getStorage() {
-  if (Platform.OS !== 'web') {
-    return require('@react-native-async-storage/async-storage').default;
-  }
-  if (typeof window === 'undefined') {
-    return {
-      getItem: (_key: string) => Promise.resolve(null),
-      setItem: (_key: string, _value: string) => Promise.resolve(),
-      removeItem: (_key: string) => Promise.resolve(),
-    };
-  }
-  return {
-    getItem: (key: string) => Promise.resolve(window.localStorage.getItem(key)),
-    setItem: (key: string, value: string) => {
-      window.localStorage.setItem(key, value);
-      return Promise.resolve();
-    },
-    removeItem: (key: string) => {
-      window.localStorage.removeItem(key);
-      return Promise.resolve();
-    },
-  };
-}
+type StorageLike = {
+  getItem: (key: string) => Promise<string | null>;
+  setItem: (key: string, value: string) => Promise<void>;
+  removeItem: (key: string) => Promise<void>;
+};
 
-const storage = getStorage();
+const memoryStore = new Map<string, string>();
+const memoryStorage: StorageLike = {
+  getItem: async (key) => memoryStore.get(key) ?? null,
+  setItem: async (key, value) => { memoryStore.set(key, value); },
+  removeItem: async (key) => { memoryStore.delete(key); },
+};
+
+let storage: StorageLike | undefined;
+
+function getStorage(): StorageLike {
+  if (storage) return storage;
+
+  if (Platform.OS !== 'web') {
+    try {
+      const candidate = require('@react-native-async-storage/async-storage').default as Partial<StorageLike> | undefined;
+      if (
+        candidate &&
+        typeof candidate.getItem === 'function' &&
+        typeof candidate.setItem === 'function' &&
+        typeof candidate.removeItem === 'function'
+      ) {
+        storage = candidate as StorageLike;
+        return storage;
+      }
+    } catch {
+      // Keep startup alive if the native storage module is unavailable on a device.
+    }
+    storage = memoryStorage;
+    return storage;
+  }
+
+  if (typeof window === 'undefined') {
+    storage = memoryStorage;
+    return storage;
+  }
+
+  storage = {
+    getItem: async (key) => window.localStorage.getItem(key),
+    setItem: async (key, value) => { window.localStorage.setItem(key, value); },
+    removeItem: async (key) => { window.localStorage.removeItem(key); },
+  };
+  return storage;
+}
 
 const KEYS = {
   USER: 'padhai_user',
@@ -37,12 +61,11 @@ const KEYS = {
   ONBOARDED: 'padhai_onboarded',
   ACTIVE_SESSION: 'padhai_active_session',
   LANGUAGE: 'padhai_language_v1',
-  FOCUS_GUARD_ALLOWED_APPS: 'padhai_focus_guard_allowed_apps_v1',
 };
 
 export async function getItem<T>(key: string): Promise<T | null> {
   try {
-    const val = await storage.getItem(key);
+    const val = await getStorage().getItem(key);
     return val ? JSON.parse(val) : null;
   } catch {
     return null;
@@ -51,14 +74,19 @@ export async function getItem<T>(key: string): Promise<T | null> {
 
 export async function setItem<T>(key: string, value: T): Promise<void> {
   try {
-    await storage.setItem(key, JSON.stringify(value));
+    await getStorage().setItem(key, JSON.stringify(value));
   } catch {}
 }
 
 export async function removeItem(key: string): Promise<void> {
   try {
-    await storage.removeItem(key);
+    await getStorage().removeItem(key);
   } catch {}
 }
 
 export const StorageKeys = KEYS;
+
+export function resetStorageForTests(): void {
+  storage = undefined;
+  memoryStore.clear();
+}
