@@ -66,7 +66,9 @@ class PadhAIFocusGuardService : Service() {
   private fun checkForegroundPackage() {
     val foreground = currentForegroundPackage() ?: return
     val decision = FocusGuardAppPolicy.decide(this, foreground)
-    val isBlocked = !decision.allowed || foreground in FocusGuardPrefs.blocked(this)
+    // The native policy is the single source of truth. Do not let a legacy
+    // persisted JS blocked list override a verified catalog decision.
+    val isBlocked = !decision.allowed
 
     if (foreground == applicationContext.packageName) {
       firstBlockedAt = 0L

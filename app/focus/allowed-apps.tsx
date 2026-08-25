@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -32,6 +33,7 @@ export default function AllowedAppsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [launchFailedPackage, setLaunchFailedPackage] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const loadApps = useCallback((isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -60,6 +62,9 @@ export default function AllowedAppsScreen() {
       case 'android_productivity_category': return t('focus.allowedAppsReasonProductivity');
       case 'android_game_category': return t('focus.allowedAppsReasonGame');
       case 'hard_deny': return t('focus.allowedAppsReasonHardDeny');
+      case 'catalog_education': return t('focus.allowedAppsReasonCatalogEducation');
+      case 'catalog_books_reference': return t('focus.allowedAppsReasonCatalogBooks');
+      case 'catalog_entertainment': return t('focus.allowedAppsReasonCatalogEntertainment');
       case 'cache': return t('focus.allowedAppsReasonCache');
       default: return t('focus.allowedAppsReasonUnknown');
     }
@@ -69,6 +74,12 @@ export default function AllowedAppsScreen() {
     setLaunchFailedPackage(null);
     if (!launchStudyApp(packageName)) setLaunchFailedPackage(packageName);
   };
+
+  const filteredApps = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return apps;
+    return apps.filter(app => `${app.label} ${app.packageName} ${app.category}`.toLowerCase().includes(query));
+  }, [apps, search]);
 
   if (Platform.OS !== 'android') {
     return (
@@ -114,7 +125,21 @@ export default function AllowedAppsScreen() {
 
         <View style={styles.sectionRow}>
           <Text style={styles.sectionTitle}>{t('focus.allowedAppsListTitle')}</Text>
-          <Text style={styles.countText}>{apps.length}</Text>
+          <Text style={styles.countText}>{filteredApps.length}</Text>
+        </View>
+
+        <View style={styles.searchRow}>
+          <MaterialIcons name="search" size={19} color={colors.textTertiary} />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder={t('focus.allowedAppsSearchPlaceholder')}
+            placeholderTextColor={colors.textTertiary}
+            style={styles.searchInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+          />
         </View>
 
         {loading ? (
@@ -125,9 +150,14 @@ export default function AllowedAppsScreen() {
             <Text style={styles.emptyTitle}>{t('focus.studyAppsEmpty')}</Text>
             <Text style={styles.emptyText}>{t('focus.allowedAppsRefreshHint')}</Text>
           </View>
+        ) : filteredApps.length === 0 ? (
+          <View style={styles.emptyState}>
+            <MaterialIcons name="search-off" size={42} color={colors.primary} />
+            <Text style={styles.emptyTitle}>{t('focus.allowedAppsSearchEmpty')}</Text>
+          </View>
         ) : (
           <View style={styles.list}>
-            {apps.map(app => (
+            {filteredApps.map(app => (
               <View key={app.packageName} style={styles.appRow}>
                 <View style={[styles.appIcon, !app.allowed && styles.appIconBlocked]}><MaterialIcons name={app.allowed ? 'menu-book' : 'block'} size={21} color={app.allowed ? colors.primary : colors.textTertiary} /></View>
                 <View style={styles.appCopy}>
@@ -173,6 +203,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   heroText: { color: colors.textSecondary, fontSize: FontSize.sm, lineHeight: 19, marginTop: 4 },
   sectionRow: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md },
   sectionTitle: { flex: 1, color: colors.textPrimary, fontSize: FontSize.lg, fontWeight: FontWeight.bold },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: Spacing.md, marginBottom: Spacing.md },
+  searchInput: { flex: 1, color: colors.textPrimary, fontSize: FontSize.base, paddingVertical: 12 },
   countText: { minWidth: 28, textAlign: 'center', color: colors.primary, fontSize: FontSize.sm, fontWeight: FontWeight.bold, backgroundColor: colors.primary + '18', borderRadius: Radius.full, paddingVertical: 5, paddingHorizontal: 9 },
   list: { gap: 10 },
   appRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md, borderRadius: Radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },

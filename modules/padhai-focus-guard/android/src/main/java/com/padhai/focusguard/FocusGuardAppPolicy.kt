@@ -123,19 +123,20 @@ internal object FocusGuardAppPolicy {
       context.packageManager.getApplicationInfo(packageName, PackageManager.MATCH_ALL)
     }.getOrNull() ?: return Decision(false, "not_installed")
     val versionCode = appVersionCode(context, packageName)
-    FocusGuardPrefs.cachedDecision(context, packageName, versionCode)?.let { cached ->
-      return Decision(cached, "cache")
-    }
-
     val category = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) appInfo.category else ApplicationInfo.CATEGORY_UNDEFINED
     val catalogCategory = FocusGuardCatalog.categoryFor(context, packageName)
-    val decision = when {
-      category == ApplicationInfo.CATEGORY_GAME -> Decision(false, "android_game_category")
+    val catalogDecision = when {
       catalogCategory == "Education" -> Decision(true, "catalog_education")
       catalogCategory == "Books & Reference" -> Decision(true, "catalog_books_reference")
+      category == ApplicationInfo.CATEGORY_GAME -> Decision(false, "android_game_category")
       catalogCategory == "Entertainment" -> Decision(false, "catalog_entertainment")
-      else -> Decision(false, "unknown_category")
+      else -> null
     }
+    val decision = catalogDecision
+      ?: FocusGuardPrefs.cachedDecision(context, packageName, versionCode)?.let { cached ->
+        Decision(cached, "cache")
+      }
+      ?: Decision(false, "unknown_category")
     FocusGuardPrefs.saveDecision(context, packageName, versionCode, decision.allowed)
     return decision
   }

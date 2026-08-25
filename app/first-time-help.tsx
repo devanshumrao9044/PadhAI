@@ -30,7 +30,7 @@ export default function FirstTimeHelpScreen() {
       const seen = await getItem<boolean>(helpKey(user.id));
       if (cancelled) return;
       if (seen) {
-        router.replace('/(tabs)/focus');
+        router.replace('/focus/setup' as Parameters<typeof router.replace>[0]);
       } else {
         setReady(true);
       }
@@ -42,7 +42,7 @@ export default function FirstTimeHelpScreen() {
     if (!user?.id || working) return;
     setWorking(true);
     await setItem(helpKey(user.id), true);
-    router.replace('/(tabs)/focus');
+    router.replace('/focus/setup' as Parameters<typeof router.replace>[0]);
   };
 
   if (!ready) {

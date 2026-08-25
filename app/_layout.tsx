@@ -59,6 +59,7 @@ function AppNavigation() {
         <Stack.Screen name="streak-broken" options={{ animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
         <Stack.Screen name="focus/active" options={{ animation: 'slide_from_bottom', gestureEnabled: false }} />
+        <Stack.Screen name="focus/setup" options={{ animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="focus/allowed-apps" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="focus/complete" options={{ animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="focus/levelup" options={{ animation: 'fade', gestureEnabled: false }} />

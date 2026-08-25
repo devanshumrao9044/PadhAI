@@ -16,6 +16,8 @@ export type InstalledFocusApp = {
   reason: string;
 };
 
+export const focusGuardSetupKey = (userId: string): string => `padhai:focus-guard-setup-v1:${userId}`;
+
 type NativeFocusGuard = {
   getStatus(): FocusGuardStatus;
   configure(blockedPackages: string[], allowedPackages: string[]): void;
