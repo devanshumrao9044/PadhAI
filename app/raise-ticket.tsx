@@ -8,6 +8,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import { submitStudyGroupTicket, type StudyGroupTicketCategory } from '@/features/study-groups/services/studyGroups';
+import { getSafeErrorMessage } from '@/features/core/services/safeError';
+import { readSupportHistory, writeSupportHistory } from '@/features/study-groups/services/supportCache';
 
 const CATEGORIES: StudyGroupTicketCategory[] = ['bug', 'account', 'study_group', 'report_follow_up', 'feature_request', 'other'];
 
@@ -43,10 +45,17 @@ export default function RaiseTicketScreen() {
     if (nextSubjectError || nextDetailsError) return;
     setSaving(true);
     try {
-      await submitStudyGroupTicket({ userId: user.id, category, subject, details, groupId: typeof routeGroupId === 'string' ? routeGroupId : null, reportId: typeof routeReportId === 'string' ? routeReportId : null });
+      const createdTicket = await submitStudyGroupTicket({ userId: user.id, category, subject, details, groupId: typeof routeGroupId === 'string' ? routeGroupId : null, reportId: typeof routeReportId === 'string' ? routeReportId : null });
+      const cachedHistory = await readSupportHistory(user.id);
+      await writeSupportHistory(user.id, { ...cachedHistory, tickets: [createdTicket, ...cachedHistory.tickets.filter(ticket => ticket.id !== createdTicket.id)] });
       setSubmitted(true);
     } catch (ticketError) {
-      setError(ticketError instanceof Error ? ticketError.message : 'Could not send the ticket.');
+      setError(getSafeErrorMessage(ticketError, {
+        fallback: 'Could not send the ticket. Please try again.',
+        network: 'Check your connection and try again.',
+        permission: 'You do not have permission to submit this ticket.',
+        rateLimit: 'Too many requests. Please wait and try again.',
+      }));
     } finally {
       setSaving(false);
     }

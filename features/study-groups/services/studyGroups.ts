@@ -94,7 +94,7 @@ export interface StudyGroupPendingMember {
 
 export interface StudyGroupReport {
   id: string;
-  groupId: string;
+  groupId: string | null;
   reporterId: string;
   reportedUserId: string | null;
   reasonCode: StudyGroupReportReason;
@@ -206,7 +206,7 @@ function mapMember(row: any, now = Date.now()): StudyGroupMember {
 function mapReport(row: any): StudyGroupReport {
   return {
     id: String(row.id),
-    groupId: String(row.group_id),
+    groupId: row.group_id ? String(row.group_id) : null,
     reporterId: String(row.reporter_id),
     reportedUserId: row.reported_user_id ? String(row.reported_user_id) : null,
     reasonCode: String(row.reason_code) as StudyGroupReportReason,
@@ -460,6 +460,12 @@ export async function deleteStudyGroupPermanently(groupId: string): Promise<void
   if (data !== true) throw new Error('You do not have permission to delete this Study Group.');
 }
 
+export async function assertStudyGroupActive(groupId: string): Promise<void> {
+  const { data, error } = await supabase.rpc('assert_study_group_active', { p_group_id: groupId });
+  throwIfError(error);
+  if (data !== true) throw new Error('This Study Group is temporarily suspended.');
+}
+
 export async function updateStudyGroupPresence(input: {
   groupId: string;
   userId: string;
@@ -515,6 +521,18 @@ export async function getOwnerStudyGroupReports(): Promise<StudyGroupReport[]> {
     .limit(100);
   throwIfError(error);
   return (data ?? []).map(mapReport);
+}
+
+export async function getStudyGroupNames(groupIds: string[]): Promise<Record<string, string>> {
+  const ids = Array.from(new Set(groupIds.filter(Boolean))).slice(0, 100);
+  if (ids.length === 0) return {};
+  const { data, error } = await supabase
+    .from('study_groups')
+    .select('id,name')
+    .in('id', ids)
+    .limit(100);
+  throwIfError(error);
+  return Object.fromEntries((data ?? []).map((row: any) => [String(row.id), String(row.name ?? '')]));
 }
 
 export async function reviewStudyGroupReport(reportId: string, status: StudyGroupReportStatus, resolution = ''): Promise<void> {

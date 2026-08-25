@@ -13,11 +13,13 @@ import {
   searchPublicStudyGroups,
   STUDY_GROUP_ICON_OPTIONS,
   submitStudyGroupReport,
+  leaveStudyGroup,
   type StudyGroup,
   type StudyGroupMembership,
   type StudyGroupReportReason,
 } from '@/features/study-groups/services/studyGroups';
 import StudyGroupReportSheet from '@/components/study-groups/StudyGroupReportSheet';
+import { getSafeErrorMessage } from '@/features/core/services/safeError';
 
 type MyGroupEntry = { group: StudyGroup; membership: StudyGroupMembership };
 type ListItem = { kind: 'mine' | 'search'; entry: MyGroupEntry | StudyGroup };
@@ -57,7 +59,11 @@ export default function StudyGroupsScreen() {
       setMyGroups(fresh);
       await writeUserCache(user.id, 'studyGroups', fresh);
     } catch (loadError) {
-      if (!myGroups.length) setError(loadError instanceof Error ? loadError.message : 'Could not load groups.');
+      if (!myGroups.length) setError(getSafeErrorMessage(loadError, {
+        fallback: 'Could not load groups. Please try again.',
+        network: 'Check your connection and try again.',
+        permission: 'You do not have permission to view these groups.',
+      }));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -74,17 +80,39 @@ export default function StudyGroupsScreen() {
     try {
       setSearchResults(await searchPublicStudyGroups(query));
     } catch (searchError) {
-      setError(searchError instanceof Error ? searchError.message : 'Could not search groups.');
+      setError(getSafeErrorMessage(searchError, {
+        fallback: 'Could not search groups. Please try again.',
+        network: 'Check your connection and try again.',
+        permission: 'You do not have permission to search groups.',
+        rateLimit: 'Too many requests. Please wait and try again.',
+      }));
     } finally {
       setSearching(false);
     }
   };
 
-  const openGroupMenu = (group: StudyGroup) => {
-    Alert.alert(t('groups.moreOptions'), group.name, [
-      { text: t('groups.reportGroupAction'), onPress: () => setReportGroup(group) },
+  const leaveFromMenu = (group: StudyGroup) => {
+    Alert.alert(t('groups.leaveGroup'), t('groups.leaveConfirm'), [
       { text: t('common.cancel'), style: 'cancel' },
+      { text: t('groups.leaveGroup'), style: 'destructive', onPress: () => {
+        void leaveStudyGroup(group.id).then(() => loadGroups(true)).catch(leaveError => {
+          setError(getSafeErrorMessage(leaveError, {
+            fallback: 'Could not leave the group. Please try again.',
+            network: 'Check your connection and try again.',
+            permission: 'You do not have permission to leave this group.',
+          }));
+        });
+      } },
     ]);
+  };
+
+  const openGroupMenu = (group: StudyGroup, membership: StudyGroupMembership | null) => {
+    const actions = [
+      ...(membership?.status === 'approved' && membership.role !== 'owner' ? [{ text: t('groups.leaveGroup'), style: 'destructive' as const, onPress: () => leaveFromMenu(group) }] : []),
+      { text: t('groups.reportGroupAction'), onPress: () => setReportGroup(group) },
+      { text: t('common.cancel'), style: 'cancel' as const },
+    ];
+    Alert.alert(t('groups.moreOptions'), group.name, actions);
   };
 
   const submitGroupReport = async (reasonCode: StudyGroupReportReason, details: string) => {
@@ -114,7 +142,7 @@ export default function StudyGroupsScreen() {
             </View>
             <MaterialIcons name="chevron-right" size={22} color={colors.textTertiary} />
           </Pressable>
-          <Pressable onPress={() => openGroupMenu(group)} style={styles.moreButton} accessibilityLabel={t('groups.moreOptions')} hitSlop={8}>
+          <Pressable onPress={() => openGroupMenu(group, membership)} style={styles.moreButton} accessibilityLabel={t('groups.moreOptions')} hitSlop={8}>
             <MaterialIcons name="more-vert" size={22} color={colors.textSecondary} />
           </Pressable>
         </View>

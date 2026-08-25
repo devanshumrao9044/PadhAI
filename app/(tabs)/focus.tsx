@@ -15,6 +15,7 @@ import { getFocusGuardStatus } from '@/features/focus/services/focusGuard';
 
 const DURATIONS = [15, 25, 45, 60, 90];
 const CUSTOM_KEY = -1;
+const OPEN_ENDED_KEY = -2;
 const OPEN_ENDED_PLANNED_MINS = 1440;
 
 export default function FocusScreen() {
@@ -47,6 +48,12 @@ export default function FocusScreen() {
     if (autofocusTimerRef.current) {
       clearTimeout(autofocusTimerRef.current);
       autofocusTimerRef.current = null;
+    }
+    if (d === OPEN_ENDED_KEY) {
+      setOpenEndedMode(true);
+      setCustomMode(false);
+      setCustomInput('');
+      return;
     }
     if (d === CUSTOM_KEY) {
       setCustomMode(true);
@@ -121,6 +128,14 @@ export default function FocusScreen() {
         {/* Duration selector */}
         <Text style={styles.sectionLabel}>{t('focus.durationChoose')}</Text>
         <View style={styles.durationGrid}>
+          <Pressable
+            style={[styles.durationChip, openEndedMode ? styles.durationChipActive : null]}
+            onPress={() => handleDurationSelect(OPEN_ENDED_KEY)}
+            accessibilityLabel={t('focus.openEnded')}
+          >
+            <MaterialIcons name="all-inclusive" size={21} color={openEndedMode ? colors.primary : colors.textTertiary} />
+            <Text style={[styles.durationLabel, openEndedMode ? styles.durationLabelActive : null]}>{t('focus.openEndedShort')}</Text>
+          </Pressable>
           {DURATIONS.map(d => (
             <Pressable
               key={d}
@@ -151,15 +166,6 @@ export default function FocusScreen() {
           </Pressable>
         </View>
 
-        <Pressable
-          style={[styles.openEndedCard, openEndedMode && styles.openEndedCardActive]}
-          onPress={() => { setOpenEndedMode(true); setCustomMode(false); setCustomInput(''); }}
-        >
-          <View style={[styles.openEndedIcon, openEndedMode && styles.openEndedIconActive]}><MaterialIcons name="all-inclusive" size={20} color={openEndedMode ? colors.primary : colors.textSecondary} /></View>
-          <View style={styles.openEndedCopy}><Text style={[styles.openEndedTitle, openEndedMode && styles.openEndedTitleActive]}>{t('focus.openEnded')}</Text><Text style={styles.openEndedHint}>{t('focus.openEndedHint')}</Text></View>
-          {openEndedMode ? <MaterialIcons name="check-circle" size={20} color={colors.primary} /> : null}
-        </Pressable>
-
         {/* Custom duration input — appears below grid when custom is active */}
         {isCustomSelected ? (
           <View style={styles.customInputRow}>
@@ -184,13 +190,11 @@ export default function FocusScreen() {
           </View>
         ) : null}
 
-        {/* XP preview */}
-        <View style={styles.xpPreview}>
-          <MaterialIcons name={openEndedMode ? 'hourglass-top' : 'bolt'} size={18} color={openEndedMode ? colors.primary : colors.warning} />
-          <Text style={styles.xpPreviewText} numberOfLines={3} ellipsizeMode="tail">
-            {openEndedMode ? t('focus.openEndedHint') : <>{t('focus.sessionXP')} <Text style={styles.xpPreviewBold}>+{expectedXP} XP</Text></>}
-          </Text>
-        </View>
+        {/* XP preview is intentionally hidden for open-ended mode: there is no fixed estimate or deduction. */}
+        {!openEndedMode ? <View style={styles.xpPreview}>
+          <MaterialIcons name="bolt" size={18} color={colors.warning} />
+          <Text style={styles.xpPreviewText} numberOfLines={3} ellipsizeMode="tail">{t('focus.sessionXP')} <Text style={styles.xpPreviewBold}>+{expectedXP} XP</Text></Text>
+        </View> : null}
 
         {/* Subject selector */}
         {activeSubjects.length > 0 ? (
@@ -326,14 +330,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   durationMinsActive: { color: colors.primary },
   durationLabel: { fontSize: FontSize.xs, color: colors.textTertiary },
   durationLabelActive: { color: colors.primary },
-  openEndedCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.sm, marginBottom: Spacing.sm },
-  openEndedCardActive: { backgroundColor: colors.primary + '14', borderColor: colors.primary },
-  openEndedIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.surfaceVariant, alignItems: 'center', justifyContent: 'center' },
-  openEndedIconActive: { backgroundColor: colors.primary + '20' },
-  openEndedCopy: { flex: 1, minWidth: 0 },
-  openEndedTitle: { color: colors.textPrimary, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
-  openEndedTitleActive: { color: colors.primary },
-  openEndedHint: { color: colors.textSecondary, fontSize: FontSize.xs, lineHeight: 16, marginTop: 2 },
   xpPreview: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: colors.surface, borderRadius: Radius.md,

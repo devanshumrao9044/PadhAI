@@ -9,6 +9,7 @@ test('join and lifecycle migrations qualify status and keep owner actions server
   const joinMigration = read('supabase/migrations/20260825_fix_join_status_ambiguity.sql');
   const lifecycleMigration = read('supabase/migrations/20260825_study_group_lifecycle.sql');
   const rejoinMigration = read('supabase/migrations/20260825_fix_join_membership_rejoin.sql');
+  const suspensionMigration = read('supabase/migrations/20260825_enforce_group_suspension.sql');
 
   assert.match(joinMigration, /g\.status/);
   assert.match(joinMigration, /m\.status/);
@@ -18,6 +19,8 @@ test('join and lifecycle migrations qualify status and keep owner actions server
   assert.match(lifecycleMigration, /suspended_until/);
   assert.match(lifecycleMigration, /delete_study_group_permanently/);
   assert.match(lifecycleMigration, /REVOKE ALL ON FUNCTION private\.delete_study_group_permanently/);
+  assert.match(suspensionMigration, /private\.assert_study_group_active/);
+  assert.match(suspensionMigration, /temporarily suspended/);
 });
 
 test('chapter deletion uses explicit owner-bound soft-delete RPCs', () => {
@@ -27,6 +30,29 @@ test('chapter deletion uses explicit owner-bound soft-delete RPCs', () => {
   assert.match(migration, /soft_delete_chapters/);
   assert.match(context, /supabase\.rpc\('soft_delete_chapter'/);
   assert.match(context, /supabase\.rpc\('soft_delete_chapters'/);
+});
+
+test('native installed-app decisions stay boolean and Tracker cannot start a direct subject timer', () => {
+  const policy = read('modules/padhai-focus-guard/android/src/main/java/com/padhai/focusguard/FocusGuardAppPolicy.kt');
+  const module = read('modules/padhai-focus-guard/android/src/main/java/com/padhai/focusguard/PadhAIFocusGuardModule.kt');
+  const tracker = read('app/(tabs)/tracker.tsx');
+  assert.match(policy, /"allowed" to decision\.allowed/);
+  assert.doesNotMatch(policy, /"allowed" to decision\.allowed\.toString\(\)/);
+  assert.match(module, /getInstalledApps/);
+  assert.doesNotMatch(tracker, /toggleSubjectTimer/);
+  assert.doesNotMatch(tracker, /loadSubjectTimers/);
+  assert.ok(tracker.includes("pathname: '/(tabs)/focus'"));
+});
+
+test('local ticket history is bounded and supports device-only hiding', () => {
+  const cacheCodec = read('features/core/services/cacheCodec.ts');
+  const supportCache = read('features/study-groups/services/supportCache.ts');
+  const review = read('app/review-tickets.tsx');
+  assert.match(cacheCodec, /supportTickets/);
+  assert.match(supportCache, /slice\(0, 100\)/);
+  assert.match(supportCache, /hiddenTicketIds/);
+  assert.match(review, /hideSupportTicket/);
+  assert.match(review, /hideSupportReport/);
 });
 
 test('open-ended focus is manually finished but still bounded for server verification', () => {
@@ -40,4 +66,5 @@ test('open-ended focus is manually finished but still bounded for server verific
   assert.match(active, /handleManualFinish/);
   assert.match(models, /openEnded\?: boolean/);
   assert.match(context, /openEnded,/);
+  assert.match(context, /assertStudyGroupActive\(studyGroupId\)/);
 });

@@ -27,7 +27,7 @@ import { normalizeChapterAnalyticsRows } from '@/features/analytics/services/cha
 import { reconcileTrackerState } from '@/features/tracker/services/trackerState';
 import { getRecoveredStreak, isStreakRecoveryEligible } from '@/features/focus/services/streakRecovery';
 import { haptics } from '@/features/core/services/haptics';
-import { clearStudyGroupPresence } from '@/features/study-groups/services/studyGroups';
+import { assertStudyGroupActive, clearStudyGroupPresence } from '@/features/study-groups/services/studyGroups';
 import {
   enqueueOfflineFocusSession,
   isNetworkReachable,
@@ -1004,6 +1004,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // ── Sessions ──────────────────────────────────────────────────────────────
   const startSession = async (plannedMins: number, subjectId: string | null, chapterId: string | null, isRecoverySession?: boolean, recoveryLostStreak?: number, studyGroupId?: string | null, openEnded = false): Promise<string> => {
+    if (studyGroupId) await assertStudyGroupActive(studyGroupId);
     const sessionId = uuidv4();
     const active: ActiveSession = {
       sessionId,

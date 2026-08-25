@@ -155,7 +155,7 @@ internal object FocusGuardAppPolicy {
     FocusGuardPrefs.markAppDecisionCacheReady(context)
   }
 
-  fun listInstalledApps(context: Context): List<Map<String, String>> {
+  fun listInstalledApps(context: Context): List<Map<String, Any>> {
     val launcherIntent = android.content.Intent(android.content.Intent.ACTION_MAIN)
       .addCategory(android.content.Intent.CATEGORY_LAUNCHER)
     val packageManager = context.packageManager
@@ -171,12 +171,12 @@ internal object FocusGuardAppPolicy {
         mapOf(
           "packageName" to appInfo.packageName,
           "label" to packageManager.getApplicationLabel(appInfo).toString(),
-          "allowed" to decision.allowed.toString(),
+          "allowed" to decision.allowed,
           "reason" to decision.reason,
           "category" to (FocusGuardCatalog.categoryFor(context, appInfo.packageName) ?: applicationCategory(appInfo)),
         )
       }
-      .sortedWith(compareByDescending<Map<String, String>> { it["allowed"] == "true" }.thenBy { it["label"].orEmpty().lowercase() })
+      .sortedWith(compareByDescending<Map<String, Any>> { it["allowed"] == true }.thenBy { it["label"].toString().lowercase() })
       .toList()
   }
 

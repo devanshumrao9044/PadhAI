@@ -167,6 +167,28 @@ export default function StudyGroupDetailScreen() {
   const studyingMembers = members.filter(member => member.presenceStatus === 'studying');
   const groupTotal = members.reduce((sum, member) => sum + member.todayMinutes, 0);
   const isSuspended = Boolean(group?.suspendedUntil && Date.parse(group.suspendedUntil) > Date.now());
+  const suspensionPopupForRef = useRef<string | null>(null);
+
+  const showSuspendedPopup = () => {
+    const until = group?.suspendedUntil ? new Date(group.suspendedUntil).toLocaleString() : '';
+    Alert.alert(t('groups.suspendedPopupTitle'), t('groups.suspendedPopupMessage', { value: until }), [{ text: t('common.close') }]);
+  };
+
+  useEffect(() => {
+    if (isSuspended && group?.id && suspensionPopupForRef.current !== group.id) {
+      suspensionPopupForRef.current = group.id;
+      const until = group.suspendedUntil ? new Date(group.suspendedUntil).toLocaleString() : '';
+      Alert.alert(t('groups.suspendedPopupTitle'), t('groups.suspendedPopupMessage', { value: until }), [{ text: t('common.close') }]);
+    } else if (!isSuspended) {
+      suspensionPopupForRef.current = null;
+    }
+  }, [group?.id, group?.suspendedUntil, isSuspended, t]);
+
+  const requireActiveGroup = () => {
+    if (!isSuspended) return true;
+    showSuspendedPopup();
+    return false;
+  };
 
   const showNotice = (message: string) => {
     if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
@@ -206,7 +228,7 @@ export default function StudyGroupDetailScreen() {
   };
 
   const saveMemberPermissions = async () => {
-    if (!manageTarget) return;
+    if (!requireActiveGroup() || !manageTarget) return;
     setManaging(true);
     try {
       await updateStudyGroupMemberRole({ membershipId: manageTarget.membershipId, role: 'admin', permissions: permissionDraft });
@@ -225,7 +247,7 @@ export default function StudyGroupDetailScreen() {
   };
 
   const demoteMember = async () => {
-    if (!manageTarget) return;
+    if (!requireActiveGroup() || !manageTarget) return;
     setManaging(true);
     try {
       await updateStudyGroupMemberRole({ membershipId: manageTarget.membershipId, role: 'member', permissions: DEFAULT_STUDY_GROUP_PERMISSIONS });
@@ -244,7 +266,7 @@ export default function StudyGroupDetailScreen() {
   };
 
   const removeMember = async () => {
-    if (!manageTarget) return;
+    if (!requireActiveGroup() || !manageTarget) return;
     setManaging(true);
     try {
       await removeStudyGroupMember(manageTarget.membershipId);
@@ -263,7 +285,7 @@ export default function StudyGroupDetailScreen() {
   };
 
   const joinPublicGroup = async () => {
-    if (!groupId) return;
+    if (!requireActiveGroup() || !groupId) return;
     setJoining(true);
     try {
       await joinStudyGroup(groupId);
@@ -281,7 +303,7 @@ export default function StudyGroupDetailScreen() {
   };
 
   const openGroupEditor = () => {
-    if (!group || !canEditGroup) return;
+    if (!requireActiveGroup() || !group || !canEditGroup) return;
     setEditName(group.name);
     setEditDescription(group.description);
     setEditRules(group.rules);
@@ -292,7 +314,7 @@ export default function StudyGroupDetailScreen() {
   };
 
   const saveGroupDetails = async () => {
-    if (!group) return;
+    if (!requireActiveGroup() || !group) return;
     setSavingGroup(true);
     setError('');
     try {
@@ -320,7 +342,7 @@ export default function StudyGroupDetailScreen() {
   };
 
   const chooseIcon = async (iconKey: string) => {
-    if (!groupId) return;
+    if (!requireActiveGroup() || !groupId) return;
     try {
       await updateStudyGroupIcon(groupId, iconKey);
       setShowIconPicker(false);
@@ -417,7 +439,7 @@ export default function StudyGroupDetailScreen() {
   };
 
   const regenerateInvite = async () => {
-    if (!groupId) return;
+    if (!requireActiveGroup() || !groupId) return;
     try {
       const nextToken = await createStudyGroupInvite(groupId);
       setInviteToken(nextToken);
@@ -460,7 +482,7 @@ export default function StudyGroupDetailScreen() {
     const actorRole = ownerAccess ? 'owner' : membership?.role ?? 'member';
     const memberAction = member.role === 'admin' ? 'editPermissions' : 'promote';
     const memberPermission = member.role === 'admin' ? 'editCoAdminPermissions' : 'assignCoAdmin';
-    const canOpenManager = member.userId !== user?.id && member.role !== 'owner' && canManageStudyGroupMember(actorRole, member.role, memberAction, ownerAccess || membership?.role === 'owner' || Boolean(membership?.permissions[memberPermission]));
+    const canOpenManager = !isSuspended && member.userId !== user?.id && member.role !== 'owner' && canManageStudyGroupMember(actorRole, member.role, memberAction, ownerAccess || membership?.role === 'owner' || Boolean(membership?.permissions[memberPermission]));
     return (
       <View key={member.membershipId} style={styles.memberCard}>
         <View style={[styles.memberIcon, member.presenceStatus === 'studying' && styles.memberIconLive]}>
@@ -505,15 +527,15 @@ export default function StudyGroupDetailScreen() {
           <View style={styles.rulesCard}><Text style={styles.sectionTitle}>{t('groups.rules')}</Text><Text style={styles.body}>{group.rules || t('groups.noRules')}</Text></View>
 
           {isApprovedMember ? <>
-            <Pressable onPress={() => router.push(`/focus?studyGroupId=${encodeURIComponent(group.id)}` as never)} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}><MaterialIcons name="timer" size={19} color={colors.background} /><Text style={styles.primaryText}>{t('groups.startGroupSession')}</Text></Pressable>
-            <Pressable onPress={() => setShowIconPicker(true)} style={styles.outlineButton}><MaterialIcons name="palette" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.changeIcon')}</Text></Pressable>
+            <Pressable onPress={() => { if (requireActiveGroup()) router.push(`/focus?studyGroupId=${encodeURIComponent(group.id)}` as never); }} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, isSuspended && styles.disabled]}><MaterialIcons name="timer" size={19} color={colors.background} /><Text style={styles.primaryText}>{t('groups.startGroupSession')}</Text></Pressable>
+            <Pressable onPress={() => { if (requireActiveGroup()) setShowIconPicker(true); }} style={[styles.outlineButton, isSuspended && styles.disabled]}><MaterialIcons name="palette" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.changeIcon')}</Text></Pressable>
             {members.length ? <View style={styles.section}><Text style={styles.sectionTitle}>{t('groups.members')} · {members.length}</Text>{members.map(renderMember)}</View> : <Text style={styles.emptyText}>{t('groups.noMembers')}</Text>}
-          </> : membership?.status === 'pending' ? <View style={styles.pendingCard}><MaterialIcons name="hourglass-top" size={22} color={colors.warning} /><Text style={styles.pendingText}>{t('groups.pendingApproval')}</Text></View> : <View style={styles.pendingCard}><MaterialIcons name="public" size={22} color={colors.primary} /><Text style={styles.pendingText}>{t('groups.requestToJoin')}</Text><Pressable onPress={() => { void joinPublicGroup(); }} disabled={joining} style={styles.smallApprove}><Text style={styles.smallApproveText}>{joining ? '…' : t('groups.joinGroup')}</Text></Pressable></View>}
+          </> : membership?.status === 'pending' ? <View style={styles.pendingCard}><MaterialIcons name="hourglass-top" size={22} color={colors.warning} /><Text style={styles.pendingText}>{t('groups.pendingApproval')}</Text></View> : <View style={styles.pendingCard}><MaterialIcons name="public" size={22} color={colors.primary} /><Text style={styles.pendingText}>{t('groups.requestToJoin')}</Text><Pressable onPress={() => { void joinPublicGroup(); }} disabled={joining || isSuspended} style={[styles.smallApprove, isSuspended && styles.disabled]}><Text style={styles.smallApproveText}>{joining ? '…' : t('groups.joinGroup')}</Text></Pressable></View>}
 
           {isAdmin ? <View style={styles.adminCard}>
-            {canManageJoinRequests ? <><View style={styles.adminHeader}><Text style={styles.sectionTitle}>{t('groups.manageRequests')}</Text><Text style={styles.adminCount}>{pending.length}</Text></View>{pending.length === 0 ? <Text style={styles.body}>{t('groups.noMembers')}</Text> : pending.map(request => <View key={request.membershipId} style={styles.requestRow}><View style={styles.requestCopy}><Text style={styles.requestName}>{request.name}</Text><Text style={styles.memberStatus}>Pending request</Text></View><Pressable onPress={() => { void reviewStudyGroupMember(request.membershipId, 'approved').then(() => load(true)); }} style={styles.smallApprove}><Text style={styles.smallApproveText}>{t('groups.approve')}</Text></Pressable><Pressable onPress={() => { void reviewStudyGroupMember(request.membershipId, 'rejected').then(() => load(true)); }} style={styles.smallReject}><Text style={styles.smallRejectText}>{t('groups.reject')}</Text></Pressable></View>)}</> : null}
-            {canEditGroup ? <Pressable onPress={openGroupEditor} style={styles.outlineButton}><MaterialIcons name="edit" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.permissionEditGroup')}</Text></Pressable> : null}
-            {canManageInvites ? <View style={styles.adminActions}>{inviteToken ? <><Pressable onPress={() => { void copyInvite(); }} style={styles.outlineButton}><MaterialIcons name="content-copy" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.copyLink')}</Text></Pressable><Pressable onPress={() => { void shareInvite(); }} style={styles.outlineButton}><MaterialIcons name="share" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.shareInvite')}</Text></Pressable></> : null}<Pressable onPress={() => { void regenerateInvite(); }} style={styles.outlineButton}><MaterialIcons name="refresh" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.inviteLink')}</Text></Pressable></View> : null}
+            {canManageJoinRequests ? <><View style={styles.adminHeader}><Text style={styles.sectionTitle}>{t('groups.manageRequests')}</Text><Text style={styles.adminCount}>{pending.length}</Text></View>{pending.length === 0 ? <Text style={styles.body}>{t('groups.noMembers')}</Text> : pending.map(request => <View key={request.membershipId} style={styles.requestRow}><View style={styles.requestCopy}><Text style={styles.requestName}>{request.name}</Text><Text style={styles.memberStatus}>Pending request</Text></View><Pressable onPress={() => { if (requireActiveGroup()) void reviewStudyGroupMember(request.membershipId, 'approved').then(() => load(true)); }} disabled={isSuspended} style={[styles.smallApprove, isSuspended && styles.disabled]}><Text style={styles.smallApproveText}>{t('groups.approve')}</Text></Pressable><Pressable onPress={() => { if (requireActiveGroup()) void reviewStudyGroupMember(request.membershipId, 'rejected').then(() => load(true)); }} disabled={isSuspended} style={[styles.smallReject, isSuspended && styles.disabled]}><Text style={styles.smallRejectText}>{t('groups.reject')}</Text></Pressable></View>)}</> : null}
+            {canEditGroup ? <Pressable onPress={openGroupEditor} disabled={isSuspended} style={[styles.outlineButton, isSuspended && styles.disabled]}><MaterialIcons name="edit" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.permissionEditGroup')}</Text></Pressable> : null}
+            {canManageInvites ? <View style={styles.adminActions}>{inviteToken ? <><Pressable onPress={() => { void copyInvite(); }} style={styles.outlineButton}><MaterialIcons name="content-copy" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.copyLink')}</Text></Pressable><Pressable onPress={() => { void shareInvite(); }} style={styles.outlineButton}><MaterialIcons name="share" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.shareInvite')}</Text></Pressable></> : null}<Pressable onPress={() => { void regenerateInvite(); }} disabled={isSuspended} style={[styles.outlineButton, isSuspended && styles.disabled]}><MaterialIcons name="refresh" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.inviteLink')}</Text></Pressable></View> : null}
             {membership?.role === 'owner' || ownerAccess ? <View style={styles.lifecycleCard}>
               <Text style={styles.lifecycleTitle}>{t('groups.suspendGroup')}</Text>
               <Text style={styles.lifecycleHint}>{t('groups.suspendGroupHint')}</Text>

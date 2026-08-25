@@ -145,7 +145,7 @@ export function getInstalledApps(): InstalledFocusApp[] {
       .map(app => ({
         packageName: app.packageName,
         label: app.label,
-        allowed: app.allowed === true,
+        allowed: (app.allowed as unknown) === true || (app.allowed as unknown) === 'true',
         category: app.category || 'Uncategorized',
         reason: app.reason ?? 'unknown_category',
       }));

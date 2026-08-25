@@ -12,6 +12,7 @@ import {
   getMyStudyGroupTickets,
   getOwnerStudyGroupReports,
   getOwnerStudyGroupTickets,
+  getStudyGroupNames,
   isPadhaiOwner,
   respondToStudyGroupTicket,
   reviewStudyGroupReport,
@@ -21,6 +22,7 @@ import {
   type StudyGroupTicketStatus,
 } from '@/features/study-groups/services/studyGroups';
 import { getSafeErrorMessage } from '@/features/core/services/safeError';
+import { filterVisibleSupportHistory, hideSupportReport, hideSupportTicket, readSupportHistory, writeSupportHistory, type LocalSupportHistory } from '@/features/study-groups/services/supportCache';
 
 export default function ReviewTicketsScreen() {
   const { colors } = useTheme();
@@ -38,11 +40,18 @@ export default function ReviewTicketsScreen() {
   const [expandedTicketId, setExpandedTicketId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savingTicketId, setSavingTicketId] = useState<string | null>(null);
+  const [, setLocalHistory] = useState<LocalSupportHistory>({ tickets: [], reports: [], hiddenTicketIds: [], hiddenReportIds: [] });
+  const [groupNames, setGroupNames] = useState<Record<string, string>>({});
 
   const load = useCallback(async (refresh = false) => {
     if (!user?.id) return;
     if (refresh) setRefreshing(true);
     setError('');
+    const cachedHistory = await readSupportHistory(user.id);
+    const visibleCachedHistory = filterVisibleSupportHistory(cachedHistory);
+    setLocalHistory(cachedHistory);
+    setTickets(visibleCachedHistory.tickets);
+    setReports(visibleCachedHistory.reports);
     try {
       const isOwner = await isPadhaiOwner(user.id);
       setOwner(isOwner);
@@ -50,14 +59,21 @@ export default function ReviewTicketsScreen() {
       const [ticketRows, reportRows] = isOwner
         ? await Promise.all([getOwnerStudyGroupTickets(), getOwnerStudyGroupReports()])
         : await Promise.all([getMyStudyGroupTickets(user.id), getMyStudyGroupReports(user.id)]);
-      setTickets(ticketRows);
-      setReports(reportRows);
+      const nextHistory: LocalSupportHistory = { ...cachedHistory, tickets: ticketRows, reports: reportRows };
+      const names = isOwner ? await getStudyGroupNames(reportRows.map(report => report.groupId ?? '')) : {};
+      setGroupNames(names);
+      const visibleNextHistory = filterVisibleSupportHistory(nextHistory);
+      await writeSupportHistory(user.id, nextHistory);
+      setLocalHistory(nextHistory);
+      setTickets(visibleNextHistory.tickets);
+      setReports(visibleNextHistory.reports);
     } catch (loadError) {
       setError(getSafeErrorMessage(loadError, {
         fallback: 'Could not load your support history.',
-        network: 'Check your connection and try again.',
+        network: 'Showing the last saved support history. Check your connection to refresh.',
         permission: 'You do not have permission to view this support history.',
       }));
+      setOwnerChecked(true);
     } finally {
       setRefreshing(false);
     }
@@ -69,6 +85,32 @@ export default function ReviewTicketsScreen() {
     if (!user?.id || !ownerChecked) return;
     return subscribeToStudyGroupTickets(user.id, owner, () => { void load(); });
   }, [load, owner, ownerChecked, user?.id]);
+
+  const deleteTicketLocally = (ticketId: string) => {
+    if (!user?.id) return;
+    Alert.alert(t('support.deleteLocalTitle'), t('support.deleteLocalMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('support.deleteLocal'), style: 'destructive', onPress: () => {
+        void hideSupportTicket(user.id, ticketId).then(next => {
+          setLocalHistory(next);
+          setTickets(filterVisibleSupportHistory(next).tickets);
+        });
+      } },
+    ]);
+  };
+
+  const deleteReportLocally = (reportId: string) => {
+    if (!user?.id) return;
+    Alert.alert(t('support.deleteLocalTitle'), t('support.deleteLocalMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('support.deleteLocal'), style: 'destructive', onPress: () => {
+        void hideSupportReport(user.id, reportId).then(next => {
+          setLocalHistory(next);
+          setReports(filterVisibleSupportHistory(next).reports);
+        });
+      } },
+    ]);
+  };
 
   const updateReport = (report: StudyGroupReport) => {
     if (!owner) return;
@@ -127,7 +169,7 @@ export default function ReviewTicketsScreen() {
             <Text style={styles.cardTitle} numberOfLines={2}>{item.subject}</Text>
             <Text style={styles.cardMeta}>{item.category.replaceAll('_', ' ')} · {new Date(item.createdAt).toLocaleDateString()}</Text>
           </View>
-          <View style={styles.statusColumn}><Text style={[styles.status, isClosed && styles.statusClosed]}>{statusLabel(item.status, t)}</Text><MaterialIcons name={expanded ? 'expand-less' : 'expand-more'} size={20} color={colors.textTertiary} /></View>
+          <View style={styles.statusColumn}><Text style={[styles.status, isClosed && styles.statusClosed]}>{statusLabel(item.status, t)}</Text><MaterialIcons name={expanded ? 'expand-less' : 'expand-more'} size={20} color={colors.textTertiary} /></View><Pressable onPress={() => deleteTicketLocally(item.id)} style={styles.deleteButton} accessibilityLabel={t('support.deleteLocal')}><MaterialIcons name="delete-outline" size={20} color={colors.danger} /></Pressable>
         </Pressable>
         {expanded ? (
           <View style={styles.expandedBody}>
@@ -152,8 +194,11 @@ export default function ReviewTicketsScreen() {
     );
   };
 
+  const reportGroupLabel = (report: StudyGroupReport) => report.groupId ? (groupNames[report.groupId] || t('support.groupUnavailable')) : t('support.groupUnavailable');
+  const showReportGroup = (report: StudyGroupReport) => Alert.alert(t('support.reportGroupContext'), reportGroupLabel(report));
+
   const renderReport = ({ item }: { item: StudyGroupReport }) => (
-    <Pressable onPress={() => updateReport(item)} style={({ pressed }) => [styles.card, pressed && owner && styles.pressed]}><View style={styles.cardHeader}><View style={[styles.cardIcon, { backgroundColor: colors.warning + '18' }]}><MaterialIcons name="flag" size={20} color={colors.warning} /></View><View style={styles.cardCopy}><Text style={styles.cardTitle}>{item.reasonCode.replaceAll('_', ' ')}</Text><Text style={styles.cardMeta}>{new Date(item.createdAt).toLocaleDateString()}</Text></View><View style={styles.statusColumn}><Text style={styles.status}>{statusLabel(item.status, t)}</Text><MaterialIcons name={owner ? 'chevron-right' : 'flag'} size={18} color={colors.textTertiary} /></View></View><Text style={styles.details} numberOfLines={4}>{item.details || 'No additional details provided.'}</Text>{item.resolution ? <Text style={styles.resolution}>{item.resolution}</Text> : null}{owner ? <Text style={styles.ownerHint}>{t('support.ownerReplyHint')}</Text> : null}</Pressable>
+    <View style={styles.card}><Pressable onPress={() => updateReport(item)} style={({ pressed }) => [styles.cardHeader, pressed && owner && styles.pressed]}><View style={[styles.cardIcon, { backgroundColor: colors.warning + '18' }]}><MaterialIcons name="flag" size={20} color={colors.warning} /></View><View style={styles.cardCopy}><Text style={styles.cardTitle}>{item.reasonCode.replaceAll('_', ' ')}</Text><Text style={styles.cardMeta}>{new Date(item.createdAt).toLocaleDateString()}</Text></View><View style={styles.statusColumn}><Text style={styles.status}>{statusLabel(item.status, t)}</Text><MaterialIcons name={owner ? 'chevron-right' : 'flag'} size={18} color={colors.textTertiary} /></View><Pressable onPress={() => deleteReportLocally(item.id)} style={styles.deleteButton} accessibilityLabel={t('support.deleteLocal')}><MaterialIcons name="delete-outline" size={20} color={colors.danger} /></Pressable></Pressable><Pressable onPress={() => showReportGroup(item)} style={styles.groupContextButton}><MaterialIcons name="groups" size={17} color={colors.primary} /><Text style={styles.groupContextText} numberOfLines={1}>{reportGroupLabel(item)}</Text><MaterialIcons name="chevron-right" size={18} color={colors.textTertiary} /></Pressable><Text style={styles.details} numberOfLines={4}>{item.details || 'No additional details provided.'}</Text>{item.resolution ? <Text style={styles.resolution}>{item.resolution}</Text> : null}{owner ? <Text style={styles.ownerHint}>{t('support.ownerReplyHint')}</Text> : null}</View>
   );
 
   return (
@@ -208,6 +253,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   statusColumn: { alignItems: 'flex-end', gap: 2, maxWidth: '32%' },
   status: { color: colors.primary, fontSize: FontSize.xs, fontWeight: FontWeight.bold, textAlign: 'right', textTransform: 'capitalize' },
   statusClosed: { color: colors.success },
+  deleteButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.sm, backgroundColor: colors.danger + '10' },
+  groupContextButton: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.sm, paddingVertical: 8, paddingHorizontal: Spacing.sm, borderRadius: Radius.sm, backgroundColor: colors.primary + '10' },
+  groupContextText: { flex: 1, color: colors.primary, fontSize: FontSize.xs, fontWeight: FontWeight.semiBold },
   expandedBody: { borderTopWidth: 1, borderTopColor: colors.border, marginTop: Spacing.md, paddingTop: Spacing.md },
   details: { color: colors.textSecondary, fontSize: FontSize.sm, lineHeight: 20 },
   timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: Spacing.md },
