@@ -6,6 +6,10 @@ import android.content.pm.PackageManager
 import android.telecom.TelecomManager
 import android.provider.Telephony
 import android.os.Build
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.util.Base64
+import java.io.ByteArrayOutputStream
 
 internal object FocusGuardAppPolicy {
   private val knownStudyPackages = setOf(
@@ -174,6 +178,7 @@ internal object FocusGuardAppPolicy {
           "allowed" to decision.allowed,
           "reason" to decision.reason,
           "category" to (FocusGuardCatalog.categoryFor(context, appInfo.packageName) ?: applicationCategory(appInfo)),
+          "iconBase64" to encodeIcon(context, appInfo),
         )
       }
       .sortedWith(compareByDescending<Map<String, Any>> { it["allowed"] == true }.thenBy { it["label"].toString().lowercase() })
@@ -207,6 +212,22 @@ internal object FocusGuardAppPolicy {
     val defaultSms = runCatching { Telephony.Sms.getDefaultSmsPackage(context) }.getOrNull()
     if (defaultSms?.lowercase() == packageName) return true
     return false
+  }
+
+  private fun encodeIcon(context: Context, appInfo: ApplicationInfo): String {
+    return runCatching {
+      val size = 48
+      val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+      val canvas = Canvas(bitmap)
+      val drawable = appInfo.loadIcon(context.packageManager)
+      drawable.setBounds(0, 0, size, size)
+      drawable.draw(canvas)
+      ByteArrayOutputStream().use { output ->
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
+        bitmap.recycle()
+        Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP)
+      }
+    }.getOrDefault("")
   }
 
   private fun appVersionCode(context: Context, packageName: String): Long {

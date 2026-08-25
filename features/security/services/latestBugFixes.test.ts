@@ -32,6 +32,16 @@ test('chapter deletion uses explicit owner-bound soft-delete RPCs', () => {
   assert.match(context, /supabase\.rpc\('soft_delete_chapters'/);
 });
 
+test('Infinity selection is exclusive and Allowed Apps carries full labels and icons', () => {
+  const focus = read('app/(tabs)/focus.tsx');
+  const allowedApps = read('app/focus/allowed-apps.tsx');
+  const policy = read('modules/padhai-focus-guard/android/src/main/java/com/padhai/focusguard/FocusGuardAppPolicy.kt');
+  assert.match(focus, /!openEndedMode && !isCustomSelected && selectedMins === d/);
+  assert.match(allowedApps, /<Image source=\{\{ uri: app\.iconBase64 \}\}/);
+  assert.doesNotMatch(allowedApps, /app\.label\}.*numberOfLines=\{1\}/);
+  assert.match(policy, /"iconBase64" to encodeIcon/);
+});
+
 test('native installed-app decisions stay boolean and Tracker cannot start a direct subject timer', () => {
   const policy = read('modules/padhai-focus-guard/android/src/main/java/com/padhai/focusguard/FocusGuardAppPolicy.kt');
   const module = read('modules/padhai-focus-guard/android/src/main/java/com/padhai/focusguard/PadhAIFocusGuardModule.kt');

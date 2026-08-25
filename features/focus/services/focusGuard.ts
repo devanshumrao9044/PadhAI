@@ -14,6 +14,7 @@ export type InstalledFocusApp = {
   allowed: boolean;
   category: string;
   reason: string;
+  iconBase64?: string | null;
 };
 
 export const focusGuardSetupKey = (userId: string): string => `padhai:focus-guard-setup-v1:${userId}`;
@@ -148,6 +149,9 @@ export function getInstalledApps(): InstalledFocusApp[] {
         allowed: (app.allowed as unknown) === true || (app.allowed as unknown) === 'true',
         category: app.category || 'Uncategorized',
         reason: app.reason ?? 'unknown_category',
+        iconBase64: typeof (app as any).iconBase64 === 'string' && (app as any).iconBase64.length > 0
+          ? `data:image/png;base64,${(app as any).iconBase64}`
+          : null,
       }));
   } catch {
     return [];

@@ -139,13 +139,13 @@ export default function FocusScreen() {
           {DURATIONS.map(d => (
             <Pressable
               key={d}
-              style={[styles.durationChip, !isCustomSelected && selectedMins === d ? styles.durationChipActive : null]}
+              style={[styles.durationChip, !openEndedMode && !isCustomSelected && selectedMins === d ? styles.durationChipActive : null]}
               onPress={() => handleDurationSelect(d)}
             >
-              <Text style={[styles.durationMins, !isCustomSelected && selectedMins === d ? styles.durationMinsActive : null]}>
+              <Text style={[styles.durationMins, !openEndedMode && !isCustomSelected && selectedMins === d ? styles.durationMinsActive : null]}>
                 {d}
               </Text>
-              <Text style={[styles.durationLabel, !isCustomSelected && selectedMins === d ? styles.durationLabelActive : null]}>
+              <Text style={[styles.durationLabel, !openEndedMode && !isCustomSelected && selectedMins === d ? styles.durationLabelActive : null]}>
                 {t('focus.durationMin')}
               </Text>
             </Pressable>
