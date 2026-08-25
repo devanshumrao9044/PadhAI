@@ -13,7 +13,7 @@ internal object FocusGuardPrefs {
   private const val BREAK_REQUESTED = "break_requested"
   private const val STARTED_AT = "started_at"
   // Bump whenever the classifier, hard-deny rules, or verified study catalog changes.
-  private const val POLICY_REVISION = "2026-08-25-study-catalog-2"
+  private const val POLICY_REVISION = "2026-08-25-playstore-catalog-2"
 
   fun get(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 

@@ -32,14 +32,6 @@ internal object FocusGuardAppPolicy {
     "com.udemy.android",
   )
 
-  private val studyLabelTokens = listOf(
-    "physics wallah", "unacademy", "khan academy", "byju", "vedantu", "doubtnut",
-    "testbook", "adda247", "careerwill", "aakash", "fiitjee", "embibe", "toppr",
-    "coursera", "udemy", "quizlet", "duolingo", "brilliant", "swayam", "nptel",
-    "education", "educational", "learning", "study", "academy", "coaching", "lecture",
-    "exam prep", "exam preparation", "school",
-  )
-
   private val exactHardDenyPackages = setOf(
     "com.google.android.youtube",
     "com.google.android.apps.youtube.music",
@@ -136,10 +128,12 @@ internal object FocusGuardAppPolicy {
     }
 
     val category = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) appInfo.category else ApplicationInfo.CATEGORY_UNDEFINED
-    val label = runCatching { context.packageManager.getApplicationLabel(appInfo).toString() }.getOrDefault("").lowercase()
+    val catalogCategory = FocusGuardCatalog.categoryFor(context, packageName)
     val decision = when {
       category == ApplicationInfo.CATEGORY_GAME -> Decision(false, "android_game_category")
-      studyLabelTokens.any { token -> label.contains(token) || normalized.contains(token.replace(" ", "")) } -> Decision(true, "study_label_match")
+      catalogCategory == "Education" -> Decision(true, "catalog_education")
+      catalogCategory == "Books & Reference" -> Decision(true, "catalog_books_reference")
+      catalogCategory == "Entertainment" -> Decision(false, "catalog_entertainment")
       else -> Decision(false, "unknown_category")
     }
     FocusGuardPrefs.saveDecision(context, packageName, versionCode, decision.allowed)
@@ -150,11 +144,13 @@ internal object FocusGuardAppPolicy {
     if (!force && FocusGuardPrefs.appDecisionCacheReady(context)) return
     val launcherIntent = android.content.Intent(android.content.Intent.ACTION_MAIN)
       .addCategory(android.content.Intent.CATEGORY_LAUNCHER)
-    context.packageManager.queryIntentActivities(launcherIntent, PackageManager.MATCH_ALL)
+    val packages = context.packageManager.queryIntentActivities(launcherIntent, PackageManager.MATCH_ALL)
       .asSequence()
       .mapNotNull { it.activityInfo?.applicationInfo?.packageName }
       .distinct()
-      .forEach { decide(context, it) }
+      .toList()
+    FocusGuardCatalog.ensureLoaded(context, packages.toSet())
+    packages.forEach { decide(context, it) }
     FocusGuardPrefs.markAppDecisionCacheReady(context)
   }
 
@@ -162,19 +158,21 @@ internal object FocusGuardAppPolicy {
     val launcherIntent = android.content.Intent(android.content.Intent.ACTION_MAIN)
       .addCategory(android.content.Intent.CATEGORY_LAUNCHER)
     val packageManager = context.packageManager
-    return packageManager.queryIntentActivities(launcherIntent, PackageManager.MATCH_ALL)
+    val apps = packageManager.queryIntentActivities(launcherIntent, PackageManager.MATCH_ALL)
       .asSequence()
       .mapNotNull { it.activityInfo?.applicationInfo }
       .filter { it.packageName != context.packageName }
       .distinctBy { it.packageName }
-      .map { appInfo ->
+      .toList()
+    FocusGuardCatalog.ensureLoaded(context, apps.map { it.packageName }.toSet())
+    return apps.map { appInfo ->
         val decision = decide(context, appInfo.packageName)
         mapOf(
           "packageName" to appInfo.packageName,
           "label" to packageManager.getApplicationLabel(appInfo).toString(),
           "allowed" to decision.allowed.toString(),
           "reason" to decision.reason,
-          "category" to applicationCategory(appInfo),
+          "category" to (FocusGuardCatalog.categoryFor(context, appInfo.packageName) ?: applicationCategory(appInfo)),
         )
       }
       .sortedWith(compareByDescending<Map<String, String>> { it["allowed"] == "true" }.thenBy { it["label"].orEmpty().lowercase() })
