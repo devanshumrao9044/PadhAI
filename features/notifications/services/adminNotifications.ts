@@ -101,6 +101,19 @@ export async function loadUserNotifications(): Promise<UserNotification[]> {
   return (data ?? []).map(mapNotification);
 }
 
+export function subscribeToUserNotifications(userId: string, onChange: () => void): () => void {
+  const channel = supabase
+    .channel(`user-notifications-${userId}`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'user_notifications',
+      filter: `user_id=eq.${userId}`,
+    }, onChange)
+    .subscribe();
+  return () => { void supabase.removeChannel(channel); };
+}
+
 export async function loadUnreadNotificationCount(): Promise<number> {
   const { count, error } = await supabase
     .from('user_notifications')
@@ -154,7 +167,7 @@ export async function uploadNotificationAttachment(userId: string, attachment: P
       cacheControl: '86400',
       upsert: false,
     });
-  if (error) throw new Error(`Attachment upload failed: ${error.message}`);
+  if (error) throw new Error('Attachment upload failed.');
   return { path, mimeType: attachment.mimeType, sizeBytes: attachment.sizeBytes };
 }
 

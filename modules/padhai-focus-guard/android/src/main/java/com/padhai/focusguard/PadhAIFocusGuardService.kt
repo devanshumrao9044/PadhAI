@@ -91,10 +91,10 @@ class PadhAIFocusGuardService : Service() {
     if (lastBlockedPackage != foreground) {
       lastBlockedPackage = foreground
       firstBlockedAt = now
-      showBlockOverlay()
+      showBlockOverlay(reason = decision.reason)
     } else if (now - firstBlockedAt >= WARNING_GRACE_MS) {
       FocusGuardPrefs.requestBreak(this)
-      showBlockOverlay(broken = true)
+      showBlockOverlay(broken = true, reason = decision.reason)
     }
   }
 
@@ -172,7 +172,7 @@ class PadhAIFocusGuardService : Service() {
     focusTimerText = null
   }
 
-  private fun showBlockOverlay(broken: Boolean = false) {
+  private fun showBlockOverlay(broken: Boolean = false, reason: String = "unknown_category") {
     if (!Settings.canDrawOverlays(this)) return
     val manager = getSystemService(WINDOW_SERVICE) as WindowManager
     if (blockOverlay == null) {
@@ -219,10 +219,11 @@ class PadhAIFocusGuardService : Service() {
 
     val parts = (blockOverlay as? LinearLayout)?.tag as? OverlayParts ?: return
     parts.title.text = if (broken) "Focus session paused" else "Focus mode is active"
+    val reasonText = reason.replace('_', ' ')
     parts.body.text = if (broken) {
-      "This app is blocked by PadhAI's automatic Focus policy. Return to PadhAI to end the session."
+      "This app is blocked by PadhAI's automatic Focus policy.\nReason: $reasonText\nReturn to PadhAI to end the session."
     } else {
-      "Return to PadhAI. Only verified study or essential system apps can run during Focus."
+      "Return to PadhAI. Only verified study or essential system apps can run during Focus.\nReason: $reasonText"
     }
   }
 

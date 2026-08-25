@@ -13,7 +13,7 @@ internal object FocusGuardPrefs {
   private const val BREAK_REQUESTED = "break_requested"
   private const val STARTED_AT = "started_at"
   // Bump whenever the classifier, hard-deny rules, or verified study catalog changes.
-  private const val POLICY_REVISION = "2026-08-25-playstore-catalog-3-education-priority"
+  private const val POLICY_REVISION = "2026-08-25-playstore-catalog-4-clear-legacy-blocks"
 
   fun get(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -27,14 +27,13 @@ internal object FocusGuardPrefs {
   }
 
   fun setBlockedPackages(context: Context, blocked: List<String>) {
-    val normalized = JSONArray(blocked.distinct()).toString()
-    val preferences = get(context)
-    if (preferences.getString(BLOCKED_PACKAGES, null) == normalized) return
-    preferences.edit()
-      .putString(BLOCKED_PACKAGES, normalized)
-      .remove(APP_DECISION_CACHE)
-      .putBoolean(APP_CACHE_READY, false)
-      .apply()
+    // Retained for old JS bundles, but never persist a client-controlled block
+    // list. Hard-deny and catalog policy are compiled into native code.
+    clearLegacyBlockedPackages(context)
+  }
+
+  fun clearLegacyBlockedPackages(context: Context) {
+    get(context).edit().remove(BLOCKED_PACKAGES).apply()
   }
 
   fun blocked(context: Context): Set<String> = packages(context, BLOCKED_PACKAGES)

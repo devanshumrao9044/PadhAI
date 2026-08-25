@@ -11,6 +11,7 @@ import { supabase } from '@/features/core/services/supabase';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
+import { getSafeErrorMessage } from '@/features/core/services/safeError';
 import { useApp } from '@/hooks/useApp';
 import { useAuthSession } from '@/auth/AuthSessionProvider';
 import { getLevelForUser, getXPProgressForUser, LEVELS } from '@/constants/levels';
@@ -194,7 +195,12 @@ export default function ProfileScreen() {
     try {
       await signOut();
     } catch (error: any) {
-      showAlert(t('profile.signOutFailed'), error?.message ?? t('profile.tryAgain'));
+      showAlert(t('profile.signOutFailed'), getSafeErrorMessage(error, {
+        fallback: t('profile.tryAgain'),
+        network: t('common.networkError'),
+        permission: t('common.permissionError'),
+        rateLimit: t('common.rateLimitError'),
+      }));
     }
   };
 
@@ -232,7 +238,11 @@ export default function ProfileScreen() {
         setAvatarError(null);
         setEditAvatarUrl(asset.uri);
       } catch (error: any) {
-          setAvatarError(error?.message ?? t('profile.tryAgain'));
+          setAvatarError(getSafeErrorMessage(error, {
+            fallback: t('profile.tryAgain'),
+            network: t('common.networkError'),
+            permission: t('common.permissionError'),
+          }));
       }
     }
   };
@@ -309,10 +319,17 @@ export default function ProfileScreen() {
 
       setEditVisible(false);
     } catch (error: any) {
-      const message = error?.message || 'Unknown error occurred.';
-      showAlert(t('profile.saveFailed'), message.includes('compressed photo')
-        ? `${message} Maximum final size is ${formatFileSize(MAX_AVATAR_OUTPUT_BYTES)}.`
-        : message);
+      const rawMessage = error instanceof Error ? error.message : '';
+      const isCompressionError = rawMessage.toLowerCase().includes('compressed photo');
+      const message = isCompressionError
+        ? `${rawMessage} Maximum final size is ${formatFileSize(MAX_AVATAR_OUTPUT_BYTES)}.`
+        : getSafeErrorMessage(error, {
+            fallback: t('profile.tryAgain'),
+            network: t('common.networkError'),
+            permission: t('common.permissionError'),
+            rateLimit: t('common.rateLimitError'),
+          });
+      showAlert(t('profile.saveFailed'), message);
       setAvatarError(message);
     } finally {
       setLoading(false);
@@ -420,6 +437,16 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.notificationHeroButton} onPress={() => router.push('/notifications' as Parameters<typeof router.push>[0])}>
             <Text style={styles.notificationHeroButtonText}>{t('notifications.openInbox')}</Text>
             <MaterialIcons name="chevron-right" size={18} color={colors.background} />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.ticketHeroCard}>
+          <View style={[styles.notificationHeroIcon, styles.ticketHeroIcon]}><MaterialIcons name="support-agent" size={24} color={colors.primary} /></View>
+          <View style={styles.notificationHeroInfo}>
+            <Text style={styles.notificationHeroTitle}>{t('support.reviewMyTickets')}</Text>
+            <Text style={styles.notificationHeroText}>{t('support.reviewMyTicketsHint')}</Text>
+          </View>
+          <TouchableOpacity style={styles.notificationHeroButton} onPress={() => router.push('/review-tickets' as Parameters<typeof router.push>[0])} activeOpacity={0.8}>
+            <MaterialIcons name="chevron-right" size={20} color={colors.background} />
           </TouchableOpacity>
         </View>
         {adminRole ? (
@@ -797,6 +824,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   card: { backgroundColor: colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.md, marginBottom: Spacing.md },
   cardTitle: { fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, color: colors.textTertiary, letterSpacing: 1.2, marginBottom: Spacing.sm, textTransform: 'uppercase' },
   notificationHeroCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.primary + '55', backgroundColor: colors.primary + '12' },
+  ticketHeroCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md, marginTop: Spacing.sm, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.accent + '55', backgroundColor: colors.accent + '10' },
+  ticketHeroIcon: { borderWidth: 1, borderColor: colors.accent + '55' },
   notificationHeroIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
   notificationHeroInfo: { flex: 1, minWidth: 0 },
   notificationHeroTitle: { color: colors.textPrimary, fontSize: FontSize.base, lineHeight: 20, fontWeight: FontWeight.bold, flexShrink: 1 },

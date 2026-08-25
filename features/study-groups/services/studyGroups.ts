@@ -549,9 +549,39 @@ export async function getOwnerStudyGroupTickets(): Promise<StudyGroupTicket[]> {
   return (data ?? []).map(mapTicket);
 }
 
+export async function respondToStudyGroupTicket(input: {
+  ticketId: string;
+  status: Exclude<StudyGroupTicketStatus, 'open'>;
+  resolution: string;
+}): Promise<void> {
+  const resolution = input.resolution.trim();
+  if (resolution.length < 3 || resolution.length > 1000) {
+    throw new Error('Ticket response must be between 3 and 1000 characters.');
+  }
+  const { error } = await supabase.rpc('respond_to_study_group_ticket', {
+    p_ticket_id: input.ticketId,
+    p_status: input.status,
+    p_resolution: resolution,
+  });
+  throwIfError(error);
+}
+
 export async function closeStudyGroupTicket(ticketId: string): Promise<void> {
   const { error } = await supabase.rpc('close_study_group_ticket', { p_ticket_id: ticketId });
   throwIfError(error);
+}
+
+export function subscribeToStudyGroupTickets(userId: string, owner: boolean, onChange: () => void): () => void {
+  const channel = supabase
+    .channel(`support-tickets-${userId}`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'study_group_tickets',
+      ...(owner ? {} : { filter: `user_id=eq.${userId}` }),
+    }, onChange)
+    .subscribe();
+  return () => { void supabase.removeChannel(channel); };
 }
 
 export async function isPadhaiOwner(userId: string): Promise<boolean> {

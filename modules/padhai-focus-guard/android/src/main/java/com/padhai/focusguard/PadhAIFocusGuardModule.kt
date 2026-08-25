@@ -39,6 +39,8 @@ class PadhAIFocusGuardModule : Module() {
     Function("start") {
       val canStart = canDrawOverlay() && hasUsageStatsAccess()
       if (canStart) {
+        // Remove legacy JS block state before starting the native policy engine.
+        FocusGuardPrefs.clearLegacyBlockedPackages(context)
         FocusGuardAppPolicy.warmInstalledCache(context)
         FocusGuardPrefs.setEnabled(context, true)
         FocusGuardPrefs.setStartedAt(context, System.currentTimeMillis())

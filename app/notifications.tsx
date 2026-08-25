@@ -19,11 +19,13 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { NotificationSkeletonList } from '@/components/ui/Skeleton';
 import { getSafeErrorMessage } from '@/features/core/services/safeError';
+import { useApp } from '@/hooks/useApp';
 import {
   deleteUserNotification,
   getNotificationAttachmentUrl,
   loadUserNotifications,
   markUserNotificationRead,
+  subscribeToUserNotifications,
   type UserNotification,
 } from '@/features/notifications/services/adminNotifications';
 
@@ -37,6 +39,7 @@ export default function NotificationsScreen() {
   const { colors } = useTheme();
   const { t } = useLanguage();
   const router = useRouter();
+  const { user } = useApp();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [items, setItems] = useState<UserNotification[]>([]);
   const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
@@ -71,6 +74,11 @@ export default function NotificationsScreen() {
   }, [t]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    return subscribeToUserNotifications(user.id, () => { void load(true); });
+  }, [load, user?.id]);
 
   useEffect(() => {
     let active = true;
