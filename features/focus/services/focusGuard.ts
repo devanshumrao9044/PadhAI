@@ -25,6 +25,7 @@ type NativeFocusGuard = {
   stop(): void;
   consumeBreakRequest(): boolean;
   getInstalledApps(): InstalledFocusApp[];
+  refreshAppDecisionCache(): boolean;
   launchStudyApp(packageName: string): boolean;
   openOverlaySettings(): void;
   openUsageStatsSettings(): void;
@@ -122,6 +123,15 @@ export function stopFocusGuard(): void {
 export function consumeFocusBreakRequest(): boolean {
   try {
     return Boolean(getNativeFocusGuard()?.consumeBreakRequest());
+  } catch {
+    return false;
+  }
+}
+
+export function refreshFocusGuardAppDecisionCache(): boolean {
+  if (!isAndroidFocusGuardAvailable()) return false;
+  try {
+    return Boolean(getNativeFocusGuard()?.refreshAppDecisionCache());
   } catch {
     return false;
   }

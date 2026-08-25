@@ -8,6 +8,7 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Build
@@ -179,27 +180,40 @@ class PadhAIFocusGuardService : Service() {
       val layout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER
-        setPadding(48, 48, 48, 48)
-        setBackgroundColor(Color.parseColor("#F8F7FF"))
+        setPadding(32, 48, 32, 48)
+        setBackgroundColor(Color.parseColor("#120A24"))
+        minimumHeight = resources.displayMetrics.heightPixels
+        minimumWidth = resources.displayMetrics.widthPixels
+        systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+          View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+          View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+          View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
       }
       val title = TextView(this).apply {
-        textSize = 24f
-        setTextColor(Color.parseColor("#2B1B4D"))
+        textSize = 27f
+        setTextColor(Color.WHITE)
         gravity = Gravity.CENTER
+        setTypeface(typeface, android.graphics.Typeface.BOLD)
       }
       val body = TextView(this).apply {
         textSize = 16f
-        setTextColor(Color.parseColor("#554B6B"))
+        setTextColor(Color.parseColor("#DCD3F4"))
         gravity = Gravity.CENTER
-        setPadding(0, 24, 0, 24)
+        setPadding(0, 20, 0, 28)
+        setLineSpacing(3f, 1.05f)
       }
       val returnButton = Button(this).apply {
         text = "Return to PadhAI"
+        isAllCaps = false
+        setTextColor(Color.WHITE)
+        backgroundTintList = ColorStateList.valueOf(Color.parseColor("#7C3AED"))
+        minHeight = 54
+        setPadding(28, 0, 28, 0)
         setOnClickListener { openPadhAI() }
       }
-      layout.addView(title)
-      layout.addView(body)
-      layout.addView(returnButton)
+      layout.addView(title, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+      layout.addView(body, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+      layout.addView(returnButton, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
       layout.tag = OverlayParts(title, body)
       blockOverlay = layout
       val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -211,9 +225,15 @@ class PadhAIFocusGuardService : Service() {
         WindowManager.LayoutParams.MATCH_PARENT,
         WindowManager.LayoutParams.MATCH_PARENT,
         type,
-        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
-        PixelFormat.TRANSLUCENT,
-      ).apply { gravity = Gravity.CENTER }
+        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+          WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+          WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+        PixelFormat.OPAQUE,
+      ).apply {
+        gravity = Gravity.TOP or Gravity.START
+        x = 0
+        y = 0
+      }
       runCatching { manager.addView(layout, params) }
     }
 

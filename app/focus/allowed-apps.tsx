@@ -19,6 +19,7 @@ import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/
 import { useApp } from '@/hooks/useApp';
 import {
   getInstalledApps,
+  refreshFocusGuardAppDecisionCache,
   launchStudyApp,
   type InstalledFocusApp,
 } from '@/features/focus/services/focusGuard';
@@ -39,6 +40,10 @@ export default function AllowedAppsScreen() {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
+      // Re-scan installed packages so a newly installed Education app or a
+      // policy revision is reflected immediately. Native final decisions remain
+      // authoritative; the catalog label is only explanatory metadata.
+      refreshFocusGuardAppDecisionCache();
       setApps(getInstalledApps());
     } finally {
       if (isRefresh) setRefreshing(false);
@@ -163,7 +168,7 @@ export default function AllowedAppsScreen() {
                 <View style={styles.appCopy}>
                   <Text style={styles.appName} numberOfLines={1}>{app.label}</Text>
                   <View style={styles.metaLine}>
-                    <Text style={[styles.categoryText, app.allowed ? styles.categoryAllowed : styles.categoryBlocked]}>{app.category}</Text>
+                    <Text style={[styles.categoryText, app.allowed ? styles.categoryAllowed : styles.categoryBlocked]}>Category: {app.category}</Text>
                     <Text style={styles.reasonText}>{app.allowed ? `${t('focus.allowedAppsVerifiedStatus')} · ${policyReasonLabel(app.reason)}` : `${t('focus.allowedAppsBlockedStatus')} · ${policyReasonLabel(app.reason)}`}</Text>
                   </View>
                 </View>

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
-  Animated, Pressable, View, Text, StyleSheet,
+  Alert, Animated, Pressable, View, Text, StyleSheet,
   TouchableOpacity, Dimensions, ScrollView
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -10,6 +10,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
+import { useAuthSession } from '@/auth/AuthSessionProvider';
 import { getLevelForUser } from '@/constants/levels';
 import { isPadhaiOwner } from '@/features/study-groups/services/studyGroups';
 
@@ -37,6 +38,7 @@ export default function SideDrawer({ visible, onClose }: Props) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useApp();
+  const { signOut, signingOut } = useAuthSession();
   const slideAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const overlayAnim = useRef(new Animated.Value(0)).current;
   // mounted keeps the component in the tree during the close animation
@@ -90,6 +92,14 @@ export default function SideDrawer({ visible, onClose }: Props) {
       return;
     }
     router.push(route as any);
+  };
+
+  const confirmSignOut = () => {
+    if (signingOut) return;
+    Alert.alert(t('profile.signOutTitle'), t('profile.signOutMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('profile.signOut'), style: 'destructive', onPress: () => { void signOut(); } },
+    ]);
   };
 
   if (!mounted) return null;
@@ -191,11 +201,16 @@ export default function SideDrawer({ visible, onClose }: Props) {
             <View style={styles.supportTextBlock}><Text style={styles.supportLabel}>{t('support.helpSupport')}</Text><Text style={styles.supportSub}>{t('support.reportProblem')}</Text></View>
             <MaterialIcons name="chevron-right" size={18} color={colors.textTertiary} />
           </TouchableOpacity>
-          {isOwner ? <TouchableOpacity style={styles.supportItem} onPress={() => navigate('/review-tickets')} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.supportItem} onPress={() => navigate('/review-tickets')} activeOpacity={0.8}>
             <View style={styles.supportIconWrap}><MaterialIcons name="history" size={20} color={colors.primary} /></View>
-            <View style={styles.supportTextBlock}><Text style={styles.supportLabel}>{t('support.reviewTicketsReports')}</Text><Text style={styles.supportSub}>{t('support.ownerInbox')}</Text></View>
+            <View style={styles.supportTextBlock}><Text style={styles.supportLabel}>{t('support.reviewMyTickets')}</Text><Text style={styles.supportSub}>{isOwner ? t('support.ownerInbox') : t('support.ticketUserView')}</Text></View>
             <MaterialIcons name="chevron-right" size={18} color={colors.textTertiary} />
-          </TouchableOpacity> : null}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.supportItem} onPress={confirmSignOut} activeOpacity={0.8} disabled={signingOut}>
+            <View style={[styles.supportIconWrap, { backgroundColor: colors.danger + '18' }]}><MaterialIcons name="logout" size={20} color={colors.danger} /></View>
+            <View style={styles.supportTextBlock}><Text style={[styles.supportLabel, { color: colors.danger }]}>{signingOut ? t('profile.signingOut') : t('profile.signOut')}</Text><Text style={styles.supportSub}>{t('profile.signOutHint')}</Text></View>
+            <MaterialIcons name="chevron-right" size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
         </ScrollView>
 
         {/* Footer */}

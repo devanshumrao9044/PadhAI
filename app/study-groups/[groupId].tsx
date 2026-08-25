@@ -9,7 +9,9 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import {
-  archiveStudyGroup,
+  deleteStudyGroupPermanently,
+  restoreStudyGroup,
+  suspendStudyGroup,
   canManageStudyGroupMember,
   createStudyGroupInvite,
   formatStudyDuration,
@@ -39,10 +41,20 @@ import {
   type StudyGroupReportReason,
 } from '@/features/study-groups/services/studyGroups';
 import StudyGroupReportSheet from '@/components/study-groups/StudyGroupReportSheet';
+import { getSafeErrorMessage } from '@/features/core/services/safeError';
 
 function iconName(iconKey: string): string {
   return STUDY_GROUP_ICON_OPTIONS.find(option => option.key === iconKey)?.icon ?? 'menu-book';
 }
+
+const SUSPEND_OPTIONS = [
+  { minutes: 30, label: '30 min' },
+  { minutes: 60, label: '1 hour' },
+  { minutes: 180, label: '3 hours' },
+  { minutes: 720, label: '12 hours' },
+  { minutes: 1440, label: '1 day' },
+  { minutes: 10080, label: '7 days' },
+];
 
 const PERMISSION_ITEMS: { key: StudyGroupPermissionKey; labelKey: string }[] = [
   { key: 'manageJoinRequests', labelKey: 'permissionManageRequests' },
@@ -88,6 +100,8 @@ export default function StudyGroupDetailScreen() {
   const [noticeMessage, setNoticeMessage] = useState('');
   const [showIconPicker, setShowIconPicker] = useState(false);
   const [showGroupEditor, setShowGroupEditor] = useState(false);
+  const [showSuspensionPicker, setShowSuspensionPicker] = useState(false);
+  const [lifecycleBusy, setLifecycleBusy] = useState(false);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editRules, setEditRules] = useState('');
@@ -126,7 +140,11 @@ export default function StudyGroupDetailScreen() {
       }
       if (!groupData) setError('This Study Group is no longer available.');
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'Could not load this Study Group.');
+      setError(getSafeErrorMessage(loadError, {
+        fallback: 'Could not load this Study Group. Please try again.',
+        network: 'Check your connection and try again.',
+        permission: 'You do not have permission to view this Study Group.',
+      }));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -148,6 +166,7 @@ export default function StudyGroupDetailScreen() {
   const isApprovedMember = ownerAccess || membership?.status === 'approved';
   const studyingMembers = members.filter(member => member.presenceStatus === 'studying');
   const groupTotal = members.reduce((sum, member) => sum + member.todayMinutes, 0);
+  const isSuspended = Boolean(group?.suspendedUntil && Date.parse(group.suspendedUntil) > Date.now());
 
   const showNotice = (message: string) => {
     if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
@@ -195,7 +214,11 @@ export default function StudyGroupDetailScreen() {
       showNotice(t('groups.permissionsUpdated'));
       await load(true);
     } catch (manageError) {
-      setError(manageError instanceof Error ? manageError.message : 'Could not update member permissions.');
+      setError(getSafeErrorMessage(manageError, {
+        fallback: 'Could not update member permissions. Please try again.',
+        network: 'Check your connection and try again.',
+        permission: 'You do not have permission to manage this member.',
+      }));
     } finally {
       setManaging(false);
     }
@@ -210,7 +233,11 @@ export default function StudyGroupDetailScreen() {
       showNotice(t('groups.permissionsUpdated'));
       await load(true);
     } catch (manageError) {
-      setError(manageError instanceof Error ? manageError.message : 'Could not demote the co-admin.');
+      setError(getSafeErrorMessage(manageError, {
+        fallback: 'Could not demote the co-admin. Please try again.',
+        network: 'Check your connection and try again.',
+        permission: 'You do not have permission to demote this co-admin.',
+      }));
     } finally {
       setManaging(false);
     }
@@ -225,7 +252,11 @@ export default function StudyGroupDetailScreen() {
       showNotice(t('groups.memberRemoved'));
       await load(true);
     } catch (manageError) {
-      setError(manageError instanceof Error ? manageError.message : 'Could not remove the member.');
+      setError(getSafeErrorMessage(manageError, {
+        fallback: 'Could not remove the member. Please try again.',
+        network: 'Check your connection and try again.',
+        permission: 'You do not have permission to remove this member.',
+      }));
     } finally {
       setManaging(false);
     }
@@ -238,7 +269,12 @@ export default function StudyGroupDetailScreen() {
       await joinStudyGroup(groupId);
       await load(true);
     } catch (joinError) {
-      setError(joinError instanceof Error ? joinError.message : 'Could not join this group.');
+      setError(getSafeErrorMessage(joinError, {
+        fallback: 'Could not join this group. Please try again.',
+        network: 'Check your connection and try again.',
+        permission: 'You do not have permission to join this group.',
+        rateLimit: 'Too many requests. Please wait and try again.',
+      }));
     } finally {
       setJoining(false);
     }
@@ -273,7 +309,11 @@ export default function StudyGroupDetailScreen() {
       showNotice(t('groups.permissionsUpdated'));
       await load(true);
     } catch (editError) {
-      setError(editError instanceof Error ? editError.message : 'Could not update the group.');
+      setError(getSafeErrorMessage(editError, {
+        fallback: 'Could not update the group. Please try again.',
+        network: 'Check your connection and try again.',
+        permission: 'You do not have permission to edit this group.',
+      }));
     } finally {
       setSavingGroup(false);
     }
@@ -286,8 +326,80 @@ export default function StudyGroupDetailScreen() {
       setShowIconPicker(false);
       await load(true);
     } catch (iconError) {
-      setError(iconError instanceof Error ? iconError.message : 'Could not update your icon.');
+      setError(getSafeErrorMessage(iconError, {
+        fallback: 'Could not update your icon. Please try again.',
+        network: 'Check your connection and try again.',
+        permission: 'You do not have permission to update your icon.',
+      }));
     }
+  };
+
+  const handleSuspend = async (durationMinutes: number) => {
+    if (!group || lifecycleBusy) return;
+    setLifecycleBusy(true);
+    setError('');
+    try {
+      await suspendStudyGroup(group.id, durationMinutes);
+      setShowSuspensionPicker(false);
+      showNotice(t('groups.suspendedStatus'));
+      await load(true);
+    } catch (lifecycleError) {
+      setError(getSafeErrorMessage(lifecycleError, {
+        fallback: 'Could not suspend this Study Group. Please try again.',
+        network: t('common.networkError'),
+        permission: t('common.permissionError'),
+      }));
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!group || lifecycleBusy) return;
+    setLifecycleBusy(true);
+    setError('');
+    try {
+      await restoreStudyGroup(group.id);
+      showNotice(t('groups.restoreGroup'));
+      await load(true);
+    } catch (lifecycleError) {
+      setError(getSafeErrorMessage(lifecycleError, {
+        fallback: 'Could not restore this Study Group. Please try again.',
+        network: t('common.networkError'),
+        permission: t('common.permissionError'),
+      }));
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
+
+  const handlePermanentDelete = () => {
+    if (!group || lifecycleBusy) return;
+    Alert.alert(t('groups.deleteGroupConfirm'), t('groups.deleteGroupConfirmBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('groups.deleteGroupPermanently'),
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            setLifecycleBusy(true);
+            setError('');
+            try {
+              await deleteStudyGroupPermanently(group.id);
+              router.replace('/study-groups' as never);
+            } catch (lifecycleError) {
+              setError(getSafeErrorMessage(lifecycleError, {
+                fallback: 'Could not delete this Study Group. Please try again.',
+                network: t('common.networkError'),
+                permission: t('common.permissionError'),
+              }));
+            } finally {
+              setLifecycleBusy(false);
+            }
+          })();
+        },
+      },
+    ]);
   };
 
   const getInviteLink = () => inviteToken ? `PadhAI://study-groups/join?token=${encodeURIComponent(inviteToken)}` : '';
@@ -311,7 +423,12 @@ export default function StudyGroupDetailScreen() {
       setInviteToken(nextToken);
       showNotice(t('groups.linkRegenerated'));
     } catch (inviteError) {
-      setError(inviteError instanceof Error ? inviteError.message : 'Could not create an invite.');
+      setError(getSafeErrorMessage(inviteError, {
+        fallback: 'Could not create an invite. Please try again.',
+        network: 'Check your connection and try again.',
+        permission: 'You do not have permission to create invites.',
+        rateLimit: 'Too many requests. Please wait and try again.',
+      }));
     }
   };
 
@@ -327,7 +444,11 @@ export default function StudyGroupDetailScreen() {
           await leaveStudyGroup(groupId);
           router.replace('/study-groups' as never);
         } catch (leaveError) {
-          setError(leaveError instanceof Error ? leaveError.message : 'Could not leave the group.');
+          setError(getSafeErrorMessage(leaveError, {
+            fallback: 'Could not leave the group. Please try again.',
+            network: 'Check your connection and try again.',
+            permission: 'You do not have permission to leave this group.',
+          }));
         }
       } },
     ]);
@@ -375,6 +496,7 @@ export default function StudyGroupDetailScreen() {
             {ownerAccess ? <View style={styles.ownerBadge}><MaterialIcons name="verified-user" size={14} color={colors.primary} /><Text style={styles.ownerBadgeText}>Owner</Text></View> : null}
           </View>
           {group.description ? <Text style={styles.description}>{group.description}</Text> : null}
+          {isSuspended ? <View style={styles.suspendedCard}><MaterialIcons name="pause-circle-filled" size={20} color={colors.warning} /><View style={styles.suspendedCopy}><Text style={styles.suspendedTitle}>{t('groups.suspendedStatus')}</Text><Text style={styles.suspendedText}>{t('groups.suspendGroupHint')}</Text><Text style={styles.suspendedText}>{t('groups.suspendedUntil', { value: new Date(group.suspendedUntil as string).toLocaleString() })}</Text></View></View> : null}
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}><Text style={styles.summaryValue}>{studyingMembers.length}</Text><Text style={styles.summaryLabel}>{t('groups.studyingNow')}</Text></View>
             <View style={styles.summaryItem}><Text style={styles.summaryValue}>{formatStudyDuration(groupTotal)}</Text><Text style={styles.summaryLabel}>{t('groups.groupTotal')}</Text></View>
@@ -392,7 +514,12 @@ export default function StudyGroupDetailScreen() {
             {canManageJoinRequests ? <><View style={styles.adminHeader}><Text style={styles.sectionTitle}>{t('groups.manageRequests')}</Text><Text style={styles.adminCount}>{pending.length}</Text></View>{pending.length === 0 ? <Text style={styles.body}>{t('groups.noMembers')}</Text> : pending.map(request => <View key={request.membershipId} style={styles.requestRow}><View style={styles.requestCopy}><Text style={styles.requestName}>{request.name}</Text><Text style={styles.memberStatus}>Pending request</Text></View><Pressable onPress={() => { void reviewStudyGroupMember(request.membershipId, 'approved').then(() => load(true)); }} style={styles.smallApprove}><Text style={styles.smallApproveText}>{t('groups.approve')}</Text></Pressable><Pressable onPress={() => { void reviewStudyGroupMember(request.membershipId, 'rejected').then(() => load(true)); }} style={styles.smallReject}><Text style={styles.smallRejectText}>{t('groups.reject')}</Text></Pressable></View>)}</> : null}
             {canEditGroup ? <Pressable onPress={openGroupEditor} style={styles.outlineButton}><MaterialIcons name="edit" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.permissionEditGroup')}</Text></Pressable> : null}
             {canManageInvites ? <View style={styles.adminActions}>{inviteToken ? <><Pressable onPress={() => { void copyInvite(); }} style={styles.outlineButton}><MaterialIcons name="content-copy" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.copyLink')}</Text></Pressable><Pressable onPress={() => { void shareInvite(); }} style={styles.outlineButton}><MaterialIcons name="share" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.shareInvite')}</Text></Pressable></> : null}<Pressable onPress={() => { void regenerateInvite(); }} style={styles.outlineButton}><MaterialIcons name="refresh" size={17} color={colors.primary} /><Text style={styles.outlineText}>{t('groups.inviteLink')}</Text></Pressable></View> : null}
-            {membership?.role === 'owner' || ownerAccess ? <Pressable onPress={() => { Alert.alert(t('groups.leaveGroup'), t('groups.leaveConfirm'), [{ text: t('common.cancel'), style: 'cancel' }, { text: 'Archive', style: 'destructive', onPress: async () => { try { await archiveStudyGroup(group.id); router.replace('/study-groups' as never); } catch (archiveError) { setError(archiveError instanceof Error ? archiveError.message : 'Could not archive the group.'); } } }]); }} style={styles.archiveButton}><Text style={styles.archiveText}>Archive group</Text></Pressable> : null}
+            {membership?.role === 'owner' || ownerAccess ? <View style={styles.lifecycleCard}>
+              <Text style={styles.lifecycleTitle}>{t('groups.suspendGroup')}</Text>
+              <Text style={styles.lifecycleHint}>{t('groups.suspendGroupHint')}</Text>
+              {isSuspended ? <Pressable onPress={() => { void handleRestore(); }} disabled={lifecycleBusy} style={[styles.outlineButton, lifecycleBusy && styles.disabled]}><MaterialIcons name="play-circle" size={17} color={colors.success} /><Text style={[styles.outlineText, { color: colors.success }]}>{lifecycleBusy ? t('groups.suspending') : t('groups.restoreGroup')}</Text></Pressable> : <Pressable onPress={() => setShowSuspensionPicker(true)} disabled={lifecycleBusy} style={[styles.outlineButton, lifecycleBusy && styles.disabled]}><MaterialIcons name="pause-circle" size={17} color={colors.warning} /><Text style={[styles.outlineText, { color: colors.warning }]}>{lifecycleBusy ? t('groups.suspending') : t('groups.suspendGroup')}</Text></Pressable>}
+              <Pressable onPress={handlePermanentDelete} disabled={lifecycleBusy} style={[styles.archiveButton, lifecycleBusy && styles.disabled]}><Text style={styles.archiveText}>{t('groups.deleteGroupPermanently')}</Text></Pressable>
+            </View> : null}
           </View> : null}
           {isApprovedMember && membership?.role !== 'owner' ? <Pressable onPress={handleLeave} style={styles.leaveButton}><Text style={styles.leaveText}>{t('groups.leaveGroup')}</Text></Pressable> : null}
           {isApprovedMember ? <Pressable onPress={() => router.push('/raise-ticket' as never)} style={styles.supportLink}><MaterialIcons name="support-agent" size={18} color={colors.primary} /><Text style={styles.outlineText}>{t('support.reportProblem')}</Text></Pressable> : null}
@@ -402,6 +529,9 @@ export default function StudyGroupDetailScreen() {
 
       <Modal visible={showIconPicker} transparent animationType="slide" onRequestClose={() => setShowIconPicker(false)}>
         <View style={styles.modalOverlay}><View style={styles.modalCard}><Text style={styles.modalTitle}>{t('groups.chooseIcon')}</Text><Text style={styles.modalSubtitle}>{t('groups.iconHint')}</Text><View style={styles.iconGrid}>{STUDY_GROUP_ICON_OPTIONS.map(option => <Pressable key={option.key} onPress={() => { void chooseIcon(option.key); }} style={styles.reasonRow}><View style={styles.iconPickerChoice}><MaterialIcons name={option.icon as any} size={25} color={colors.primary} /></View><Text style={styles.reasonText}>{option.key}</Text></Pressable>)}</View><Pressable onPress={() => setShowIconPicker(false)} style={styles.cancelButton}><Text style={styles.cancelText}>{t('common.close')}</Text></Pressable></View></View>
+      </Modal>
+      <Modal visible={showSuspensionPicker} transparent animationType="slide" onRequestClose={() => setShowSuspensionPicker(false)}>
+        <View style={styles.modalOverlay}><View style={styles.modalCard}><Text style={styles.modalTitle}>{t('groups.suspendDuration')}</Text><Text style={styles.modalSubtitle}>{t('groups.suspendGroupHint')}</Text>{SUSPEND_OPTIONS.map(option => <Pressable key={option.minutes} onPress={() => { void handleSuspend(option.minutes); }} disabled={lifecycleBusy} style={[styles.durationOption, lifecycleBusy && styles.disabled]}><MaterialIcons name="schedule" size={18} color={colors.primary} /><Text style={styles.durationOptionText}>{option.label}</Text></Pressable>)}<Pressable onPress={() => setShowSuspensionPicker(false)} style={styles.cancelButton}><Text style={styles.cancelText}>{t('common.cancel')}</Text></Pressable></View></View>
       </Modal>
       <Modal visible={showGroupEditor} transparent animationType="slide" onRequestClose={() => setShowGroupEditor(false)}>
         <View style={styles.modalOverlay}><View style={styles.modalCard}><Text style={styles.modalTitle}>{t('groups.permissionEditGroup')}</Text><TextInput value={editName} onChangeText={setEditName} placeholder={t('groups.groupName')} placeholderTextColor={colors.textTertiary} style={styles.editorInput} maxLength={60} /><TextInput value={editDescription} onChangeText={setEditDescription} placeholder={t('groups.description')} placeholderTextColor={colors.textTertiary} style={[styles.editorInput, styles.multiline]} maxLength={240} multiline textAlignVertical="top" /><TextInput value={editRules} onChangeText={setEditRules} placeholder={t('groups.rules')} placeholderTextColor={colors.textTertiary} style={[styles.editorInput, styles.multiline]} maxLength={2000} multiline textAlignVertical="top" /><TextInput value={editTargetExam} onChangeText={setEditTargetExam} placeholder={t('groups.targetExam')} placeholderTextColor={colors.textTertiary} style={styles.editorInput} maxLength={40} /><View style={styles.editorRow}><TextInput value={editDailyGoal} onChangeText={setEditDailyGoal} placeholder={t('groups.dailyGoal')} placeholderTextColor={colors.textTertiary} style={[styles.editorInput, styles.editorHalf]} keyboardType="number-pad" /><TextInput value={editMaxMembers} onChangeText={setEditMaxMembers} placeholder={t('groups.maxMembers')} placeholderTextColor={colors.textTertiary} style={[styles.editorInput, styles.editorHalf]} keyboardType="number-pad" /></View><View style={styles.modalActions}><Pressable onPress={() => setShowGroupEditor(false)} style={styles.cancelButton}><Text style={styles.cancelText}>{t('common.cancel')}</Text></Pressable><Pressable onPress={() => { void saveGroupDetails(); }} disabled={savingGroup} style={[styles.modalSubmit, savingGroup && styles.disabled]}><Text style={styles.primaryText}>{savingGroup ? t('common.loading') : t('groups.savePermissions')}</Text></Pressable></View></View></View>
@@ -470,6 +600,15 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   outlineText: { color: colors.primary, fontSize: FontSize.xs, fontWeight: FontWeight.bold },
   archiveButton: { paddingVertical: 10, alignItems: 'center' },
   archiveText: { color: colors.danger, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
+  lifecycleCard: { marginTop: Spacing.sm, paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: colors.border, gap: Spacing.sm },
+  lifecycleTitle: { color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.bold },
+  lifecycleHint: { color: colors.textSecondary, fontSize: FontSize.xs, lineHeight: 18 },
+  suspendedCard: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, backgroundColor: colors.warning + '16', borderWidth: 1, borderColor: colors.warning + '55', borderRadius: Radius.lg, padding: Spacing.md },
+  suspendedCopy: { flex: 1, gap: 3 },
+  suspendedTitle: { color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.bold },
+  suspendedText: { color: colors.textSecondary, fontSize: FontSize.xs, lineHeight: 17 },
+  durationOption: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderTopWidth: 1, borderTopColor: colors.border, paddingVertical: 10 },
+  durationOptionText: { color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.semiBold },
   leaveButton: { alignItems: 'center', paddingVertical: Spacing.md },
   leaveText: { color: colors.danger, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
   supportLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10 },

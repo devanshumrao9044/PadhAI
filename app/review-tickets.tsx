@@ -158,14 +158,15 @@ export default function ReviewTicketsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}><Pressable onPress={() => router.back()} style={styles.headerButton}><MaterialIcons name="arrow-back" size={22} color={colors.textPrimary} /></Pressable><View style={styles.headerCopy}><Text style={styles.title}>{owner ? t('support.ownerTicketInbox') : t('support.reviewMyTickets')}</Text><Text style={styles.subtitle}>{owner ? t('support.ticketOwnerView') : t('support.ticketUserView')}</Text></View><Pressable onPress={() => router.push('/raise-ticket' as never)} style={styles.addButton}><MaterialIcons name="add" size={22} color={colors.background} /></Pressable></View>
+      <View style={styles.header}><Pressable onPress={() => router.back()} style={styles.headerButton}><MaterialIcons name="arrow-back" size={22} color={colors.textPrimary} /></Pressable><View style={styles.headerCopy}><Text style={styles.title}>{owner ? t('support.ownerTicketInbox') : t('support.reviewMyTickets')}</Text><Text style={styles.subtitle}>{owner ? t('support.ticketOwnerView') : t('support.reviewMyTicketsHint')}</Text></View><Pressable onPress={() => router.push('/raise-ticket' as never)} style={styles.addButton}><MaterialIcons name="add" size={22} color={colors.background} /></Pressable></View>
       <View style={styles.tabs}><Pressable onPress={() => setTab('tickets')} style={[styles.tab, tab === 'tickets' && styles.tabActive]}><Text style={[styles.tabText, tab === 'tickets' && styles.tabTextActive]}>{t('support.myTickets')} ({tickets.length})</Text></Pressable><Pressable onPress={() => setTab('reports')} style={[styles.tab, tab === 'reports' && styles.tabActive]}><Text style={[styles.tabText, tab === 'reports' && styles.tabTextActive]}>{t('support.myReports')} ({reports.length})</Text></Pressable></View>
+      {!owner ? <View style={styles.userIntro}><MaterialIcons name="verified-user" size={17} color={colors.primary} /><Text style={styles.userIntroText}>{t('support.reviewMyTicketsHint')}</Text></View> : null}
       {owner ? <Pressable onPress={() => router.push('/admin/study-groups' as never)} style={styles.ownerLink}><MaterialIcons name="admin-panel-settings" size={18} color={colors.primary} /><Text style={styles.ownerLinkText}>{t('support.manageStudyGroups')}</Text><MaterialIcons name="chevron-right" size={18} color={colors.textTertiary} /></Pressable> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {!ownerChecked ? <Text style={styles.emptyText}>{t('common.loading')}</Text> : tab === 'tickets' ? (
-        <FlatList<StudyGroupTicket> data={tickets} keyExtractor={item => item.id} renderItem={renderTicket} contentContainerStyle={tickets.length ? styles.list : styles.empty} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void load(true); }} tintColor={colors.primary} />} ListEmptyComponent={<Text style={styles.emptyText}>{t('support.noTickets')}</Text>} showsVerticalScrollIndicator={false} />
+        <FlatList<StudyGroupTicket> data={tickets} keyExtractor={item => item.id} renderItem={renderTicket} contentContainerStyle={tickets.length ? styles.list : styles.empty} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void load(true); }} tintColor={colors.primary} />} ListEmptyComponent={<View style={styles.emptyState}><MaterialIcons name="support-agent" size={42} color={colors.primary} /><Text style={styles.emptyTitle}>{t('support.noTickets')}</Text>{!owner ? <Pressable onPress={() => router.push('/raise-ticket' as never)} style={styles.emptyButton}><Text style={styles.emptyButtonText}>{t('support.raiseTicket')}</Text></Pressable> : null}</View>} showsVerticalScrollIndicator={false} />
       ) : (
-        <FlatList<StudyGroupReport> data={reports} keyExtractor={item => item.id} renderItem={renderReport} contentContainerStyle={reports.length ? styles.list : styles.empty} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void load(true); }} tintColor={colors.primary} />} ListEmptyComponent={<Text style={styles.emptyText}>{t('support.noReports')}</Text>} showsVerticalScrollIndicator={false} />
+        <FlatList<StudyGroupReport> data={reports} keyExtractor={item => item.id} renderItem={renderReport} contentContainerStyle={reports.length ? styles.list : styles.empty} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void load(true); }} tintColor={colors.primary} />} ListEmptyComponent={<View style={styles.emptyState}><MaterialIcons name="flag" size={42} color={colors.warning} /><Text style={styles.emptyTitle}>{t('support.noReports')}</Text></View>} showsVerticalScrollIndicator={false} />
       )}
     </SafeAreaView>
   );
@@ -185,6 +186,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   subtitle: { color: colors.textSecondary, fontSize: FontSize.xs, lineHeight: 17, marginTop: 2 },
   addButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, paddingHorizontal: Spacing.md },
+  userIntro: { flexDirection: 'row', alignItems: 'center', gap: 7, marginHorizontal: Spacing.md, marginTop: Spacing.sm, padding: Spacing.sm, borderRadius: Radius.md, backgroundColor: colors.primary + '10', borderWidth: 1, borderColor: colors.primary + '30' },
+  userIntroText: { flex: 1, color: colors.textSecondary, fontSize: FontSize.xs, lineHeight: 17 },
   tab: { flex: 1, alignItems: 'center', paddingVertical: Spacing.md, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabActive: { borderBottomColor: colors.primary },
   tabText: { color: colors.textSecondary, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold, textAlign: 'center' },
@@ -192,6 +195,10 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   list: { padding: Spacing.md, gap: Spacing.sm, paddingBottom: 50 },
   empty: { flexGrow: 1, justifyContent: 'center', padding: Spacing.xl },
   emptyText: { color: colors.textSecondary, textAlign: 'center', fontSize: FontSize.md, lineHeight: 22 },
+  emptyState: { alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, padding: Spacing.xl },
+  emptyTitle: { color: colors.textSecondary, textAlign: 'center', fontSize: FontSize.md, lineHeight: 22 },
+  emptyButton: { backgroundColor: colors.primary, borderRadius: Radius.md, paddingHorizontal: Spacing.lg, paddingVertical: 11, marginTop: Spacing.sm },
+  emptyButtonText: { color: colors.background, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.sm },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   cardIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center' },

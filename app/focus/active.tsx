@@ -22,6 +22,14 @@ function formatTime(secs: number): string {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
+function formatElapsedTime(secs: number): string {
+  const safe = Math.max(0, Math.floor(secs));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const seconds = safe % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
 export default function FocusActiveScreen() {
   const { colors } = useTheme();
   const { t } = useLanguage();
@@ -84,6 +92,7 @@ export default function FocusActiveScreen() {
 
   const plannedMins = activeSession?.plannedMins ?? 25;
   const plannedSecs = plannedMins * 60;
+  const isOpenEnded = Boolean(activeSession?.openEnded);
 
   const liveStateRef = useRef({
     activeSession,
@@ -218,6 +227,17 @@ export default function FocusActiveScreen() {
       }
     }
   }, []);
+
+  const handleManualFinish = () => {
+    if (elapsedRef.current < 60) {
+      Alert.alert(t('focus.finishFocus'), t('focus.finishFocusMinimum'));
+      return;
+    }
+    Alert.alert(t('focus.finishFocus'), t('focus.finishFocusConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('focus.finishFocus'), onPress: () => { void handleComplete(); } },
+    ]);
+  };
 
   const handleBreak = async () => {
     if (isCompletingRef.current || !activeSession) return;
@@ -507,9 +527,9 @@ export default function FocusActiveScreen() {
         </View>
 
         <View style={styles.timerSection}>
-          <Text style={styles.timerLabel}>REMAINING</Text>
-          <Text style={styles.timerText}>{formatTime(remaining)}</Text>
-          <Text style={styles.timerSub}>of {plannedMins} min session</Text>
+          <Text style={styles.timerLabel}>{isOpenEnded ? t('focus.openEndedActive') : 'REMAINING'}</Text>
+          <Text style={[styles.timerText, isOpenEnded && styles.elapsedTimerText]}>{isOpenEnded ? formatElapsedTime(elapsed) : formatTime(remaining)}</Text>
+          <Text style={styles.timerSub}>{isOpenEnded ? t('focus.elapsedTime') : `of ${plannedMins} min session`}</Text>
           <View style={[styles.syncBadge, clockAnomalyRef.current && styles.syncBadgeWarning]}>
             <MaterialIcons name={clockAnomalyRef.current ? 'schedule' : isOnline ? 'cloud-done' : 'cloud-off'} size={14} color={clockAnomalyRef.current ? colors.warning : isOnline ? colors.success : colors.primary} />
             <Text style={[styles.syncBadgeText, clockAnomalyRef.current && { color: colors.warning }, !clockAnomalyRef.current && !isOnline && { color: colors.primary }]}>
@@ -518,22 +538,24 @@ export default function FocusActiveScreen() {
           </View>
         </View>
 
-        <View style={styles.progressContainer}>
+        {isOpenEnded ? <View style={styles.openEndedStatus}><MaterialIcons name="all-inclusive" size={16} color={colors.primary} /><Text style={styles.openEndedStatusText}>{t('focus.openEndedHint')}</Text></View> : <View style={styles.progressContainer}>
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, { width: `${progress * 100}%` as any }]} />
           </View>
           <Text style={styles.progressPct}>{t('focus.percentComplete', { value: Math.round(progress * 100) })}</Text>
-        </View>
+        </View>}
 
         {Platform.OS === 'android' ? (
           <>
             <TouchableOpacity style={styles.allowedAppsButton} onPress={() => router.push('/focus/allowed-apps' as Parameters<typeof router.push>[0])} activeOpacity={0.85}>
               <MaterialIcons name="apps" size={18} color={colors.primary} />
-              <Text style={styles.allowedAppsButtonText}>{t('focus.allowedAppsTitle')}</Text>
+              <Text style={styles.allowedAppsButtonText}>{t('focus.allowedAppsOpen')}</Text>
               <MaterialIcons name="chevron-right" size={18} color={colors.primary} />
             </TouchableOpacity>
           </>
         ) : null}
+
+        {isOpenEnded ? <TouchableOpacity style={styles.finishButton} onPress={handleManualFinish} disabled={isProcessing} activeOpacity={0.85}><MaterialIcons name="check" size={18} color={colors.background} /><Text style={styles.finishButtonText}>{isProcessing ? t('focus.processing') : t('focus.finishFocus')}</Text></TouchableOpacity> : null}
 
         <Text style={styles.hint}>
           {tapCount > 0 ? t('focus.moreTaps', { value: 3 - tapCount }) : t('focus.tripleTapExit')}
@@ -575,24 +597,29 @@ export default function FocusActiveScreen() {
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  fullScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl },
-  subjectTag: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surface, borderRadius: Radius.full, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: colors.border, marginBottom: Spacing.xxl },
+  fullScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md },
+  subjectTag: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surface, borderRadius: Radius.full, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: colors.border, marginBottom: Spacing.lg },
   subjectDot: { width: 8, height: 8, borderRadius: 4 },
   subjectText: { fontSize: FontSize.sm, color: colors.textSecondary, fontWeight: FontWeight.medium },
-  timerSection: { alignItems: 'center', marginBottom: Spacing.xxl },
+  timerSection: { alignItems: 'center', marginBottom: Spacing.lg },
   timerLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.semiBold, color: colors.textTertiary, letterSpacing: 2, marginBottom: Spacing.sm, textTransform: 'uppercase' },
-  timerText: { fontSize: 96, fontWeight: FontWeight.extraBold, color: colors.textPrimary, letterSpacing: -2, includeFontPadding: false },
-  timerSub: { fontSize: FontSize.base, color: colors.textSecondary, marginTop: Spacing.sm },
+  timerText: { fontSize: 64, fontWeight: FontWeight.extraBold, color: colors.textPrimary, letterSpacing: -2, includeFontPadding: false },
+  elapsedTimerText: { fontSize: 52, color: colors.primary, letterSpacing: -1 },
+  timerSub: { fontSize: FontSize.sm, color: colors.textSecondary, marginTop: 4 },
   syncBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.md, paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.full, backgroundColor: colors.success + '18', borderWidth: 1, borderColor: colors.success + '44' },
   syncBadgeWarning: { backgroundColor: colors.warning + '18', borderColor: colors.warning + '44' },
   syncBadgeText: { fontSize: FontSize.xs, color: colors.success, fontWeight: FontWeight.semiBold },
-  progressContainer: { width: '100%', marginBottom: Spacing.md },
+  progressContainer: { width: '100%', marginBottom: Spacing.sm },
+  openEndedStatus: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, width: '100%', backgroundColor: colors.primary + '12', borderWidth: 1, borderColor: colors.primary + '35', borderRadius: Radius.md, padding: Spacing.sm, marginBottom: Spacing.sm },
+  openEndedStatusText: { flex: 1, color: colors.textSecondary, fontSize: FontSize.xs, lineHeight: 17 },
   progressTrack: { height: 6, backgroundColor: colors.surfaceVariant, borderRadius: Radius.full, overflow: 'hidden', marginBottom: 8 },
   progressFill: { height: '100%', backgroundColor: colors.primary, borderRadius: Radius.full },
   progressPct: { fontSize: FontSize.sm, color: colors.textTertiary, textAlign: 'center' },
   allowedAppsButton: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.sm, backgroundColor: colors.surface, borderRadius: Radius.full, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 8 },
   allowedAppsButtonText: { flex: 1, color: colors.textSecondary, fontSize: FontSize.sm, fontWeight: FontWeight.semiBold },
-  hint: { fontSize: FontSize.xs, color: colors.textTertiary, marginTop: Spacing.xl, textAlign: 'center' },
+  finishButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', backgroundColor: colors.primary, borderRadius: Radius.md, paddingVertical: 12, marginTop: Spacing.sm },
+  finishButtonText: { color: colors.background, fontSize: FontSize.sm, fontWeight: FontWeight.bold },
+  hint: { fontSize: FontSize.xs, color: colors.textTertiary, marginTop: Spacing.md, textAlign: 'center' },
   motivationStrip: { position: 'absolute', bottom: Spacing.xl, flexDirection: 'row', alignItems: 'center', gap: 6 },
   motivationText: { fontSize: FontSize.xs, color: colors.primary, fontWeight: FontWeight.medium, letterSpacing: 0.5 },
   exitOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.overlay, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },

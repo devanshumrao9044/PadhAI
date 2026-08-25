@@ -86,7 +86,7 @@ export type AppContextType = {
   last30Days: DailySummary[];
   last90Days: DailySummary[];
   activeSession: ActiveSession | null;
-  startSession: (plannedMins: number, subjectId: string | null, chapterId: string | null, isRecoverySession?: boolean, recoveryLostStreak?: number, studyGroupId?: string | null) => Promise<string>;
+  startSession: (plannedMins: number, subjectId: string | null, chapterId: string | null, isRecoverySession?: boolean, recoveryLostStreak?: number, studyGroupId?: string | null, openEnded?: boolean) => Promise<string>;
   checkpointActiveSession: (elapsedSeconds: number, clockAnomaly?: boolean) => Promise<void>;
   discardActiveSession: () => Promise<void>;
   completeSession: (sessionId: string, actualMins: number, actualSeconds?: number) => Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number; referralXpAwarded?: number; syncPending?: boolean; syncRejected?: boolean; syncError?: string; clockAnomaly?: boolean }) | null>;
@@ -913,8 +913,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteChapter = async (id: string) => {
-    const { error } = await supabase.from('chapters').update({ is_deleted: true }).eq('id', id);
+    const { data, error } = await supabase.rpc('soft_delete_chapter', { p_chapter_id: id });
     if (error) throw error;
+    if (data !== true) throw new Error('This chapter could not be deleted. It may already be deleted or no longer belong to this account.');
     deletedChapterIdsRef.current.add(id);
     const updatedChapters = chapters.filter(c => c.id !== id);
     const updatedTopics = topics.filter(topic => topic.chapterId !== id);
@@ -933,8 +934,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const bulkDeleteChapters = async (ids: string[]) => {
     if (!ids.length) return;
-    const { error } = await supabase.from('chapters').update({ is_deleted: true }).in('id', ids);
+    const { data, error } = await supabase.rpc('soft_delete_chapters', { p_chapter_ids: ids });
     if (error) throw error;
+    if (Number(data ?? 0) !== ids.length) throw new Error('Some chapters could not be deleted. Refresh the tracker and try again.');
     ids.forEach(id => deletedChapterIdsRef.current.add(id));
     const deletedChapterIds = new Set(ids);
     const updatedChapters = chapters.filter(c => !deletedChapterIds.has(c.id));
@@ -1001,12 +1003,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // ── Sessions ──────────────────────────────────────────────────────────────
-  const startSession = async (plannedMins: number, subjectId: string | null, chapterId: string | null, isRecoverySession?: boolean, recoveryLostStreak?: number, studyGroupId?: string | null): Promise<string> => {
+  const startSession = async (plannedMins: number, subjectId: string | null, chapterId: string | null, isRecoverySession?: boolean, recoveryLostStreak?: number, studyGroupId?: string | null, openEnded = false): Promise<string> => {
     const sessionId = uuidv4();
     const active: ActiveSession = {
       sessionId,
       startedAt: new Date().toISOString(),
       plannedMins,
+      openEnded,
       subjectId,
       chapterId,
       studyGroupId: studyGroupId ?? null,

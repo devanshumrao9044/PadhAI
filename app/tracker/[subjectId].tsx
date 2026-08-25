@@ -12,6 +12,7 @@ import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/
 import { useApp } from '@/hooks/useApp';
 import ChapterItem from '@/components/feature/ChapterItem';
 import type { Chapter } from '@/types/models';
+import { getSafeErrorMessage } from '@/features/core/services/safeError';
 
 export default function SubjectDetailScreen() {
   const { colors } = useTheme();
@@ -87,8 +88,12 @@ export default function SubjectDetailScreen() {
       await updateSubject(subject.id, { name: editSubjectName.trim() });
       setSubjectModalVisible(false);
     } catch (error: any) {
-      console.error("Subject Update Error", error);
-      alert("Failed to update subject: " + error.message);
+      console.error('Subject Update Error');
+      alert(getSafeErrorMessage(error, {
+        fallback: 'Failed to update subject. Please try again.',
+        network: 'Check your connection and try again.',
+        permission: 'You do not have permission to update this subject.',
+      }));
     } finally {
       setUpdatingSubject(false);
     }
@@ -100,8 +105,12 @@ export default function SubjectDetailScreen() {
       await deleteSubject(subject.id);
       router.back(); // Redirect back to tracker main screen
     } catch (error: any) {
-      console.error("Subject Delete Error", error);
-      alert("Failed to delete subject: " + error.message);
+      console.error('Subject Delete Error');
+      alert(getSafeErrorMessage(error, {
+        fallback: 'Failed to delete subject. Please try again.',
+        network: 'Check your connection and try again.',
+        permission: 'You do not have permission to delete this subject.',
+      }));
     }
   };
 
@@ -134,8 +143,12 @@ export default function SubjectDetailScreen() {
       }
       setModalVisible(false);
     } catch (error: any) {
-      console.error("Save Error", error);
-      alert("Failed to save: " + error.message);
+      console.error('Save Error');
+      alert(getSafeErrorMessage(error, {
+        fallback: 'Failed to save. Please try again.',
+        network: 'Check your connection and try again.',
+        permission: 'You do not have permission to edit this chapter.',
+      }));
     } finally {
       setSaving(false);
     }
@@ -167,8 +180,12 @@ export default function SubjectDetailScreen() {
       setSelectedIds([]);
       setIsSelectionMode(false);
     } catch (error: any) {
-      console.error("Bulk Delete Failed", error);
-      alert("Delete Failed: " + error.message);
+      console.error('Bulk Delete Failed');
+      alert(getSafeErrorMessage(error, {
+        fallback: 'Delete failed. Please try again.',
+        network: 'Check your connection and try again.',
+        permission: 'You do not have permission to delete these chapters.',
+      }));
     }
   };
 
@@ -176,8 +193,12 @@ export default function SubjectDetailScreen() {
     try {
       await deleteChapter(id);
     } catch (error: any) {
-      console.error("Delete Failed", error);
-      alert("Delete Failed: " + error.message);
+      console.error('Delete Failed');
+      alert(getSafeErrorMessage(error, {
+        fallback: 'Delete failed. Please try again.',
+        network: 'Check your connection and try again.',
+        permission: 'You do not have permission to delete this chapter.',
+      }));
     }
   };
 
@@ -340,6 +361,7 @@ export default function SubjectDetailScreen() {
                     onStatusChange={(status) => handleStatusChange(chapter.id, status)}
                     onPress={() => isSelectionMode ? toggleSelection(chapter.id) : router.push(`/tracker/chapters/${chapter.id}` as any)}
                     onDelete={() => handleSingleDelete(chapter.id)}
+                    onStartFocus={() => router.push({ pathname: '/(tabs)/focus', params: { subjectId: subject.id, chapterId: chapter.id } } as any)}
                   />
                 </View>
 

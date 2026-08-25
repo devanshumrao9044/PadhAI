@@ -26,9 +26,10 @@ interface ChapterItemProps {
   onStatusChange: (status: Chapter['status']) => void;
   onPress: () => void;
   onDelete: () => void;
+  onStartFocus: () => void;
 }
 
-export default function ChapterItem({ chapter, onStatusChange, onPress, onDelete }: ChapterItemProps) {
+export default function ChapterItem({ chapter, onStatusChange, onPress, onDelete, onStartFocus }: ChapterItemProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const statusColors = useMemo(() => ({
@@ -75,6 +76,13 @@ export default function ChapterItem({ chapter, onStatusChange, onPress, onDelete
         </View>
 
         <View style={styles.actions}>
+          <TouchableOpacity
+            onPress={onStartFocus}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Start focus"
+          >
+            <MaterialIcons name="play-arrow" size={20} color={colors.primary} />
+          </TouchableOpacity>
           <TouchableOpacity
             onPress={onDelete}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

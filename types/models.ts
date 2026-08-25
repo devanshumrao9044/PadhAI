@@ -111,6 +111,8 @@ export interface ActiveSession {
   sessionId: string;
   startedAt: string;
   plannedMins: number;
+  /** Manual-finish mode; server settlement still uses the bounded plannedMins. */
+  openEnded?: boolean;
   subjectId: string | null;
   chapterId: string | null;
   studyGroupId?: string | null;

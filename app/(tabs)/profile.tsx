@@ -439,16 +439,6 @@ export default function ProfileScreen() {
             <MaterialIcons name="chevron-right" size={18} color={colors.background} />
           </TouchableOpacity>
         </View>
-        <View style={styles.ticketHeroCard}>
-          <View style={[styles.notificationHeroIcon, styles.ticketHeroIcon]}><MaterialIcons name="support-agent" size={24} color={colors.primary} /></View>
-          <View style={styles.notificationHeroInfo}>
-            <Text style={styles.notificationHeroTitle}>{t('support.reviewMyTickets')}</Text>
-            <Text style={styles.notificationHeroText}>{t('support.reviewMyTicketsHint')}</Text>
-          </View>
-          <TouchableOpacity style={styles.notificationHeroButton} onPress={() => router.push('/review-tickets' as Parameters<typeof router.push>[0])} activeOpacity={0.8}>
-            <MaterialIcons name="chevron-right" size={20} color={colors.background} />
-          </TouchableOpacity>
-        </View>
         {adminRole ? (
           <TouchableOpacity style={styles.adminQuickLink} onPress={() => router.push('/admin/notifications' as Parameters<typeof router.push>[0])} activeOpacity={0.8}>
             <MaterialIcons name="campaign" size={20} color={colors.primary} />

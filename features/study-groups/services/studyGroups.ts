@@ -50,6 +50,7 @@ export interface StudyGroup {
   joinCode: string;
   memberCount: number;
   createdAt: string;
+  suspendedUntil: string | null;
   inviteToken?: string;
 }
 
@@ -154,6 +155,7 @@ function mapGroup(row: any): StudyGroup {
     joinCode: String(row.join_code ?? ''),
     memberCount: Number(row.member_count ?? 0),
     createdAt: String(row.created_at ?? new Date(0).toISOString()),
+    suspendedUntil: row.suspended_until ? String(row.suspended_until) : null,
     ...(row.invite_token ? { inviteToken: String(row.invite_token) } : {}),
   };
 }
@@ -266,7 +268,7 @@ export async function getMyStudyGroups(userId: string): Promise<{ group: StudyGr
   if (groupIds.length === 0) return [];
   const { data, error } = await supabase
     .from('study_groups')
-    .select('id,owner_id,name,description,rules,target_exam,daily_goal_minutes,max_members,visibility,icon_key,join_code,created_at')
+    .select('id,owner_id,name,description,rules,target_exam,daily_goal_minutes,max_members,visibility,icon_key,join_code,created_at,suspended_until')
     .in('id', groupIds)
     .limit(100);
   throwIfError(error);
@@ -283,7 +285,7 @@ export async function getMyStudyGroups(userId: string): Promise<{ group: StudyGr
 export async function getOwnerStudyGroups(): Promise<StudyGroup[]> {
   const { data, error } = await supabase
     .from('study_groups')
-    .select('id,owner_id,name,description,rules,target_exam,daily_goal_minutes,max_members,visibility,icon_key,join_code,created_at')
+    .select('id,owner_id,name,description,rules,target_exam,daily_goal_minutes,max_members,visibility,icon_key,join_code,created_at,suspended_until')
     .order('created_at', { ascending: false })
     .limit(100);
   throwIfError(error);
@@ -293,7 +295,7 @@ export async function getOwnerStudyGroups(): Promise<StudyGroup[]> {
 export async function getStudyGroup(groupId: string): Promise<StudyGroup | null> {
   const { data, error } = await supabase
     .from('study_groups')
-    .select('id,owner_id,name,description,rules,target_exam,daily_goal_minutes,max_members,visibility,icon_key,join_code,created_at')
+    .select('id,owner_id,name,description,rules,target_exam,daily_goal_minutes,max_members,visibility,icon_key,join_code,created_at,suspended_until')
     .eq('id', groupId)
     .maybeSingle();
   throwIfError(error);
@@ -435,6 +437,27 @@ export async function createStudyGroupInvite(groupId: string): Promise<string> {
 export async function archiveStudyGroup(groupId: string): Promise<void> {
   const { error } = await supabase.rpc('archive_study_group', { p_group_id: groupId });
   throwIfError(error);
+}
+
+export async function suspendStudyGroup(groupId: string, durationMinutes: number): Promise<void> {
+  const { data, error } = await supabase.rpc('suspend_study_group', {
+    p_group_id: groupId,
+    p_duration_minutes: durationMinutes,
+  });
+  throwIfError(error);
+  if (data !== true) throw new Error('You do not have permission to suspend this Study Group.');
+}
+
+export async function restoreStudyGroup(groupId: string): Promise<void> {
+  const { data, error } = await supabase.rpc('restore_study_group', { p_group_id: groupId });
+  throwIfError(error);
+  if (data !== true) throw new Error('You do not have permission to restore this Study Group.');
+}
+
+export async function deleteStudyGroupPermanently(groupId: string): Promise<void> {
+  const { data, error } = await supabase.rpc('delete_study_group_permanently', { p_group_id: groupId });
+  throwIfError(error);
+  if (data !== true) throw new Error('You do not have permission to delete this Study Group.');
 }
 
 export async function updateStudyGroupPresence(input: {
