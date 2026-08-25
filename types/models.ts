@@ -155,10 +155,6 @@ export interface CalendarEvent {
   createdAt: string;
 }
 
-export interface SubjectTimerState {
-  elapsedSeconds: number;
-  startedAt: number | null;
-}
 
 export interface NotificationSettings {
   enabled: boolean;

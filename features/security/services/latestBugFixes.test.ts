@@ -46,12 +46,18 @@ test('native installed-app decisions stay boolean and Tracker cannot start a dir
   const policy = read('modules/padhai-focus-guard/android/src/main/java/com/padhai/focusguard/FocusGuardAppPolicy.kt');
   const module = read('modules/padhai-focus-guard/android/src/main/java/com/padhai/focusguard/PadhAIFocusGuardModule.kt');
   const tracker = read('app/(tabs)/tracker.tsx');
+  const productivity = read('features/productivity/services/productivity.ts');
+  const models = read('types/models.ts');
+  const cacheCodec = read('features/core/services/cacheCodec.ts');
   assert.match(policy, /"allowed" to decision\.allowed/);
   assert.doesNotMatch(policy, /"allowed" to decision\.allowed\.toString\(\)/);
   assert.match(module, /getInstalledApps/);
   assert.doesNotMatch(tracker, /toggleSubjectTimer/);
   assert.doesNotMatch(tracker, /loadSubjectTimers/);
   assert.ok(tracker.includes("pathname: '/(tabs)/focus'"));
+  assert.doesNotMatch(productivity, /SubjectTimerState|loadSubjectTimers|saveSubjectTimers/);
+  assert.doesNotMatch(models, /SubjectTimerState/);
+  assert.doesNotMatch(cacheCodec, /subjectTimers/);
 });
 
 test('local ticket history is bounded and supports device-only hiding', () => {

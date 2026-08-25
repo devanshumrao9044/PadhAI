@@ -18,7 +18,6 @@ export type CacheKind =
   | 'leaderboard'
   | 'todo'
   | 'calendar'
-  | 'subjectTimers'
   | 'notificationSettings'
   | 'studyGroups'
   | 'supportTickets';
@@ -36,7 +35,6 @@ export const CACHE_TTL_MS: Record<CacheKind, number> = {
   leaderboard: 30 * 1000,
   todo: 60 * 1000,
   calendar: 60 * 1000,
-  subjectTimers: 5 * 1000,
   notificationSettings: 30 * 24 * 60 * 60 * 1000,
   studyGroups: 60 * 1000,
   supportTickets: 30 * 24 * 60 * 60 * 1000,
