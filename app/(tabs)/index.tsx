@@ -95,7 +95,19 @@ export default function Dashboard() {
     const channel = supabase
       .channel(`dashboard-${userId}-${channelIdRef.current}`)
       .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'users', filter: `id=eq.${userId}` },
+        scheduleReload,
+      )
+      .on('postgres_changes',
         { event: '*', schema: 'public', table: 'focus_sessions', filter: `user_id=eq.${userId}` },
+        scheduleReload,
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'daily_summary', filter: `user_id=eq.${userId}` },
+        scheduleReload,
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'xp_transactions', filter: `user_id=eq.${userId}` },
         scheduleReload,
       )
       .on('postgres_changes',

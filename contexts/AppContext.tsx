@@ -46,6 +46,10 @@ import {
   getWeekStart,
   type WeeklySettlementResult,
 } from '@/features/progression/services/weeklyXp';
+import {
+  applyAuthoritativeUserRow,
+  mapUser as mapAuthoritativeUser,
+} from '@/features/progression/services/authoritativeUserProfile';
 
 export type AppContextType = {
   comebackPending: boolean;
@@ -85,7 +89,7 @@ export type AppContextType = {
   startSession: (plannedMins: number, subjectId: string | null, chapterId: string | null, isRecoverySession?: boolean, recoveryLostStreak?: number, studyGroupId?: string | null) => Promise<string>;
   checkpointActiveSession: (elapsedSeconds: number, clockAnomaly?: boolean) => Promise<void>;
   discardActiveSession: () => Promise<void>;
-  completeSession: (sessionId: string, actualMins: number, actualSeconds?: number) => Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number; referralXpAwarded?: number; syncPending?: boolean; clockAnomaly?: boolean }) | null>;
+  completeSession: (sessionId: string, actualMins: number, actualSeconds?: number) => Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number; referralXpAwarded?: number; syncPending?: boolean; syncRejected?: boolean; syncError?: string; clockAnomaly?: boolean }) | null>;
   breakSession: (sessionId: string, actualMins: number) => Promise<FocusSession | null>;
   getDailySummary: (date: string) => DailySummary | null;
   getLast7Days: () => DailySummary[];
@@ -118,23 +122,6 @@ function daysAgoStr(daysAgo: number) {
 }
 
 // ── Data Mappers ──────────────────────────────────────────────────────────────
-const mapUser = (u: any): UserProfile => ({
-  id: u.id,
-  username: u.email?.split('@')[0] ?? 'student',
-  fullName: u.name ?? 'Student',
-  targetExam: u.target_exam ?? 'OTHER',
-  classLevel: u.class ?? 'SELF_STUDY',
-  dailyGoalMinutes: u.daily_goal_minutes ?? 120,
-  xpTotal: u.xp ?? 0,
-  levelRank: typeof u.level_rank === 'number' ? u.level_rank : undefined,
-  streakCurrent: u.streak ?? 0,
-  streakLongest: u.longest_streak ?? 0,
-  lastStudyDate: u.last_study_date ?? null,
-  createdAt: u.created_at ?? new Date().toISOString(),
-  avatarUrl: u.avatar_url ?? null,          
-  myReferralCode: u.my_referral_code ?? null, 
-  hasUnlockedReward: u.has_unlocked_reward ?? false, 
-});
 
 const mapSubject = (s: any): Subject => ({
   id: s.id,
@@ -257,6 +244,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isOnboarded, setIsOnboardedState] = useState(false);
   const [user, setUserState] = useState<UserProfile | null>(null);
+  const userStateRef = useRef<UserProfile | null>(null);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
@@ -570,7 +558,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (loadGeneration !== authGenerationRef.current) return;
         if (profileData) {
-          loadedProfile = mapUser({ ...profileData, email: authUser.email });
+          loadedProfile = mapAuthoritativeUser({ ...profileData, email: authUser.email });
           setUserState(loadedProfile);
           setIsOnboardedState(!!(profileData.name && profileData.name !== 'Student'));
           await setItem(StorageKeys.USER, loadedProfile);
@@ -729,6 +717,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         void reload({ force: true });
       } else if (event === 'SIGNED_OUT') {
         authGenerationRef.current += 1;
+        userStateRef.current = null;
         setUserState(null);
         setIsOnboardedState(false);
         setSubjects([]);
@@ -759,7 +748,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
       appStateSub.remove();
     };
   }, [load, reload]);
-
+  useEffect(() => {
+    userStateRef.current = user;
+  }, [user]);
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`profile-progress-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${user.id}` },
+        payload => {
+          const nextUser = applyAuthoritativeUserRow(payload.new, userStateRef.current);
+          if (!nextUser || nextUser.id !== user.id) return;
+          userStateRef.current = nextUser;
+          setUserState(nextUser);
+          setIsOnboardedState(Boolean(nextUser.fullName && nextUser.fullName !== 'Student'));
+          void setItem(StorageKeys.USER, nextUser);
+          void writeUserCache(nextUser.id, 'user', nextUser);
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
   useEffect(() => {
     if (!user?.id) return;
     return subscribeToOfflineFocusReconnect(user.id, results => {
@@ -782,6 +795,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ── setUser: local cache/state only. Server-controlled progression fields are
   // settled by authenticated RPCs and reloaded from Supabase. ────────────────
   const setUser = async (u: UserProfile) => {
+    userStateRef.current = u;
     setUserState(u);
     setIsOnboardedState(Boolean(u.fullName && u.fullName !== 'Student'));
     await setItem(StorageKeys.USER, u);

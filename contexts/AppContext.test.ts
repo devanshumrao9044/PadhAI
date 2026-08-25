@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { normalizeChapterAnalyticsRows } from '../features/analytics/services/chapterAnalytics.ts';
+import { applyAuthoritativeUserRow } from '../features/progression/services/authoritativeUserProfile.ts';
+import type { UserProfile } from '../types/models.ts';
 
 const rpcRow = (overrides: Record<string, unknown> = {}) => ({
   chapter_id: 'chapter-1',
@@ -88,4 +90,57 @@ test('AppContext chapter analytics hydration normalizes non-finite numeric value
   assert.equal(chapter.totalSessions, 0);
   assert.equal(chapter.totalMinutes, 0);
   assert.equal(chapter.xpEarned, 0);
+});
+
+const cachedProfile: UserProfile = {
+  id: 'user-1',
+  username: 'rahul',
+  fullName: 'Rahul',
+  targetExam: 'JEE',
+  classLevel: '12th',
+  dailyGoalMinutes: 120,
+  xpTotal: 4,
+  levelRank: 1,
+  streakCurrent: 1,
+  streakLongest: 3,
+  lastStudyDate: '2026-08-25',
+  createdAt: '2026-08-01T00:00:00.000Z',
+  avatarUrl: null,
+  myReferralCode: 'RAHUL1',
+  hasUnlockedReward: false,
+};
+
+test('authoritative users Realtime payload updates XP and streak without losing cached identity', () => {
+  const next = applyAuthoritativeUserRow({
+    id: 'user-1',
+    xp: 18,
+    streak: 2,
+    longest_streak: 3,
+    last_study_date: '2026-08-25',
+  }, cachedProfile);
+
+  assert.equal(next?.xpTotal, 18);
+  assert.equal(next?.streakCurrent, 2);
+  assert.equal(next?.username, 'rahul');
+  assert.equal(next?.fullName, 'Rahul');
+  assert.equal(next?.targetExam, 'JEE');
+});
+
+test('authoritative users Realtime reconciliation ignores incomplete and cross-account payloads', () => {
+  assert.equal(applyAuthoritativeUserRow({ id: 'user-1', streak: 5 }, cachedProfile), null);
+  assert.equal(applyAuthoritativeUserRow({ id: 'user-2', xp: 50, streak: 5 }, cachedProfile), null);
+});
+
+test('authoritative users Realtime payload can recover identity from the authenticated email', () => {
+  const next = applyAuthoritativeUserRow({
+    id: 'user-1',
+    xp: 8,
+    streak: 1,
+    name: 'Updated Rahul',
+  }, null, 'rahul@example.com');
+
+  assert.equal(next?.username, 'rahul');
+  assert.equal(next?.fullName, 'Updated Rahul');
+  assert.equal(next?.xpTotal, 8);
+  assert.equal(next?.streakCurrent, 1);
 });
