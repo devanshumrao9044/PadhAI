@@ -29,8 +29,8 @@ export default function FocusScreen() {
   const initialChapterId = typeof routeChapterId === 'string' ? routeChapterId : null;
   const studyGroupId = typeof routeStudyGroupId === 'string' ? routeStudyGroupId : null;
   const [selectedMins, setSelectedMins] = useState(25);
-  const [customMode, setCustomMode] = useState(false);
-  const [openEndedMode, setOpenEndedMode] = useState(false);
+  // One source of truth prevents Infinity and a numeric chip from being active together.
+  const [durationSelection, setDurationSelection] = useState<number>(25);
   const [customInput, setCustomInput] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(initialSubjectId);
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(initialChapterId);
@@ -44,25 +44,21 @@ export default function FocusScreen() {
 
 
   const handleDurationSelect = (d: number) => {
-    setOpenEndedMode(false);
+    setDurationSelection(d);
     if (autofocusTimerRef.current) {
       clearTimeout(autofocusTimerRef.current);
       autofocusTimerRef.current = null;
     }
     if (d === OPEN_ENDED_KEY) {
-      setOpenEndedMode(true);
-      setCustomMode(false);
       setCustomInput('');
       return;
     }
     if (d === CUSTOM_KEY) {
-      setCustomMode(true);
       autofocusTimerRef.current = setTimeout(() => {
         inputRef.current?.focus();
         autofocusTimerRef.current = null;
       }, 100);
     } else {
-      setCustomMode(false);
       setSelectedMins(d);
       setCustomInput('');
     }
@@ -77,6 +73,8 @@ export default function FocusScreen() {
     }
   };
 
+  const openEndedMode = durationSelection === OPEN_ENDED_KEY;
+  const customMode = durationSelection === CUSTOM_KEY;
   const effectiveMins = openEndedMode
     ? OPEN_ENDED_PLANNED_MINS
     : customMode
@@ -129,38 +127,38 @@ export default function FocusScreen() {
         <Text style={styles.sectionLabel}>{t('focus.durationChoose')}</Text>
         <View style={styles.durationGrid}>
           <Pressable
-            style={[styles.durationChip, openEndedMode ? styles.durationChipActive : null]}
+            style={[styles.durationChip, durationSelection === OPEN_ENDED_KEY ? styles.durationChipActive : null]}
             onPress={() => handleDurationSelect(OPEN_ENDED_KEY)}
             accessibilityLabel={t('focus.openEnded')}
           >
-            <MaterialIcons name="all-inclusive" size={21} color={openEndedMode ? colors.primary : colors.textTertiary} />
-            <Text style={[styles.durationLabel, openEndedMode ? styles.durationLabelActive : null]}>{t('focus.openEndedShort')}</Text>
+            <MaterialIcons name="all-inclusive" size={21} color={durationSelection === OPEN_ENDED_KEY ? colors.primary : colors.textTertiary} />
+            <Text style={[styles.durationLabel, durationSelection === OPEN_ENDED_KEY ? styles.durationLabelActive : null]}>{t('focus.openEndedShort')}</Text>
           </Pressable>
           {DURATIONS.map(d => (
             <Pressable
               key={d}
-              style={[styles.durationChip, !openEndedMode && !isCustomSelected && selectedMins === d ? styles.durationChipActive : null]}
+              style={[styles.durationChip, durationSelection === d ? styles.durationChipActive : null]}
               onPress={() => handleDurationSelect(d)}
             >
-              <Text style={[styles.durationMins, !openEndedMode && !isCustomSelected && selectedMins === d ? styles.durationMinsActive : null]}>
+              <Text style={[styles.durationMins, durationSelection === d ? styles.durationMinsActive : null]}>
                 {d}
               </Text>
-              <Text style={[styles.durationLabel, !openEndedMode && !isCustomSelected && selectedMins === d ? styles.durationLabelActive : null]}>
+              <Text style={[styles.durationLabel, durationSelection === d ? styles.durationLabelActive : null]}>
                 {t('focus.durationMin')}
               </Text>
             </Pressable>
           ))}
           {/* Custom chip */}
           <Pressable
-            style={[styles.durationChip, isCustomSelected ? styles.durationChipActive : null]}
+            style={[styles.durationChip, durationSelection === CUSTOM_KEY ? styles.durationChipActive : null]}
             onPress={() => handleDurationSelect(CUSTOM_KEY)}
           >
             <MaterialIcons
               name="edit"
               size={22}
-              color={isCustomSelected ? colors.primary : colors.textTertiary}
+              color={durationSelection === CUSTOM_KEY ? colors.primary : colors.textTertiary}
             />
-            <Text style={[styles.durationLabel, isCustomSelected ? styles.durationLabelActive : null]}>
+            <Text style={[styles.durationLabel, durationSelection === CUSTOM_KEY ? styles.durationLabelActive : null]}>
               {t('focus.custom')}
             </Text>
           </Pressable>

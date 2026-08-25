@@ -36,8 +36,9 @@ test('Infinity selection is exclusive and Allowed Apps carries full labels and i
   const focus = read('app/(tabs)/focus.tsx');
   const allowedApps = read('app/focus/allowed-apps.tsx');
   const policy = read('modules/padhai-focus-guard/android/src/main/java/com/padhai/focusguard/FocusGuardAppPolicy.kt');
-  assert.match(focus, /!openEndedMode && !isCustomSelected && selectedMins === d/);
-  assert.match(allowedApps, /<Image source=\{\{ uri: app\.iconBase64 \}\}/);
+  assert.match(focus, /durationSelection === d/);
+  assert.match(focus, /const openEndedMode = durationSelection === OPEN_ENDED_KEY/);
+  assert.match(allowedApps, /source=\{\{ uri: iconUri \}\}/);
   assert.doesNotMatch(allowedApps, /app\.label\}.*numberOfLines=\{1\}/);
   assert.match(policy, /"iconBase64" to encodeIcon/);
 });

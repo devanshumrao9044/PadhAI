@@ -35,6 +35,7 @@ export default function AllowedAppsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [launchFailedPackage, setLaunchFailedPackage] = useState<string | null>(null);
+  const [iconFailures, setIconFailures] = useState<Record<string, boolean>>({});
   const [search, setSearch] = useState('');
 
   const loadApps = useCallback((isRefresh = false) => {
@@ -163,17 +164,25 @@ export default function AllowedAppsScreen() {
           </View>
         ) : (
           <View style={styles.list}>
-            {filteredApps.map(app => (
+            {filteredApps.map(app => {
+              const appLabel = app.label.trim() || app.packageName;
+              const iconUri = app.iconBase64 && !iconFailures[app.packageName] ? app.iconBase64 : null;
+              return (
               <View key={app.packageName} style={styles.appRow}>
                 <View style={[styles.appIcon, !app.allowed && styles.appIconBlocked]}>
-                  {app.iconBase64 ? (
-                    <Image source={{ uri: app.iconBase64 }} style={styles.appIconImage} resizeMode="contain" />
+                  {iconUri ? (
+                    <Image
+                      source={{ uri: iconUri }}
+                      style={styles.appIconImage}
+                      resizeMode="contain"
+                      onError={() => setIconFailures(current => ({ ...current, [app.packageName]: true }))}
+                    />
                   ) : (
                     <MaterialIcons name={app.allowed ? 'menu-book' : 'block'} size={21} color={app.allowed ? colors.primary : colors.textTertiary} />
                   )}
                 </View>
                 <View style={styles.appCopy}>
-                  <Text style={styles.appName}>{app.label}</Text>
+                  <Text style={styles.appName}>{appLabel}</Text>
                   <View style={styles.metaLine}>
                     <Text style={[styles.categoryText, app.allowed ? styles.categoryAllowed : styles.categoryBlocked]}>Category: {app.category}</Text>
                     <Text style={styles.reasonText}>{app.allowed ? `${t('focus.allowedAppsVerifiedStatus')} · ${policyReasonLabel(app.reason)}` : `${t('focus.allowedAppsBlockedStatus')} · ${policyReasonLabel(app.reason)}`}</Text>
@@ -191,7 +200,8 @@ export default function AllowedAppsScreen() {
                   <View style={styles.blockedPill}><MaterialIcons name="lock" size={14} color={colors.danger} /><Text style={styles.blockedPillText}>{t('focus.allowedAppsBlocked')}</Text></View>
                 )}
               </View>
-            ))}
+              );
+            })}
           </View>
         )}
       </ScrollView>
@@ -220,7 +230,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   countText: { minWidth: 28, textAlign: 'center', color: colors.primary, fontSize: FontSize.sm, fontWeight: FontWeight.bold, backgroundColor: colors.primary + '18', borderRadius: Radius.full, paddingVertical: 5, paddingHorizontal: 9 },
   list: { gap: 10 },
   appRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md, borderRadius: Radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-  appIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center' },
+  appIcon: { width: 42, height: 42, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center' },
   appIconBlocked: { backgroundColor: colors.surfaceVariant },
   appIconImage: { width: 42, height: 42, borderRadius: 14 },
   appCopy: { flex: 1, minWidth: 0 },
