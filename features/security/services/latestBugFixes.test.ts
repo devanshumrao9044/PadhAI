@@ -104,6 +104,22 @@ test('critical mutation screens use immediate action locks', () => {
   assert.match(adminNotifications, /sendActionRef/);
 });
 
+test('Google auth uses the padhai deep link and protects the OAuth callback flow', () => {
+  const provider = read('auth/AuthSessionProvider.tsx');
+  const screen = read('auth/AuthScreen.tsx');
+  const appConfig = read('app.json');
+  assert.match(provider, /signInWithOAuth/);
+  assert.match(provider, /provider: 'google'/);
+  assert.match(provider, /redirectTo: GOOGLE_REDIRECT_URI/);
+  assert.match(provider, /skipBrowserRedirect: true/);
+  assert.match(provider, /QueryParams\.getQueryParams/);
+  assert.match(provider, /supabase\.auth\.setSession/);
+  assert.match(provider, /googleSignInInFlightRef/);
+  assert.match(screen, /testID="google-auth"/);
+  assert.match(screen, /signInWithGooglePress/);
+  assert.match(appConfig, /"scheme": "padhai"/);
+});
+
 test('open-ended focus is manually finished but still bounded for server verification', () => {
   const focus = read('app/(tabs)/focus.tsx');
   const active = read('app/focus/active.tsx');

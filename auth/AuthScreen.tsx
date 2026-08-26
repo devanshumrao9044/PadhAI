@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -16,6 +16,8 @@ import { useAuthSession } from './AuthSessionProvider';
 import { getPasswordProviderError, validatePassword } from './passwordPolicy';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ThemeColors } from '@/constants/theme';
+import { getSafeErrorMessage } from '@/features/core/services/safeError';
+import { createSingleActionLock } from '@/features/core/services/singleAction';
 
 type Mode = 'login' | 'signup' | 'forgot';
 type FieldName = 'name' | 'email' | 'referralCode' | 'password';
@@ -25,7 +27,7 @@ export default function AuthScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { signIn, signUp, resendSignupConfirmation, sendPasswordReset } = useAuthSession();
+  const { signIn, signInWithGoogle, signUp, resendSignupConfirmation, sendPasswordReset } = useAuthSession();
   const [mode, setMode] = useState<Mode>('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -36,6 +38,7 @@ export default function AuthScreen() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [message, setMessage] = useState<string | null>(null);
   const [verificationEmail, setVerificationEmail] = useState<string | null>(null);
+  const googleActionRef = useRef(createSingleActionLock());
 
   const clearFeedback = () => {
     setFieldErrors({});
@@ -114,7 +117,12 @@ export default function AuthScreen() {
       } else if (mode === 'forgot' && normalizedError.includes('email address') && normalizedError.includes('invalid')) {
         setFieldErrors({ email: 'We could not send a reset link to this address. Please check the email and try again.' });
       } else {
-        setMessage(errorMessage);
+        setMessage(getSafeErrorMessage(submitError, {
+          fallback: 'Something went wrong. Please try again.',
+          network: 'Check your connection and try again.',
+          permission: 'You do not have permission to complete this action.',
+          rateLimit: 'Too many requests. Please wait a moment and try again.',
+        }));
       }
     } finally {
       setBusy(false);
@@ -134,6 +142,24 @@ export default function AuthScreen() {
         : 'We could not resend the verification email. Please try again later.');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const signInWithGooglePress = async () => {
+    if (busy || !googleActionRef.current.acquire()) return;
+    clearFeedback();
+    setBusy(true);
+    try {
+      await signInWithGoogle();
+    } catch (googleError) {
+      setMessage(getSafeErrorMessage(googleError, {
+        fallback: 'Google sign-in failed. Please try again or use email and password.',
+        network: 'Check your connection and try again.',
+        permission: 'Google sign-in was not completed.',
+      }));
+    } finally {
+      setBusy(false);
+      googleActionRef.current.release();
     }
   };
 
@@ -195,7 +221,24 @@ export default function AuthScreen() {
             </Pressable>
           </View>
 
-          {mode !== 'forgot' ? <Text style={styles.comingSoonText}>Google signup — Coming Soon</Text> : null}
+          {mode !== 'forgot' ? (
+            <>
+              <View style={styles.orRow}>
+                <View style={styles.orLine} />
+                <Text style={styles.orText}>OR</Text>
+                <View style={styles.orLine} />
+              </View>
+              <Pressable
+                testID="google-auth"
+                onPress={signInWithGooglePress}
+                disabled={busy}
+                style={({ pressed }) => [styles.googleButton, busy && styles.disabled, pressed && !busy && styles.pressed]}
+              >
+                {busy ? <ActivityIndicator color={colors.textPrimary} /> : <Text style={styles.googleMark}>G</Text>}
+                <Text style={styles.googleText}>{busy ? 'Connecting to Google…' : 'Continue with Google'}</Text>
+              </Pressable>
+            </>
+          ) : null}
           {mode === 'login' ? <Pressable onPress={() => { clearFeedback(); setMode('forgot'); }} style={styles.secondaryAction}><Text style={styles.secondaryText}>Forgot password?</Text></Pressable> : null}
           <Pressable onPress={() => { clearFeedback(); setMode(mode === 'login' ? 'signup' : 'login'); }} style={styles.secondaryAction}>
             <Text style={styles.secondaryText}>{mode === 'login' ? 'Create a new account' : 'Back to sign in'}</Text>
@@ -230,6 +273,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   disabled: { opacity: 0.6 },
   primaryText: { color: colors.background, fontSize: 16, fontWeight: '800' },
   comingSoonText: { color: colors.textTertiary, fontSize: 12, textAlign: 'center', marginTop: 16 },
+  orRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18, marginBottom: 8 },
+  orLine: { flex: 1, height: 1, backgroundColor: colors.border },
+  orText: { color: colors.textTertiary, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+  googleButton: { minHeight: 50, borderRadius: 14, backgroundColor: colors.background, borderColor: colors.borderStrong, borderWidth: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 10 },
+  googleMark: { color: '#4285F4', fontSize: 21, fontWeight: '900' },
+  googleText: { color: colors.textPrimary, fontSize: 15, fontWeight: '800' },
   secondaryAction: { alignItems: 'center', paddingVertical: 11 },
   secondaryText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
   policyAction: { alignItems: 'center', paddingVertical: 12, marginTop: 4 },

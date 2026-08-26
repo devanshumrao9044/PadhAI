@@ -1,12 +1,39 @@
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
+import * as Linking from 'expo-linking';
+import { makeRedirectUri } from 'expo-auth-session';
+import * as QueryParams from 'expo-auth-session/build/QueryParams';
+import * as WebBrowser from 'expo-web-browser';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/features/core/services/supabase';
+
+WebBrowser.maybeCompleteAuthSession();
+
+export const GOOGLE_REDIRECT_URI = makeRedirectUri({ scheme: 'padhai', path: 'auth/callback' });
+
+async function createSessionFromOAuthUrl(url: string): Promise<Session | null> {
+  const { params, errorCode } = QueryParams.getQueryParams(url);
+  if (errorCode) throw new Error(`Google sign-in failed: ${errorCode}`);
+  if (params.error_description || params.error) {
+    throw new Error(params.error_description || params.error);
+  }
+  if (!params.access_token) return null;
+  if (!params.refresh_token) throw new Error('Google sign-in returned an incomplete session. Please try again.');
+
+  const { data, error } = await supabase.auth.setSession({
+    access_token: params.access_token,
+    refresh_token: params.refresh_token,
+  });
+  if (error) throw error;
+  return data.session;
+}
 
 type AuthContextValue = {
   session: Session | null;
   ready: boolean;
   signingOut: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signUp: (name: string, email: string, password: string, referralCode?: string) => Promise<{ requiresEmailConfirmation: boolean; email: string }>;
   resendSignupConfirmation: (email: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
@@ -20,6 +47,9 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const authEventVersion = useRef(0);
+  const googleSignInInFlightRef = useRef(false);
+  const oauthCallbackInFlightRef = useRef<string | null>(null);
+  const handledOAuthCallbackRef = useRef<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -61,6 +91,72 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       throw new Error('Please verify your email address before signing in.');
     }
   }, []);
+
+  const handleOAuthCallback = useCallback(async (url: string): Promise<Session | null> => {
+    if (!url.includes('auth/callback')) return null;
+    if (handledOAuthCallbackRef.current === url || oauthCallbackInFlightRef.current) return null;
+    oauthCallbackInFlightRef.current = url;
+    try {
+      const session = await createSessionFromOAuthUrl(url);
+      handledOAuthCallbackRef.current = url;
+      return session;
+    } finally {
+      oauthCallbackInFlightRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const receiveOAuthUrl = (url: string) => {
+      if (mounted) void handleOAuthCallback(url).catch(() => undefined);
+    };
+    void Linking.getInitialURL().then(url => {
+      if (url) receiveOAuthUrl(url);
+    });
+    const subscription = Linking.addEventListener('url', ({ url }) => receiveOAuthUrl(url));
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, [handleOAuthCallback]);
+
+  const signInWithGoogle = useCallback(async () => {
+    if (googleSignInInFlightRef.current) return;
+    googleSignInInFlightRef.current = true;
+    try {
+      if (Platform.OS === 'web') {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { queryParams: { access_type: 'offline', prompt: 'select_account' } },
+        });
+        if (error) throw error;
+        return;
+      }
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: GOOGLE_REDIRECT_URI,
+          skipBrowserRedirect: true,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'select_account',
+          },
+        },
+      });
+      if (error) throw error;
+      if (!data.url) throw new Error('Google sign-in is not configured yet.');
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, GOOGLE_REDIRECT_URI);
+      if (result.type !== 'success') {
+        throw new Error(result.type === 'cancel' ? 'Google sign-in was cancelled.' : 'Google sign-in was dismissed.');
+      }
+      const session = await handleOAuthCallback(result.url);
+      if (!session) throw new Error('Google sign-in did not return a session. Please try again.');
+    } finally {
+      googleSignInInFlightRef.current = false;
+    }
+  }, [handleOAuthCallback]);
 
   const signUp = useCallback(async (
     name: string,
@@ -126,6 +222,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       ready,
       signingOut,
       signIn,
+      signInWithGoogle,
       signUp,
       resendSignupConfirmation,
       sendPasswordReset,
