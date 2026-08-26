@@ -112,12 +112,22 @@ test('Google auth uses the padhai deep link and protects the OAuth callback flow
   assert.match(provider, /provider: 'google'/);
   assert.match(provider, /redirectTo: GOOGLE_REDIRECT_URI/);
   assert.match(provider, /skipBrowserRedirect: true/);
-  assert.match(provider, /QueryParams\.getQueryParams/);
+  assert.match(provider, /function parseOAuthParams/);
   assert.match(provider, /supabase\.auth\.setSession/);
   assert.match(provider, /googleSignInInFlightRef/);
   assert.match(screen, /testID="google-auth"/);
   assert.match(screen, /signInWithGooglePress/);
   assert.match(appConfig, /"scheme": "padhai"/);
+});
+
+test('autocut stability build uses legacy architecture and avoids AuthSession startup imports', () => {
+  const appConfig = read('app.json');
+  const packageJson = read('package.json');
+  const provider = read('auth/AuthSessionProvider.tsx');
+  assert.match(appConfig, /"newArchEnabled": false/);
+  assert.doesNotMatch(packageJson, /"expo-auth-session"/);
+  assert.doesNotMatch(provider, /expo-auth-session/);
+  assert.match(provider, /require\('expo-web-browser'\)/);
 });
 
 test('new Auth users receive a Google-aware public profile from the existing secure trigger', () => {

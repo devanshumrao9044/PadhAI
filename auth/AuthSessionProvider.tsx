@@ -1,19 +1,30 @@
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
-import { makeRedirectUri } from 'expo-auth-session';
-import * as QueryParams from 'expo-auth-session/build/QueryParams';
-import * as WebBrowser from 'expo-web-browser';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/features/core/services/supabase';
 
-WebBrowser.maybeCompleteAuthSession();
+export const GOOGLE_REDIRECT_URI = 'padhai://auth/callback';
 
-export const GOOGLE_REDIRECT_URI = makeRedirectUri({ scheme: 'padhai', path: 'auth/callback' });
+function parseOAuthParams(url: string): Record<string, string> {
+  const query = url.includes('?') ? url.slice(url.indexOf('?') + 1).split('#')[0] : '';
+  const hash = url.includes('#') ? url.slice(url.indexOf('#') + 1) : '';
+  return `${query}&${hash}`.split('&').reduce<Record<string, string>>((params, pair) => {
+    if (!pair) return params;
+    const separator = pair.indexOf('=');
+    const rawKey = separator >= 0 ? pair.slice(0, separator) : pair;
+    const rawValue = separator >= 0 ? pair.slice(separator + 1) : '';
+    try {
+      params[decodeURIComponent(rawKey.replace(/\+/g, ' '))] = decodeURIComponent(rawValue.replace(/\+/g, ' '));
+    } catch {
+      // Ignore malformed callback fragments and let the missing-token check report a safe error.
+    }
+    return params;
+  }, {});
+}
 
 async function createSessionFromOAuthUrl(url: string): Promise<Session | null> {
-  const { params, errorCode } = QueryParams.getQueryParams(url);
-  if (errorCode) throw new Error(`Google sign-in failed: ${errorCode}`);
+  const params = parseOAuthParams(url);
   if (params.error_description || params.error) {
     throw new Error(params.error_description || params.error);
   }
@@ -147,6 +158,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
       if (!data.url) throw new Error('Google sign-in is not configured yet.');
 
+      const WebBrowser = require('expo-web-browser') as typeof import('expo-web-browser');
       const result = await WebBrowser.openAuthSessionAsync(data.url, GOOGLE_REDIRECT_URI);
       if (result.type !== 'success') {
         throw new Error(result.type === 'cancel' ? 'Google sign-in was cancelled.' : 'Google sign-in was dismissed.');
