@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -27,6 +27,8 @@ import {
   type AdminNotificationTarget,
   type NotificationRecipient,
 } from '@/features/notifications/services/adminNotifications';
+import { getSafeErrorMessage } from '@/features/core/services/safeError';
+import { createSingleActionLock } from '@/features/core/services/singleAction';
 import {
   prepareNotificationImage,
   prepareNotificationPdf,
@@ -52,6 +54,9 @@ export default function AdminNotificationsScreen() {
   const [sending, setSending] = useState(false);
   const [attachmentBusy, setAttachmentBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const attachmentActionRef = useRef(createSingleActionLock());
+  const confirmationActionRef = useRef(createSingleActionLock());
+  const sendActionRef = useRef(createSingleActionLock());
 
   useEffect(() => {
     if (!user?.id) return;
@@ -77,6 +82,8 @@ export default function AdminNotificationsScreen() {
   const selectedUser = recipients.find(item => item.id === selectedUserId) ?? null;
 
   const pickImage = async () => {
+    if (!attachmentActionRef.current.acquire()) return;
+    try {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (permission.status !== 'granted') {
       Alert.alert(t('notifications.adminTitle'), t('notifications.mediaPermissionDenied'));
@@ -93,13 +100,23 @@ export default function AdminNotificationsScreen() {
     try {
       setAttachment(await prepareNotificationImage(result.assets[0]));
     } catch (error: any) {
-      Alert.alert(t('notifications.adminTitle'), error?.message ?? t('notifications.attachmentFailed'));
+      Alert.alert(t('notifications.adminTitle'), getSafeErrorMessage(error, {
+        fallback: t('notifications.attachmentFailed'),
+        network: t('common.networkError'),
+        permission: t('common.permissionError'),
+        rateLimit: t('common.rateLimitError'),
+      }));
     } finally {
       setAttachmentBusy(false);
+    }
+    } finally {
+      attachmentActionRef.current.release();
     }
   };
 
   const pickPdf = async () => {
+    if (!attachmentActionRef.current.acquire()) return;
+    try {
     const result = await getDocumentAsync({
       type: 'application/pdf',
       copyToCacheDirectory: true,
@@ -110,19 +127,29 @@ export default function AdminNotificationsScreen() {
     try {
       setAttachment(await prepareNotificationPdf(result.assets[0]));
     } catch (error: any) {
-      Alert.alert(t('notifications.adminTitle'), error?.message ?? t('notifications.attachmentFailed'));
+      Alert.alert(t('notifications.adminTitle'), getSafeErrorMessage(error, {
+        fallback: t('notifications.attachmentFailed'),
+        network: t('common.networkError'),
+        permission: t('common.permissionError'),
+        rateLimit: t('common.rateLimitError'),
+      }));
     } finally {
       setAttachmentBusy(false);
+    }
+    } finally {
+      attachmentActionRef.current.release();
     }
   };
 
   const submit = () => {
+    if (!confirmationActionRef.current.acquire()) return;
     const cleanTitle = title.trim();
     const cleanBody = body.trim();
     const cleanLink = linkUrl.trim();
     const validTarget = targetType === 'all' || (targetType === 'level' && selectedLevel >= 1) || (targetType === 'user' && selectedUserId);
     if (!cleanTitle || !cleanBody || !validTarget) {
       Alert.alert(t('notifications.adminTitle'), t('notifications.invalidForm'));
+      confirmationActionRef.current.release();
       return;
     }
     if (cleanLink) {
@@ -131,6 +158,7 @@ export default function AdminNotificationsScreen() {
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('invalid');
       } catch {
         Alert.alert(t('notifications.adminTitle'), t('notifications.invalidLink'));
+        confirmationActionRef.current.release();
         return;
       }
     }
@@ -138,14 +166,19 @@ export default function AdminNotificationsScreen() {
       t('notifications.sendConfirmationTitle'),
       t('notifications.sendConfirmationMessage'),
       [
-        { text: t('notifications.cancel'), style: 'cancel' },
-        { text: t('notifications.send'), style: 'default', onPress: () => { void send(); } },
+        { text: t('notifications.cancel'), style: 'cancel', onPress: () => confirmationActionRef.current.release() },
+        { text: t('notifications.send'), style: 'default', onPress: () => { confirmationActionRef.current.release(); void send(); } },
       ],
+      { cancelable: true, onDismiss: () => confirmationActionRef.current.release() },
     );
   };
 
   const send = async () => {
-    if (!user?.id) return;
+    if (!sendActionRef.current.acquire()) return;
+    if (!user?.id) {
+      sendActionRef.current.release();
+      return;
+    }
     setSending(true);
     setResult(null);
     let uploadedPath: string | null = null;
@@ -174,9 +207,15 @@ export default function AdminNotificationsScreen() {
       if (uploadedPath) {
         try { await deleteNotificationAttachment(uploadedPath); } catch { /* best-effort cleanup */ }
       }
-      Alert.alert(t('notifications.adminTitle'), error?.message ?? t('notifications.sendFailed'));
+      Alert.alert(t('notifications.adminTitle'), getSafeErrorMessage(error, {
+        fallback: t('notifications.sendFailed'),
+        network: t('common.networkError'),
+        permission: t('common.permissionError'),
+        rateLimit: t('common.rateLimitError'),
+      }));
     } finally {
       setSending(false);
+      sendActionRef.current.release();
     }
   };
 

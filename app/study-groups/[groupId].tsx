@@ -42,6 +42,7 @@ import {
 } from '@/features/study-groups/services/studyGroups';
 import StudyGroupReportSheet from '@/components/study-groups/StudyGroupReportSheet';
 import { getSafeErrorMessage } from '@/features/core/services/safeError';
+import { createSingleActionLock } from '@/features/core/services/singleAction';
 
 function iconName(iconKey: string): string {
   return STUDY_GROUP_ICON_OPTIONS.find(option => option.key === iconKey)?.icon ?? 'menu-book';
@@ -91,6 +92,7 @@ export default function StudyGroupDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const groupMutationRef = useRef(createSingleActionLock());
   const [reportOpen, setReportOpen] = useState(false);
   const [manageTarget, setManageTarget] = useState<StudyGroupMember | null>(null);
   const [permissionDraft, setPermissionDraft] = useState<StudyGroupPermissions>(DEFAULT_STUDY_GROUP_PERMISSIONS);
@@ -228,7 +230,7 @@ export default function StudyGroupDetailScreen() {
   };
 
   const saveMemberPermissions = async () => {
-    if (!requireActiveGroup() || !manageTarget) return;
+    if (!requireActiveGroup() || !manageTarget || !groupMutationRef.current.acquire()) return;
     setManaging(true);
     try {
       await updateStudyGroupMemberRole({ membershipId: manageTarget.membershipId, role: 'admin', permissions: permissionDraft });
@@ -243,11 +245,12 @@ export default function StudyGroupDetailScreen() {
       }));
     } finally {
       setManaging(false);
+      groupMutationRef.current.release();
     }
   };
 
   const demoteMember = async () => {
-    if (!requireActiveGroup() || !manageTarget) return;
+    if (!requireActiveGroup() || !manageTarget || !groupMutationRef.current.acquire()) return;
     setManaging(true);
     try {
       await updateStudyGroupMemberRole({ membershipId: manageTarget.membershipId, role: 'member', permissions: DEFAULT_STUDY_GROUP_PERMISSIONS });
@@ -262,11 +265,12 @@ export default function StudyGroupDetailScreen() {
       }));
     } finally {
       setManaging(false);
+      groupMutationRef.current.release();
     }
   };
 
   const removeMember = async () => {
-    if (!requireActiveGroup() || !manageTarget) return;
+    if (!requireActiveGroup() || !manageTarget || !groupMutationRef.current.acquire()) return;
     setManaging(true);
     try {
       await removeStudyGroupMember(manageTarget.membershipId);
@@ -281,11 +285,12 @@ export default function StudyGroupDetailScreen() {
       }));
     } finally {
       setManaging(false);
+      groupMutationRef.current.release();
     }
   };
 
   const joinPublicGroup = async () => {
-    if (!requireActiveGroup() || !groupId) return;
+    if (!requireActiveGroup() || !groupId || !groupMutationRef.current.acquire()) return;
     setJoining(true);
     try {
       await joinStudyGroup(groupId);
@@ -299,6 +304,7 @@ export default function StudyGroupDetailScreen() {
       }));
     } finally {
       setJoining(false);
+      groupMutationRef.current.release();
     }
   };
 
@@ -314,7 +320,7 @@ export default function StudyGroupDetailScreen() {
   };
 
   const saveGroupDetails = async () => {
-    if (!requireActiveGroup() || !group) return;
+    if (!requireActiveGroup() || !group || !groupMutationRef.current.acquire()) return;
     setSavingGroup(true);
     setError('');
     try {
@@ -338,11 +344,12 @@ export default function StudyGroupDetailScreen() {
       }));
     } finally {
       setSavingGroup(false);
+      groupMutationRef.current.release();
     }
   };
 
   const chooseIcon = async (iconKey: string) => {
-    if (!requireActiveGroup() || !groupId) return;
+    if (!requireActiveGroup() || !groupId || !groupMutationRef.current.acquire()) return;
     try {
       await updateStudyGroupIcon(groupId, iconKey);
       setShowIconPicker(false);
@@ -353,11 +360,13 @@ export default function StudyGroupDetailScreen() {
         network: 'Check your connection and try again.',
         permission: 'You do not have permission to update your icon.',
       }));
+    } finally {
+      groupMutationRef.current.release();
     }
   };
 
   const handleSuspend = async (durationMinutes: number) => {
-    if (!group || lifecycleBusy) return;
+    if (!group || lifecycleBusy || !groupMutationRef.current.acquire()) return;
     setLifecycleBusy(true);
     setError('');
     try {
@@ -373,11 +382,12 @@ export default function StudyGroupDetailScreen() {
       }));
     } finally {
       setLifecycleBusy(false);
+      groupMutationRef.current.release();
     }
   };
 
   const handleRestore = async () => {
-    if (!group || lifecycleBusy) return;
+    if (!group || lifecycleBusy || !groupMutationRef.current.acquire()) return;
     setLifecycleBusy(true);
     setError('');
     try {
@@ -392,15 +402,15 @@ export default function StudyGroupDetailScreen() {
       }));
     } finally {
       setLifecycleBusy(false);
+      groupMutationRef.current.release();
     }
   };
 
   const handlePermanentDelete = () => {
-    if (!group || lifecycleBusy) return;
+    if (!group || lifecycleBusy || !groupMutationRef.current.acquire()) return;
     Alert.alert(t('groups.deleteGroupConfirm'), t('groups.deleteGroupConfirmBody'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('groups.deleteGroupPermanently'),
+            { text: t('common.cancel'), style: 'cancel', onPress: () => groupMutationRef.current.release() },
+      { text: t('groups.deleteGroupPermanently'),
         style: 'destructive',
         onPress: () => {
           void (async () => {
@@ -417,11 +427,12 @@ export default function StudyGroupDetailScreen() {
               }));
             } finally {
               setLifecycleBusy(false);
+              groupMutationRef.current.release();
             }
           })();
         },
       },
-    ]);
+    ], { cancelable: true, onDismiss: () => groupMutationRef.current.release() });
   };
 
   const getInviteLink = () => inviteToken ? `PadhAI://study-groups/join?token=${encodeURIComponent(inviteToken)}` : '';
@@ -439,7 +450,7 @@ export default function StudyGroupDetailScreen() {
   };
 
   const regenerateInvite = async () => {
-    if (!requireActiveGroup() || !groupId) return;
+    if (!requireActiveGroup() || !groupId || !groupMutationRef.current.acquire()) return;
     try {
       const nextToken = await createStudyGroupInvite(groupId);
       setInviteToken(nextToken);
@@ -451,6 +462,8 @@ export default function StudyGroupDetailScreen() {
         permission: 'You do not have permission to create invites.',
         rateLimit: 'Too many requests. Please wait and try again.',
       }));
+    } finally {
+      groupMutationRef.current.release();
     }
   };
 
@@ -459,8 +472,9 @@ export default function StudyGroupDetailScreen() {
       setError(t('groups.leaveOwner'));
       return;
     }
+    if (!groupMutationRef.current.acquire()) return;
     Alert.alert(t('groups.leaveGroup'), t('groups.leaveConfirm'), [
-      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.cancel'), style: 'cancel', onPress: () => groupMutationRef.current.release() },
       { text: t('groups.leaveGroup'), style: 'destructive', onPress: async () => {
         try {
           await leaveStudyGroup(groupId);
@@ -471,9 +485,11 @@ export default function StudyGroupDetailScreen() {
             network: 'Check your connection and try again.',
             permission: 'You do not have permission to leave this group.',
           }));
+        } finally {
+          groupMutationRef.current.release();
         }
       } },
-    ]);
+    ], { cancelable: true, onDismiss: () => groupMutationRef.current.release() });
   };
 
   const renderMember = (member: StudyGroupMember) => {

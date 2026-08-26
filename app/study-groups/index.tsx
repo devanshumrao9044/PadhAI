@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -20,6 +20,7 @@ import {
 } from '@/features/study-groups/services/studyGroups';
 import StudyGroupReportSheet from '@/components/study-groups/StudyGroupReportSheet';
 import { getSafeErrorMessage } from '@/features/core/services/safeError';
+import { createSingleActionLock } from '@/features/core/services/singleAction';
 
 type MyGroupEntry = { group: StudyGroup; membership: StudyGroupMembership };
 type ListItem = { kind: 'mine' | 'search'; entry: MyGroupEntry | StudyGroup };
@@ -43,6 +44,8 @@ export default function StudyGroupsScreen() {
   const [error, setError] = useState('');
   const [reportGroup, setReportGroup] = useState<StudyGroup | null>(null);
   const [reportNotice, setReportNotice] = useState('');
+  const searchActionRef = useRef(createSingleActionLock());
+  const groupActionRef = useRef(createSingleActionLock());
 
   const loadGroups = useCallback(async (force = false) => {
     if (!user?.id) return;
@@ -75,6 +78,7 @@ export default function StudyGroupsScreen() {
   }, [loadGroups]));
 
   const handleSearch = async () => {
+    if (!searchActionRef.current.acquire()) return;
     setSearching(true);
     setError('');
     try {
@@ -88,12 +92,14 @@ export default function StudyGroupsScreen() {
       }));
     } finally {
       setSearching(false);
+      searchActionRef.current.release();
     }
   };
 
   const leaveFromMenu = (group: StudyGroup) => {
+    if (!groupActionRef.current.acquire()) return;
     Alert.alert(t('groups.leaveGroup'), t('groups.leaveConfirm'), [
-      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.cancel'), style: 'cancel', onPress: () => groupActionRef.current.release() },
       { text: t('groups.leaveGroup'), style: 'destructive', onPress: () => {
         void leaveStudyGroup(group.id).then(() => loadGroups(true)).catch(leaveError => {
           setError(getSafeErrorMessage(leaveError, {
@@ -101,9 +107,9 @@ export default function StudyGroupsScreen() {
             network: 'Check your connection and try again.',
             permission: 'You do not have permission to leave this group.',
           }));
-        });
+        }).finally(() => groupActionRef.current.release());
       } },
-    ]);
+    ], { cancelable: true, onDismiss: () => groupActionRef.current.release() });
   };
 
   const openGroupMenu = (group: StudyGroup, membership: StudyGroupMembership | null) => {

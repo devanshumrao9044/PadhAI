@@ -266,6 +266,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const loadInFlightRef = useRef<Promise<void> | null>(null);
   const lastLoadAtRef = useRef<{ userId: string | null; at: number } | null>(null);
   const currentUserIdRef = useRef<string | null>(null);
+  const startSessionInFlightRef = useRef(false);
+  const completeSessionInFlightRef = useRef(false);
+  const breakSessionInFlightRef = useRef(false);
 
   const addToSyncQueue = async (task: Omit<SyncTask, 'id'>) => {
     const existingQueue = (await getItem<SyncTask[]>(OFFLINE_QUEUE_KEY)) || [];
@@ -1004,7 +1007,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // ── Sessions ──────────────────────────────────────────────────────────────
   const startSession = async (plannedMins: number, subjectId: string | null, chapterId: string | null, isRecoverySession?: boolean, recoveryLostStreak?: number, studyGroupId?: string | null, openEnded = false): Promise<string> => {
-    if (studyGroupId) await assertStudyGroupActive(studyGroupId);
+    if (startSessionInFlightRef.current) throw new Error('A focus session is already starting.');
+    if (activeSession && (activeSession.status === 'running' || activeSession.status === 'verification_required')) {
+      throw new Error('A focus session is already active.');
+    }
+    startSessionInFlightRef.current = true;
+    try {
+      if (studyGroupId) await assertStudyGroupActive(studyGroupId);
     const sessionId = uuidv4();
     const active: ActiveSession = {
       sessionId,
@@ -1024,8 +1033,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       processInstanceId: PROCESS_INSTANCE_ID,
     };
     setActiveSession(active);
-    await setItem(StorageKeys.ACTIVE_SESSION, active);
-    return sessionId;
+      await setItem(StorageKeys.ACTIVE_SESSION, active);
+      return sessionId;
+    } finally {
+      startSessionInFlightRef.current = false;
+    }
   };
 
   const discardActiveSession = async () => {
@@ -1054,6 +1066,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const completeSession = async (sessionId: string, actualMins: number, actualSeconds = actualMins * 60): Promise<(FocusSession & { leveledUp?: boolean; newLevelRank?: number; totalXP?: number; referralXpAwarded?: number; syncPending?: boolean; syncRejected?: boolean; syncError?: string; clockAnomaly?: boolean }) | null> => {
     const isRecoverySession = Boolean(activeSession?.isRecovery || streakRecoveryPending);
     if (!isStreakRecoveryEligible(isRecoverySession, actualMins)) return null;
+    if (completeSessionInFlightRef.current) return null;
+    completeSessionInFlightRef.current = true;
 
     try {
       const activeUser = user ?? await getItem<UserProfile>(StorageKeys.USER);
@@ -1255,10 +1269,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return { ...sessionObj, leveledUp, newLevelRank, totalXP: postSessionResult.newXPTotal, referralXpAwarded };
     } catch {
       return null;
+    } finally {
+      completeSessionInFlightRef.current = false;
     }
   };
 
   const breakSession = async (sessionId: string, actualMins: number): Promise<FocusSession | null> => {
+    if (breakSessionInFlightRef.current) return null;
+    breakSessionInFlightRef.current = true;
     try {
       const activeUser = user ?? await getItem<UserProfile>(StorageKeys.USER);
       if (!activeUser?.id) return null;
@@ -1366,6 +1384,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return sessionObj;
     } catch {
       return null;
+    } finally {
+      breakSessionInFlightRef.current = false;
     }
   };
 

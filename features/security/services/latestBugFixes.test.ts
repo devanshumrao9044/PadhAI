@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { createSingleActionLock } from '../../core/services/singleAction.ts';
 
 const root = new URL('../../..', import.meta.url).pathname;
 const read = (relativePath: string) => readFileSync(`${root}/${relativePath}`, 'utf8');
@@ -70,6 +71,37 @@ test('local ticket history is bounded and supports device-only hiding', () => {
   assert.match(supportCache, /hiddenTicketIds/);
   assert.match(review, /hideSupportTicket/);
   assert.match(review, /hideSupportReport/);
+});
+
+test('single-action locks reject same-tick duplicates and release after failures', () => {
+  const lock = createSingleActionLock();
+  assert.equal(lock.acquire(), true);
+  assert.equal(lock.acquire(), false);
+  try {
+    throw new Error('simulated action failure');
+  } catch {
+    lock.release();
+  }
+  assert.equal(lock.acquire(), true);
+  lock.release();
+});
+
+test('critical mutation screens use immediate action locks', () => {
+  const context = read('contexts/AppContext.tsx');
+  const focus = read('app/(tabs)/focus.tsx');
+  const createGroup = read('app/study-groups/create.tsx');
+  const joinGroup = read('app/study-groups/join.tsx');
+  const reportSheet = read('components/study-groups/StudyGroupReportSheet.tsx');
+  const adminNotifications = read('app/admin/notifications.tsx');
+  assert.match(context, /startSessionInFlightRef/);
+  assert.match(context, /completeSessionInFlightRef/);
+  assert.match(context, /breakSessionInFlightRef/);
+  assert.match(focus, /lockInActionRef/);
+  assert.match(createGroup, /createActionRef/);
+  assert.match(joinGroup, /previewActionRef/);
+  assert.match(joinGroup, /joinActionRef/);
+  assert.match(reportSheet, /submitActionRef/);
+  assert.match(adminNotifications, /sendActionRef/);
 });
 
 test('open-ended focus is manually finished but still bounded for server verification', () => {

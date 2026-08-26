@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -13,6 +13,8 @@ import {
   type StudyGroupIconKey,
   type StudyGroupVisibility,
 } from '@/features/study-groups/services/studyGroups';
+import { getSafeErrorMessage } from '@/features/core/services/safeError';
+import { createSingleActionLock } from '@/features/core/services/singleAction';
 
 export default function CreateStudyGroupScreen() {
   const { colors } = useTheme();
@@ -30,24 +32,32 @@ export default function CreateStudyGroupScreen() {
   const [iconKey, setIconKey] = useState<StudyGroupIconKey>('books');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const createActionRef = useRef(createSingleActionLock());
 
   const handleCreate = async () => {
+    if (!createActionRef.current.acquire()) return;
     const trimmedName = name.trim();
     const goal = Number(dailyGoal);
     const limit = Number(maxMembers);
     if (trimmedName.length < 2) {
       setError('Group name must be at least 2 characters.');
+      createActionRef.current.release();
       return;
     }
     if (!Number.isInteger(goal) || goal < 1 || goal > 1440) {
       setError('Daily goal must be between 1 and 1440 minutes.');
+      createActionRef.current.release();
       return;
     }
     if (!Number.isInteger(limit) || limit < 2 || limit > 100) {
       setError('Member limit must be between 2 and 100.');
+      createActionRef.current.release();
       return;
     }
-    if (!user?.id) return;
+    if (!user?.id) {
+      createActionRef.current.release();
+      return;
+    }
     setError('');
     setSaving(true);
     try {
@@ -63,10 +73,15 @@ export default function CreateStudyGroupScreen() {
       });
       router.replace(`/study-groups/${created.id}` as never);
     } catch (createError) {
-      const message = createError instanceof Error ? createError.message : 'Could not create the group.';
-      setError(message);
+      setError(getSafeErrorMessage(createError, {
+        fallback: 'Could not create the group. Please try again.',
+        network: 'Check your connection and try again.',
+        permission: 'You do not have permission to create a group.',
+        rateLimit: 'Too many requests. Please wait and try again.',
+      }));
     } finally {
       setSaving(false);
+      createActionRef.current.release();
     }
   };
 

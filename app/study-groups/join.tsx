@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -18,6 +18,8 @@ import {
   type StudyGroupReportReason,
 } from '@/features/study-groups/services/studyGroups';
 import StudyGroupReportSheet from '@/components/study-groups/StudyGroupReportSheet';
+import { getSafeErrorMessage } from '@/features/core/services/safeError';
+import { createSingleActionLock } from '@/features/core/services/singleAction';
 
 function iconName(iconKey: string): string {
   return STUDY_GROUP_ICON_OPTIONS.find(option => option.key === iconKey)?.icon ?? 'menu-book';
@@ -38,6 +40,8 @@ export default function JoinStudyGroupScreen() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [reportOpen, setReportOpen] = useState(false);
+  const previewActionRef = useRef(createSingleActionLock());
+  const joinActionRef = useRef(createSingleActionLock());
 
   const submitGroupReport = async (reasonCode: StudyGroupReportReason, details: string) => {
     if (!group) return;
@@ -46,8 +50,10 @@ export default function JoinStudyGroupScreen() {
   };
 
   const preview = async () => {
+    if (!previewActionRef.current.acquire()) return;
     if (!token.trim()) {
       setError('Please enter an invite token or open a valid invite link.');
+      previewActionRef.current.release();
       return;
     }
     setLoading(true);
@@ -59,14 +65,19 @@ export default function JoinStudyGroupScreen() {
       setGroup(result);
     } catch (previewError) {
       setGroup(null);
-      setError(previewError instanceof Error ? previewError.message : 'Could not load this invite.');
+      setError(getSafeErrorMessage(previewError, {
+        fallback: 'Could not load this invite. Please check the link and try again.',
+        network: 'Check your connection and try again.',
+        permission: 'You do not have permission to preview this invite.',
+      }));
     } finally {
       setLoading(false);
+      previewActionRef.current.release();
     }
   };
 
   const join = async () => {
-    if (!group || !user?.id) return;
+    if (!group || !user?.id || !joinActionRef.current.acquire()) return;
     setJoining(true);
     setError('');
     try {
@@ -77,11 +88,17 @@ export default function JoinStudyGroupScreen() {
         await updateStudyGroupIcon(group.id, iconKey);
         setMessage(t('groups.joined'));
       }
-      setTimeout(() => router.replace(`/study-groups/${group.id}` as never), 800);
+      router.replace(`/study-groups/${group.id}` as never);
     } catch (joinError) {
-      setError(joinError instanceof Error ? joinError.message : 'Could not join this group.');
+      setError(getSafeErrorMessage(joinError, {
+        fallback: 'Could not join this group. Please try again.',
+        network: 'Check your connection and try again.',
+        permission: 'You do not have permission to join this group.',
+        rateLimit: 'Too many requests. Please wait and try again.',
+      }));
     } finally {
       setJoining(false);
+      joinActionRef.current.release();
     }
   };
 

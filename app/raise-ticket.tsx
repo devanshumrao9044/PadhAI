@@ -10,6 +10,7 @@ import { useApp } from '@/hooks/useApp';
 import { submitStudyGroupTicket, type StudyGroupTicketCategory } from '@/features/study-groups/services/studyGroups';
 import { getSafeErrorMessage } from '@/features/core/services/safeError';
 import { readSupportHistory, writeSupportHistory } from '@/features/study-groups/services/supportCache';
+import { createSingleActionLock } from '@/features/core/services/singleAction';
 
 const CATEGORIES: StudyGroupTicketCategory[] = ['bug', 'account', 'study_group', 'report_follow_up', 'feature_request', 'other'];
 
@@ -29,6 +30,7 @@ export default function RaiseTicketScreen() {
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const scale = useRef(new Animated.Value(0.92)).current;
+  const submitActionRef = useRef(createSingleActionLock());
 
   useEffect(() => {
     if (!submitted) return;
@@ -36,13 +38,20 @@ export default function RaiseTicketScreen() {
   }, [scale, submitted]);
 
   const submit = async () => {
-    if (!user?.id) return;
+    if (!submitActionRef.current.acquire()) return;
+    if (!user?.id) {
+      submitActionRef.current.release();
+      return;
+    }
     const nextSubjectError = subject.trim().length < 3 ? 'Subject must be at least 3 characters.' : '';
     const nextDetailsError = details.trim().length < 5 ? 'Please add a little more detail.' : '';
     setSubjectError(nextSubjectError);
     setDetailsError(nextDetailsError);
     setError('');
-    if (nextSubjectError || nextDetailsError) return;
+    if (nextSubjectError || nextDetailsError) {
+      submitActionRef.current.release();
+      return;
+    }
     setSaving(true);
     try {
       const createdTicket = await submitStudyGroupTicket({ userId: user.id, category, subject, details, groupId: typeof routeGroupId === 'string' ? routeGroupId : null, reportId: typeof routeReportId === 'string' ? routeReportId : null });
@@ -58,6 +67,7 @@ export default function RaiseTicketScreen() {
       }));
     } finally {
       setSaving(false);
+      submitActionRef.current.release();
     }
   };
 

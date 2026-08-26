@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -22,6 +22,7 @@ import {
   type StudyGroupTicketStatus,
 } from '@/features/study-groups/services/studyGroups';
 import { getSafeErrorMessage } from '@/features/core/services/safeError';
+import { createSingleActionLock } from '@/features/core/services/singleAction';
 import { filterVisibleSupportHistory, hideSupportReport, hideSupportTicket, readSupportHistory, writeSupportHistory, type LocalSupportHistory } from '@/features/study-groups/services/supportCache';
 
 export default function ReviewTicketsScreen() {
@@ -42,6 +43,8 @@ export default function ReviewTicketsScreen() {
   const [savingTicketId, setSavingTicketId] = useState<string | null>(null);
   const [, setLocalHistory] = useState<LocalSupportHistory>({ tickets: [], reports: [], hiddenTicketIds: [], hiddenReportIds: [] });
   const [groupNames, setGroupNames] = useState<Record<string, string>>({});
+  const ticketMutationRef = useRef(createSingleActionLock());
+  const reportReviewRef = useRef(createSingleActionLock());
 
   const load = useCallback(async (refresh = false) => {
     if (!user?.id) return;
@@ -113,13 +116,18 @@ export default function ReviewTicketsScreen() {
   };
 
   const updateReport = (report: StudyGroupReport) => {
-    if (!owner) return;
+    if (!owner || !reportReviewRef.current.acquire()) return;
+    const resolve = (status: 'reviewed' | 'actioned' | 'dismissed', resolution?: string) => {
+      void reviewStudyGroupReport(report.id, status, resolution)
+        .then(() => load(true))
+        .finally(() => reportReviewRef.current.release());
+    };
     Alert.alert('Review report', 'Choose a resolution status.', [
-      { text: t('support.reviewed'), onPress: () => { void reviewStudyGroupReport(report.id, 'reviewed').then(() => load(true)); } },
-      { text: t('support.actioned'), onPress: () => { void reviewStudyGroupReport(report.id, 'actioned', 'Reviewed by the PadhAI owner.').then(() => load(true)); } },
-      { text: t('support.dismissed'), style: 'destructive', onPress: () => { void reviewStudyGroupReport(report.id, 'dismissed').then(() => load(true)); } },
-      { text: t('common.cancel'), style: 'cancel' },
-    ]);
+      { text: t('support.reviewed'), onPress: () => resolve('reviewed') },
+      { text: t('support.actioned'), onPress: () => resolve('actioned', 'Reviewed by the PadhAI owner.') },
+      { text: t('support.dismissed'), style: 'destructive', onPress: () => resolve('dismissed') },
+      { text: t('common.cancel'), style: 'cancel', onPress: () => reportReviewRef.current.release() },
+    ], { cancelable: true, onDismiss: () => reportReviewRef.current.release() });
   };
 
   const sendTicketResponse = async (ticket: StudyGroupTicket, status: Exclude<StudyGroupTicketStatus, 'open'>, responseOverride?: string) => {
@@ -128,6 +136,7 @@ export default function ReviewTicketsScreen() {
       setError(t('support.ticketResponseTooShort'));
       return;
     }
+    if (!ticketMutationRef.current.acquire()) return;
     setSavingTicketId(ticket.id);
     setError('');
     try {
@@ -143,6 +152,7 @@ export default function ReviewTicketsScreen() {
       }));
     } finally {
       setSavingTicketId(null);
+      ticketMutationRef.current.release();
     }
   };
 

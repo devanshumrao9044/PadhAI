@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, FontSize, FontWeight, Radius, Spacing } from '@/constants/theme';
 import type { StudyGroupReportReason } from '@/features/study-groups/services/studyGroups';
+import { createSingleActionLock } from '@/features/core/services/singleAction';
 
 const REPORT_REASONS: StudyGroupReportReason[] = [
   'spam',
@@ -41,6 +42,7 @@ export default function StudyGroupReportSheet({ visible, groupName, onClose, onS
   const [details, setDetails] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const submitActionRef = useRef(createSingleActionLock());
 
   useEffect(() => {
     if (!visible) return;
@@ -50,6 +52,7 @@ export default function StudyGroupReportSheet({ visible, groupName, onClose, onS
   }, [visible]);
 
   const submit = async () => {
+    if (!submitActionRef.current.acquire()) return;
     setSaving(true);
     setError('');
     try {
@@ -59,11 +62,12 @@ export default function StudyGroupReportSheet({ visible, groupName, onClose, onS
       setError(submitError instanceof Error ? submitError.message : 'Could not submit the report.');
     } finally {
       setSaving(false);
+      submitActionRef.current.release();
     }
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => { if (!saving) onClose(); }}>
       <View style={styles.overlay}>
         <View style={styles.card}>
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -72,21 +76,21 @@ export default function StudyGroupReportSheet({ visible, groupName, onClose, onS
                 <Text style={styles.title}>{t('groups.reportTitle')}</Text>
                 <Text style={styles.subtitle} numberOfLines={2}>{groupName}</Text>
               </View>
-              <Pressable onPress={onClose} style={styles.closeButton} accessibilityLabel={t('common.close')}>
+              <Pressable disabled={saving} onPress={onClose} style={[styles.closeButton, saving && styles.disabled]} accessibilityLabel={t('common.close')}>
                 <MaterialIcons name="close" size={21} color={colors.textSecondary} />
               </Pressable>
             </View>
             <Text style={styles.label}>{t('groups.reportReason')}</Text>
             {REPORT_REASONS.map(option => (
-              <Pressable key={option} onPress={() => setReason(option)} style={styles.reasonRow}>
+              <Pressable key={option} disabled={saving} onPress={() => setReason(option)} style={[styles.reasonRow, saving && styles.disabled]}>
                 <MaterialIcons name={reason === option ? 'radio-button-checked' : 'radio-button-unchecked'} size={20} color={reason === option ? colors.primary : colors.textTertiary} />
                 <Text style={styles.reasonText}>{t(`groups.${reasonKey(option)}` as any)}</Text>
               </Pressable>
             ))}
-            <TextInput value={details} onChangeText={setDetails} placeholder={t('groups.reportDetails')} placeholderTextColor={colors.textTertiary} style={styles.detailsInput} maxLength={1000} multiline textAlignVertical="top" />
+            <TextInput editable={!saving} value={details} onChangeText={setDetails} placeholder={t('groups.reportDetails')} placeholderTextColor={colors.textTertiary} style={styles.detailsInput} maxLength={1000} multiline textAlignVertical="top" />
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <View style={styles.actions}>
-              <Pressable onPress={onClose} style={styles.cancelButton}><Text style={styles.cancelText}>{t('common.cancel')}</Text></Pressable>
+              <Pressable disabled={saving} onPress={onClose} style={[styles.cancelButton, saving && styles.disabled]}><Text style={styles.cancelText}>{t('common.cancel')}</Text></Pressable>
               <Pressable onPress={() => { void submit(); }} disabled={saving} style={[styles.submitButton, saving && styles.disabled]}><Text style={styles.submitText}>{saving ? t('common.loading') : t('groups.reportSubmit')}</Text></Pressable>
             </View>
           </ScrollView>

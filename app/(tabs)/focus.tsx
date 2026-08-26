@@ -12,6 +12,7 @@ import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/
 import { useApp } from '@/hooks/useApp';
 import { calculateSessionXP } from '@/constants/levels';
 import { getFocusGuardStatus } from '@/features/focus/services/focusGuard';
+import { createSingleActionLock } from '@/features/core/services/singleAction';
 
 const DURATIONS = [15, 25, 45, 60, 90];
 const CUSTOM_KEY = -1;
@@ -37,6 +38,7 @@ export default function FocusScreen() {
   const [starting, setStarting] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const autofocusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lockInActionRef = useRef(createSingleActionLock());
 
   useEffect(() => () => {
     if (autofocusTimerRef.current) clearTimeout(autofocusTimerRef.current);
@@ -96,22 +98,23 @@ export default function FocusScreen() {
   const isLockInDisabled = starting || (!openEndedMode && (effectiveMins < 1 || effectiveMins > 480));
 
   const handleLockIn = async () => {
-    if (isLockInDisabled) return;
-    if (Platform.OS === 'android') {
-      const guard = getFocusGuardStatus();
-      if (!guard.overlay || !guard.usageStats) {
-        router.push({ pathname: '/focus/setup', params: { returnTo: '/(tabs)/focus' } } as unknown as Parameters<typeof router.push>[0]);
-        return;
-      }
-    }
+    if (isLockInDisabled || !lockInActionRef.current.acquire()) return;
     setStarting(true);
     try {
+      if (Platform.OS === 'android') {
+        const guard = getFocusGuardStatus();
+        if (!guard.overlay || !guard.usageStats) {
+          router.push({ pathname: '/focus/setup', params: { returnTo: '/(tabs)/focus' } } as unknown as Parameters<typeof router.push>[0]);
+          return;
+        }
+      }
       await startSession(effectiveMins, selectedSubjectId, selectedChapterId, false, undefined, studyGroupId, openEndedMode);
-      router.push('/focus/active');
+      router.replace('/focus/active');
     } catch {
       Alert.alert(t('focus.startErrorTitle'), t('focus.startErrorMessage'));
     } finally {
       setStarting(false);
+      lockInActionRef.current.release();
     }
   };
 
