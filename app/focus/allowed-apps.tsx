@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -18,6 +18,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
+import { createSingleActionLock } from '@/features/core/services/singleAction';
 import {
   getInstalledApps,
   refreshFocusGuardAppDecisionCache,
@@ -37,6 +38,8 @@ export default function AllowedAppsScreen() {
   const [launchFailedPackage, setLaunchFailedPackage] = useState<string | null>(null);
   const [iconFailures, setIconFailures] = useState<Record<string, boolean>>({});
   const [search, setSearch] = useState('');
+  const launchActionRef = useRef(createSingleActionLock());
+  const launchReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadApps = useCallback((isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -51,6 +54,10 @@ export default function AllowedAppsScreen() {
       if (isRefresh) setRefreshing(false);
       else setLoading(false);
     }
+  }, []);
+
+  useEffect(() => () => {
+    if (launchReleaseTimerRef.current) clearTimeout(launchReleaseTimerRef.current);
   }, []);
 
   useEffect(() => {
@@ -78,8 +85,14 @@ export default function AllowedAppsScreen() {
   };
 
   const handleOpen = (packageName: string) => {
+    if (!launchActionRef.current.acquire()) return;
     setLaunchFailedPackage(null);
-    if (!launchStudyApp(packageName)) setLaunchFailedPackage(packageName);
+    const launched = launchStudyApp(packageName);
+    if (!launched) setLaunchFailedPackage(packageName);
+    launchReleaseTimerRef.current = setTimeout(() => {
+      launchActionRef.current.release();
+      launchReleaseTimerRef.current = null;
+    }, launched ? 1200 : 500);
   };
 
   const filteredApps = useMemo(() => {

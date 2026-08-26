@@ -502,7 +502,7 @@ export default function FocusActiveScreen() {
   const progress = Math.min(1, elapsed / (plannedSecs || 1));
 
   const handleTripleTap = () => {
-    if (isProcessing) return;
+    if (isOpenEnded || isProcessing) return;
     const newCount = tapCount + 1;
     setTapCount(newCount);
 
@@ -520,7 +520,7 @@ export default function FocusActiveScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <TouchableOpacity style={styles.fullScreen} onPress={handleTripleTap} activeOpacity={1}>
+      <TouchableOpacity style={styles.fullScreen} onPress={isOpenEnded ? undefined : handleTripleTap} activeOpacity={1}>
         <View style={styles.subjectTag}>
           <View style={[styles.subjectDot, { backgroundColor: subjectColor }]} />
           <Text style={styles.subjectText}>{subjectName}</Text>
@@ -557,9 +557,9 @@ export default function FocusActiveScreen() {
 
         {isOpenEnded ? <TouchableOpacity style={styles.finishButton} onPress={handleManualFinish} disabled={isProcessing} activeOpacity={0.85}><MaterialIcons name="check" size={18} color={colors.background} /><Text style={styles.finishButtonText}>{isProcessing ? t('focus.processing') : t('focus.finishFocus')}</Text></TouchableOpacity> : null}
 
-        <Text style={styles.hint}>
+        {!isOpenEnded ? <Text style={styles.hint}>
           {tapCount > 0 ? t('focus.moreTaps', { value: 3 - tapCount }) : t('focus.tripleTapExit')}
-        </Text>
+        </Text> : null}
 
         <View style={styles.motivationStrip}>
           <MaterialIcons name="lock" size={14} color={colors.primary} />

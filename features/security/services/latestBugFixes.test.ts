@@ -109,10 +109,15 @@ test('open-ended focus is manually finished but still bounded for server verific
   const active = read('app/focus/active.tsx');
   const models = read('types/models.ts');
   const context = read('contexts/AppContext.tsx');
+  const nativeModule = read('modules/padhai-focus-guard/android/src/main/java/com/padhai/focusguard/PadhAIFocusGuardModule.kt');
+  const allowedApps = read('app/focus/allowed-apps.tsx');
   assert.match(focus, /OPEN_ENDED_PLANNED_MINS = 1440/);
   assert.match(focus, /startSession\(effectiveMins, selectedSubjectId, selectedChapterId, false, undefined, studyGroupId, openEndedMode\)/);
   assert.match(active, /activeSession\?\.openEnded/);
   assert.match(active, /handleManualFinish/);
+  assert.match(active, /onPress=\{isOpenEnded \? undefined : handleTripleTap\}/);
+  assert.match(allowedApps, /launchActionRef/);
+  assert.match(nativeModule, /Settings\.ACTION_SETTINGS/);
   assert.match(models, /openEnded\?: boolean/);
   assert.match(context, /openEnded,/);
   assert.match(context, /assertStudyGroupActive\(studyGroupId\)/);

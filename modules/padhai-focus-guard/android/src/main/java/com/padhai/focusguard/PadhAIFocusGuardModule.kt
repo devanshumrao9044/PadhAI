@@ -66,8 +66,10 @@ class PadhAIFocusGuardModule : Module() {
     Function("launchStudyApp") { packageName: String ->
       val decision = FocusGuardAppPolicy.decide(context, packageName)
       if (!decision.allowed || packageName == context.packageName) return@Function false
-      val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
-        ?: return@Function false
+      val launchIntent = when (packageName) {
+        "com.android.settings", "com.samsung.android.settings", "com.google.android.permissioncontroller", "com.android.permissioncontroller" -> Intent(Settings.ACTION_SETTINGS)
+        else -> context.packageManager.getLaunchIntentForPackage(packageName)
+      } ?: return@Function false
       launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
       context.startActivity(launchIntent)
       true
