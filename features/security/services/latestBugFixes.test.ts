@@ -120,6 +120,19 @@ test('Google auth uses the padhai deep link and protects the OAuth callback flow
   assert.match(appConfig, /"scheme": "padhai"/);
 });
 
+test('new Auth users receive a Google-aware public profile from the existing secure trigger', () => {
+  const migration = read('supabase/migrations/20260826_improve_google_profile_bootstrap.sql');
+  assert.match(migration, /CREATE OR REPLACE FUNCTION public\.handle_new_user/);
+  assert.match(migration, /SECURITY DEFINER/);
+  assert.match(migration, /SET search_path = pg_catalog, public/);
+  assert.match(migration, /raw_user_meta_data->>'full_name'/);
+  assert.match(migration, /raw_user_meta_data->>'avatar_url'/);
+  assert.match(migration, /INSERT INTO public\.users \(\s*id,\s*name,\s*email,\s*photo_url,\s*avatar_url/);
+  assert.match(migration, /ON CONFLICT \(id\) DO UPDATE/);
+  assert.match(migration, /raw_user_meta_data->>'referral_code'/);
+  assert.match(migration, /REVOKE ALL ON FUNCTION public\.handle_new_user/);
+});
+
 test('open-ended focus is manually finished but still bounded for server verification', () => {
   const focus = read('app/(tabs)/focus.tsx');
   const active = read('app/focus/active.tsx');
