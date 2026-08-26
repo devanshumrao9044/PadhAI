@@ -54,7 +54,8 @@ function AppNavigation() {
       <SwipeNavigationShell>
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
           <Stack.Screen name="index" />
-        <Stack.Screen name="reset-password" options={{ animation: 'fade' }} />
+          <Stack.Screen name="reset-password" options={{ animation: 'fade' }} />
+          <Stack.Screen name="auth/callback" options={{ animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
         <Stack.Screen name="streak-broken" options={{ animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />

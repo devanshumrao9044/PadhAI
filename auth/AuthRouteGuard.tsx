@@ -39,7 +39,8 @@ export default function AuthRouteGuard() {
     routeSegments[0] === 'first-time-help';
   const isSessionAllowedPublicRoute =
     routeSegments[0] === 'privacy-policy' ||
-    routeSegments[0] === 'reset-password';
+    routeSegments[0] === 'reset-password' ||
+    (routeSegments[0] === 'auth' && routeSegments[1] === 'callback');
 
   useEffect(() => {
     if (!ready || !navigationReady || appLoading) return;

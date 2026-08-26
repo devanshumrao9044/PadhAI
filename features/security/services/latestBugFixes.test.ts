@@ -108,6 +108,9 @@ test('Google auth uses the padhai deep link and protects the OAuth callback flow
   const provider = read('auth/AuthSessionProvider.tsx');
   const screen = read('auth/AuthScreen.tsx');
   const appConfig = read('app.json');
+  const callbackRoute = read('app/auth/callback.tsx');
+  const rootLayout = read('app/_layout.tsx');
+  const routeGuard = read('auth/AuthRouteGuard.tsx');
   assert.match(provider, /signInWithOAuth/);
   assert.match(provider, /provider: 'google'/);
   assert.match(provider, /redirectTo: GOOGLE_REDIRECT_URI/);
@@ -115,11 +118,17 @@ test('Google auth uses the padhai deep link and protects the OAuth callback flow
   assert.match(provider, /searchParams\.get\('redirect_to'\)/);
   assert.match(provider, /Add padhai:\/\/auth\/callback in Supabase Redirect URLs/);
   assert.match(provider, /function parseOAuthParams/);
+  assert.match(provider, /params\.code/);
+  assert.match(provider, /supabase\.auth\.exchangeCodeForSession/);
   assert.match(provider, /supabase\.auth\.setSession/);
   assert.match(provider, /googleSignInInFlightRef/);
   assert.match(screen, /testID="google-auth"/);
   assert.match(screen, /signInWithGooglePress/);
   assert.match(appConfig, /"scheme": "padhai"/);
+  assert.match(callbackRoute, /useAuthSession/);
+  assert.match(callbackRoute, /router\.replace\(isOnboarded \? '\/\(tabs\)' : '\/onboarding'\)/);
+  assert.match(rootLayout, /name="auth\/callback"/);
+  assert.match(routeGuard, /routeSegments\[0\] === 'auth' && routeSegments\[1\] === 'callback'/);
 });
 
 test('autocut stability build uses legacy architecture and avoids AuthSession startup imports', () => {

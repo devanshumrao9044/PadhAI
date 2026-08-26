@@ -28,6 +28,11 @@ async function createSessionFromOAuthUrl(url: string): Promise<Session | null> {
   if (params.error_description || params.error) {
     throw new Error(params.error_description || params.error);
   }
+  if (params.code) {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(params.code);
+    if (error) throw error;
+    return data.session;
+  }
   if (!params.access_token) return null;
   if (!params.refresh_token) throw new Error('Google sign-in returned an incomplete session. Please try again.');
 
