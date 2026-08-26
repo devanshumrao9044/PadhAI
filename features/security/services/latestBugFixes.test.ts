@@ -112,6 +112,8 @@ test('Google auth uses the padhai deep link and protects the OAuth callback flow
   assert.match(provider, /provider: 'google'/);
   assert.match(provider, /redirectTo: GOOGLE_REDIRECT_URI/);
   assert.match(provider, /skipBrowserRedirect: true/);
+  assert.match(provider, /searchParams\.get\('redirect_to'\)/);
+  assert.match(provider, /Add padhai:\/\/auth\/callback in Supabase Redirect URLs/);
   assert.match(provider, /function parseOAuthParams/);
   assert.match(provider, /supabase\.auth\.setSession/);
   assert.match(provider, /googleSignInInFlightRef/);

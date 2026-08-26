@@ -157,7 +157,15 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       });
       if (error) throw error;
       if (!data.url) throw new Error('Google sign-in is not configured yet.');
-
+      let authorizeUrl: URL;
+      try {
+        authorizeUrl = new URL(data.url);
+      } catch {
+        throw new Error('Google sign-in returned an invalid authorization URL.');
+      }
+      if (authorizeUrl.searchParams.get('redirect_to') !== GOOGLE_REDIRECT_URI) {
+        throw new Error('Google redirect is not configured for the PadhAI app. Add padhai://auth/callback in Supabase Redirect URLs.');
+      }
       const WebBrowser = require('expo-web-browser') as typeof import('expo-web-browser');
       const result = await WebBrowser.openAuthSessionAsync(data.url, GOOGLE_REDIRECT_URI);
       if (result.type !== 'success') {
