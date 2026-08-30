@@ -12,6 +12,8 @@ internal object FocusGuardPrefs {
   private const val ENABLED = "enabled"
   private const val BREAK_REQUESTED = "break_requested"
   private const val STARTED_AT = "started_at"
+  private const val RECENT_ALLOWED_LAUNCH_PACKAGE = "recent_allowed_launch_package"
+  private const val RECENT_ALLOWED_LAUNCH_UNTIL = "recent_allowed_launch_until"
   // Bump whenever the classifier, hard-deny rules, or verified study catalog changes.
   private const val POLICY_REVISION = "2026-08-25-playstore-catalog-6-boolean-decision-bridge"
 
@@ -88,6 +90,36 @@ internal object FocusGuardPrefs {
   }
 
   fun startedAt(context: Context): Long = get(context).getLong(STARTED_AT, 0L)
+
+  /**
+   * UsageStats can briefly report the previous foreground activity after
+   * PadhAI intentionally launches an already-approved study app. Remember
+   * only that exact launch for a few seconds; this is not a session allowlist.
+   */
+  fun recordAllowedLaunch(context: Context, packageName: String) {
+    get(context).edit()
+      .putString(RECENT_ALLOWED_LAUNCH_PACKAGE, packageName.lowercase())
+      .putLong(RECENT_ALLOWED_LAUNCH_UNTIL, System.currentTimeMillis() + 5_000L)
+      .apply()
+  }
+
+  fun isRecentAllowedLaunch(context: Context, packageName: String): Boolean {
+    val prefs = get(context)
+    val until = prefs.getLong(RECENT_ALLOWED_LAUNCH_UNTIL, 0L)
+    val matches = prefs.getString(RECENT_ALLOWED_LAUNCH_PACKAGE, null) == packageName.lowercase()
+    if (!matches || until < System.currentTimeMillis()) {
+      if (until != 0L) clearRecentAllowedLaunch(context)
+      return false
+    }
+    return true
+  }
+
+  fun clearRecentAllowedLaunch(context: Context) {
+    get(context).edit()
+      .remove(RECENT_ALLOWED_LAUNCH_PACKAGE)
+      .remove(RECENT_ALLOWED_LAUNCH_UNTIL)
+      .apply()
+  }
 
   fun enabled(context: Context): Boolean = get(context).getBoolean(ENABLED, false)
 
