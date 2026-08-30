@@ -43,7 +43,11 @@ class PadhAIFocusGuardModule : Module() {
         FocusGuardPrefs.clearLegacyBlockedPackages(context)
         FocusGuardAppPolicy.warmInstalledCache(context)
         FocusGuardPrefs.setEnabled(context, true)
-        FocusGuardPrefs.setStartedAt(context, System.currentTimeMillis())
+        // Do not reset an already-running native session. The overlay timer is
+        // based on this persisted value and must survive app/foreground changes.
+        if (FocusGuardPrefs.startedAt(context) <= 0L) {
+          FocusGuardPrefs.setStartedAt(context, System.currentTimeMillis())
+        }
         PadhAIFocusGuardService.start(context)
       }
       canStart
@@ -52,6 +56,7 @@ class PadhAIFocusGuardModule : Module() {
     Function("stop") {
       FocusGuardPrefs.setEnabled(context, false)
       FocusGuardPrefs.setStartedAt(context, 0L)
+      FocusGuardPrefs.clearRecentAllowedLaunch(context)
       PadhAIFocusGuardService.stop(context)
     }
 
@@ -70,6 +75,10 @@ class PadhAIFocusGuardModule : Module() {
         "com.android.settings", "com.samsung.android.settings", "com.google.android.permissioncontroller", "com.android.permissioncontroller" -> Intent(Settings.ACTION_SETTINGS)
         else -> context.packageManager.getLaunchIntentForPackage(packageName)
       } ?: return@Function false
+      // UsageStats may report the previous foreground activity for one or two
+      // polling cycles. Mark only this policy-approved, PadhAI-initiated launch
+      // for a short window so that race cannot immediately trigger the blocker.
+      FocusGuardPrefs.recordAllowedLaunch(context, packageName)
       launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
       context.startActivity(launchIntent)
       true
