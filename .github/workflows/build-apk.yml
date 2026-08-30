@@ -6,6 +6,7 @@ on:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -14,7 +15,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: pnpm
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
