@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import {
   View, Text, StyleSheet, ScrollView,
   ActivityIndicator, RefreshControl, Animated, TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -11,7 +12,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { LEVELS, getLevelForUser } from '@/constants/levels';
-import { formatXPValue, isNegativeXP } from '@/features/progression/services/xpDisplay';
+import { formatXPValue } from '@/features/progression/services/xpDisplay';
 import { useApp } from '@/hooks/useApp';
 import { supabase } from '@/features/core/services/supabase';
 import { getWeeklyZone } from '@/features/progression/services/weeklyXp';
@@ -37,49 +38,53 @@ type LeaderboardCacheData = {
   entries: LeaderboardEntry[];
 };
 
-// ── Hero Badge: reference-style winged shield for the level carousel ───────────
-function LevelBadge({
-  levelDef, isCurrent, size,
-}: { levelDef: typeof LEVELS[0]; isCurrent: boolean; size: 'sm' | 'lg' }) {
+// ── Podium Card for Top 3 ─────────────────────────────────────────────────────
+function PodiumCard({ entry, isMe, height }: { entry: LeaderboardEntry; isMe: boolean; height: number }) {
   const { colors } = useTheme();
   const { t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const scale = useRef(new Animated.Value(isCurrent ? 0.86 : 0.76)).current;
 
+  const rankColors: Record<number, string> = {
+    1: colors.levelLegend,
+    2: colors.levelGrinder,
+    3: colors.levelConsistent,
+  };
+  const accent = rankColors[entry.rank] ?? colors.primary;
+  const medalIcons: Record<number, 'emoji-events' | 'military-tech' | 'workspace-premium'> = {
+    1: 'emoji-events',
+    2: 'military-tech',
+    3: 'workspace-premium',
+  };
+  const medalLabel = entry.rank === 1 ? t('leaderboard.goldMedal') : entry.rank === 2 ? t('leaderboard.silverMedal') : t('leaderboard.bronzeMedal');
+
+  const scale = useRef(new Animated.Value(0.8)).current;
   useEffect(() => {
     Animated.spring(scale, {
       toValue: 1,
-      tension: 60,
-      friction: 7,
+      tension: 50,
+      friction: 6,
       useNativeDriver: true,
     }).start();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const badgeSize = size === 'lg' ? 92 : 56;
-  const fontSize = size === 'lg' ? 30 : 18;
-  const wingHeight = size === 'lg' ? 28 : 19;
+  }, []);
 
   return (
-    <Animated.View style={[styles.badgeWrap, isCurrent && styles.currentBadgeWrap, { transform: [{ scale }] }]}>
-      <View style={[styles.badgeAssembly, { width: badgeSize + 48, height: badgeSize + 30 }]}>
-        <View style={[styles.badgeWing, { width: badgeSize * 0.48, height: wingHeight, backgroundColor: levelDef.color + '88', left: 0, transform: [{ rotate: '-18deg' }] }]} />
-        <View style={[styles.badgeWing, { width: badgeSize * 0.48, height: wingHeight, backgroundColor: levelDef.color + '88', right: 0, transform: [{ rotate: '18deg' }] }]} />
-        <View style={[styles.badgeShield, { width: badgeSize, height: badgeSize, borderRadius: badgeSize * 0.24, backgroundColor: levelDef.color, borderColor: isCurrent ? colors.surface : levelDef.color + 'DD', borderWidth: isCurrent ? 3 : 2, transform: [{ rotate: '30deg' }] }]}>
-          <View style={[styles.badgeShieldInner, { borderColor: colors.surface + '88' }]}>
-            <Text style={[styles.badgeNum, { fontSize, color: colors.surface, transform: [{ rotate: '-30deg' }] }]}>{levelDef.rank}</Text>
-          </View>
+    <Animated.View style={[styles.podiumCard, { height, transform: [{ scale }] }, isMe && styles.podiumCardMe]}>
+      <LinearGradient
+        colors={[accent + '22', colors.surface]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.podiumGradient}
+      >
+        <View style={[styles.podiumMedal, { backgroundColor: accent + '20', borderColor: accent }]}>
+          <MaterialIcons name={medalIcons[entry.rank]} size={entry.rank === 1 ? 28 : 22} color={accent} />
         </View>
-        <View style={[styles.badgeRibbon, { backgroundColor: isCurrent ? colors.accent : colors.warning, bottom: 0, width: badgeSize * 0.46, height: size === 'lg' ? 18 : 12 }]} />
-      </View>
-      {isCurrent ? (
-        <Text style={[styles.badgeLabelCurrent, { color: colors.textPrimary }]}>
-          {(levelDef.rank === 1 ? t('profile.levelBeginner')
-            : levelDef.rank === 2 ? t('profile.levelGrinder')
-            : levelDef.rank === 3 ? t('profile.levelConsistent')
-            : levelDef.rank === 4 ? t('profile.levelBeast')
-            : t('profile.levelLegend'))}
+        <Text style={[styles.podiumName, isMe && { color: colors.primary }]} numberOfLines={1} ellipsizeMode="tail">
+          {isMe ? t('leaderboard.you') : entry.name}
         </Text>
-      ) : null}
+        <Text style={[styles.podiumXP, { color: accent }]}>{formatXPValue(entry.xp)}</Text>
+        <Text style={styles.podiumXPLabel}>{t('common.xp')}</Text>
+      </LinearGradient>
+      <View style={[styles.podiumBase, { backgroundColor: accent, height: entry.rank === 1 ? 8 : entry.rank === 2 ? 6 : 4 }]} />
     </Animated.View>
   );
 }
@@ -99,35 +104,28 @@ function RankZoneBar({ rank, total }: { rank: number; total: number }) {
   const safetyPct = (safetyCount / safeTotal) * 100;
   const promotionPct = (promotionCount / safeTotal) * 100;
 
-  // Rank 1 is best and belongs at the promotion end of the bar.
-  // A one-player leaderboard is treated as fully promoted rather than demotion.
   const rankPct = safeTotal <= 1 ? 100 : ((safeTotal - safeRank) / (safeTotal - 1)) * 100;
-  // Keep the badge and indicator fully inside the rounded track at both edges.
-  const safeRankPct = Math.max(12, Math.min(88, rankPct));
+  const safeRankPct = Math.max(8, Math.min(92, rankPct));
   const zone = getWeeklyZone(safeRank, safeTotal);
-
   const zoneColor = zone === 'promotion' ? colors.success : zone === 'safety' ? colors.warning : colors.danger;
 
   return (
     <View style={styles.zoneBarContainer}>
       <View style={styles.zoneLabels}>
-        <Text numberOfLines={1} ellipsizeMode="clip" style={[styles.zoneLabel, { color: colors.danger }]}>{t('leaderboard.demotionZone')}</Text>
-        <Text numberOfLines={1} ellipsizeMode="clip" style={[styles.zoneLabel, { color: colors.warning }]}>{t('leaderboard.safetyZone')}</Text>
-        <Text numberOfLines={1} ellipsizeMode="clip" style={[styles.zoneLabel, { color: colors.success }]}>{t('leaderboard.promotionZone')}</Text>
+        <Text numberOfLines={1} style={[styles.zoneLabel, { color: colors.danger }]}>{t('leaderboard.demotionZone')}</Text>
+        <Text numberOfLines={1} style={[styles.zoneLabel, { color: colors.warning }]}>{t('leaderboard.safetyZone')}</Text>
+        <Text numberOfLines={1} style={[styles.zoneLabel, { color: colors.success }]}>{t('leaderboard.promotionZone')}</Text>
       </View>
 
-      {/* Rank badge above bar */}
       <View style={[styles.rankBadgeAbove, { left: `${safeRankPct}%` as any, borderColor: colors.primary, backgroundColor: colors.surfaceVariant }]}>
         <Text style={[styles.rankBadgeAboveText, { color: colors.textPrimary }]}>{t('leaderboard.rank')}: {safeRank}</Text>
         <View style={[styles.rankPointerTail, { borderTopColor: colors.primary }]} />
       </View>
 
-      {/* The bar */}
       <View style={styles.zoneBarTrack}>
-        <View style={[styles.zoneSegment, { flex: demotionPct, backgroundColor: colors.danger + '88' }]} />
-        <View style={[styles.zoneSegment, { flex: safetyPct, backgroundColor: colors.warning + '88' }]} />
-        <View style={[styles.zoneSegment, { flex: promotionPct, backgroundColor: colors.success + '88' }]} />
-        {/* Indicator dot */}
+        <View style={[styles.zoneSegment, { flex: demotionPct, backgroundColor: colors.danger + '66' }]} />
+        <View style={[styles.zoneSegment, { flex: safetyPct, backgroundColor: colors.warning + '66' }]} />
+        <View style={[styles.zoneSegment, { flex: promotionPct, backgroundColor: colors.success + '66' }]} />
         <View style={[styles.zoneDot, { left: `${safeRankPct}%` as any, backgroundColor: zoneColor }]} />
       </View>
 
@@ -136,11 +134,6 @@ function RankZoneBar({ rank, total }: { rank: number; total: number }) {
         <Text style={styles.zoneRankNum}>{safeTotal - demotionCount}</Text>
         <Text style={styles.zoneRankNum}>{promotionCount}</Text>
         <Text style={styles.zoneRankNum}>1</Text>
-      </View>
-      <View style={styles.zoneRankLabels}>
-        <Text style={styles.zoneRankLabel}>{t('leaderboard.rank')}</Text>
-        <Text style={styles.zoneRankLabel}>{t('leaderboard.rank')}</Text>
-        <Text style={styles.zoneRankLabel}>{t('leaderboard.rank')}</Text>
       </View>
     </View>
   );
@@ -159,52 +152,31 @@ function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
     2: 'military-tech',
     3: 'workspace-premium',
   };
-  const displayXP = formatXPValue(entry.xp);
-  const negativeXP = isNegativeXP(entry.xp);
   const isTopThree = entry.rank <= 3;
   const medalIcon = medalIcons[entry.rank];
-  const medalLabel = entry.rank === 1
-    ? t('leaderboard.goldMedal')
-    : entry.rank === 2
-    ? t('leaderboard.silverMedal')
-    : t('leaderboard.bronzeMedal');
-  const rowColors: [string, string] = isMe
-    ? [colors.primary + '2A', colors.primary + '08']
-    : isTopThree
-    ? [rankBg + '24', colors.surface]
-    : [colors.surfaceVariant, colors.surface];
 
   return (
-    <LinearGradient
-      accessibilityLabel={isTopThree ? `${entry.name}, ${medalLabel}, ${t('leaderboard.rank')} ${entry.rank}, ${displayXP} ${t('common.xp')}` : `${entry.name}, ${t('leaderboard.rank')} ${entry.rank}, ${displayXP} ${t('common.xp')}`}
-      colors={rowColors}
-      start={{ x: 0, y: 0.5 }}
-      end={{ x: 1, y: 0.5 }}
+    <View
+      accessibilityLabel={`${entry.name}, ${t('leaderboard.rank')} ${entry.rank}, ${entry.xp} ${t('common.xp')}`}
       style={[
         styles.boardRow,
         isMe && styles.boardRowMe,
         isTopThree && styles.topThreeRow,
         entry.rank === 1 && styles.firstPlaceRow,
-        entry.rank === 2 && styles.secondPlaceRow,
-        entry.rank === 3 && styles.thirdPlaceRow,
       ]}
     >
-      <View style={[styles.boardRankBadge, isTopThree && styles.medalBadge, { backgroundColor: rankBg + '32', borderColor: rankBg }]}>
-        {medalIcon ? <MaterialIcons name={medalIcon} size={17} color={rankBg} /> : null}
+      <View style={[styles.boardRankBadge, isTopThree && styles.medalBadge, { backgroundColor: rankBg + '20', borderColor: rankBg + '88' }]}>
+        {medalIcon ? <MaterialIcons name={medalIcon} size={16} color={rankBg} /> : null}
         <Text style={[styles.boardRankText, { color: colors.textPrimary }]}>{entry.rank}</Text>
       </View>
-      <Text style={[styles.boardName, isMe && styles.boardNameMe]} numberOfLines={2} ellipsizeMode="tail">
+      <Text style={[styles.boardName, isMe && styles.boardNameMe]} numberOfLines={1} ellipsizeMode="tail">
         {entry.name}{isMe ? ` (${t('leaderboard.you')})` : ''}
       </Text>
       <View style={styles.boardXPBadge}>
-        <Text style={[styles.boardXPText, negativeXP && styles.boardXPTextNegative]}>{displayXP}</Text>
-        <View style={styles.xpShield}>
-          <View style={styles.xpShieldInner}>
-            <Text style={styles.xpMiniText}>{t('common.xp')}</Text>
-          </View>
-        </View>
+        <Text style={styles.boardXPText}>{formatXPValue(entry.xp)}</Text>
+        <Text style={styles.xpMiniText}>{t('common.xp')}</Text>
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -245,6 +217,8 @@ export default function LeaderboardScreen() {
     ? { ...entry, xp: user.xpTotal, level: currentLevel.rank }
     : entry);
   const visibleEntries = displayEntries.slice(0, MAX_VISIBLE_LEADERBOARD_ENTRIES);
+  const podiumEntries = displayEntries.slice(0, 3);
+  const restEntries = displayEntries.slice(3, MAX_VISIBLE_LEADERBOARD_ENTRIES);
   const daysUntilReset = useMemo(() => {
     const day = new Date().getDay();
     return day === 0 ? 7 : 7 - day;
@@ -367,7 +341,6 @@ export default function LeaderboardScreen() {
     setRefreshing(false);
   }, [syncLeaderboard]);
 
-  // Build carousel: show currentLevel ±2 levels
   const carouselLevels = LEVELS.filter(
     l => Math.abs(l.rank - currentLevel.rank) <= 2
   );
@@ -387,6 +360,7 @@ export default function LeaderboardScreen() {
           />
         }
       >
+        {/* ── Header ─────────────────────────────────────────────────────────── */}
         <View style={styles.pageHeader}>
           <TouchableOpacity
             accessibilityRole="button"
@@ -394,7 +368,7 @@ export default function LeaderboardScreen() {
             onPress={() => router.back()}
             style={styles.headerIconButton}
           >
-            <MaterialIcons name="arrow-back" size={28} color={colors.textPrimary} />
+            <MaterialIcons name="arrow-back" size={26} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.pageTitle}>{t('leaderboard.pageTitle')}</Text>
           <View style={styles.headerActions}>
@@ -404,7 +378,7 @@ export default function LeaderboardScreen() {
               onPress={() => router.push('/rewards' as Parameters<typeof router.push>[0])}
               style={styles.headerIconButton}
             >
-              <MaterialIcons name="emoji-events" size={30} color={colors.warning} />
+              <MaterialIcons name="emoji-events" size={26} color={colors.warning} />
             </TouchableOpacity>
             <TouchableOpacity
               accessibilityRole="button"
@@ -412,70 +386,100 @@ export default function LeaderboardScreen() {
               onPress={() => setGuideVisible(true)}
               style={styles.headerIconButton}
             >
-              <MaterialIcons name="help-outline" size={28} color={colors.textPrimary} />
+              <MaterialIcons name="help-outline" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* ── Section 1: Hero Level Carousel ────────────────────────────── */}
+        {/* ── Section 1: Level Hero ──────────────────────────────────────────── */}
         <LinearGradient
           colors={[colors.background, colors.surfaceVariant]}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={styles.heroSection}
         >
-          {/* Spotlight glow behind current level */}
-          <View style={[styles.spotlight, { backgroundColor: currentLevel.color + '20' }]} />
+          <View style={[styles.spotlight, { backgroundColor: currentLevel.color + '18' }]} />
 
-          {/* Level badges row */}
+          {/* Level carousel */}
           <View style={styles.badgesRow}>
-            {carouselLevels.map(l => (
-              <LevelBadge
-                key={l.rank}
-                levelDef={l}
-                isCurrent={l.rank === currentLevel.rank}
-                size={l.rank === currentLevel.rank ? 'lg' : 'sm'}
-              />
-            ))}
+            {carouselLevels.map(l => {
+              const isCurrent = l.rank === currentLevel.rank;
+              const badgeSize = isCurrent ? 76 : 48;
+              return (
+                <View key={l.rank} style={[styles.badgeWrap, isCurrent && styles.currentBadgeWrap]}>
+                  <View style={[styles.badgeShield, {
+                    width: badgeSize, height: badgeSize, borderRadius: badgeSize * 0.26,
+                    backgroundColor: l.color + (isCurrent ? '22' : '14'),
+                    borderColor: isCurrent ? colors.surface : l.color + '66',
+                    borderWidth: isCurrent ? 3 : 2,
+                  }]}>
+                    <Text style={[styles.badgeNum, { fontSize: isCurrent ? 26 : 16, color: l.color }]}>{l.rank}</Text>
+                  </View>
+                  {isCurrent ? (
+                    <Text style={[styles.badgeLabelCurrent, { color: colors.textPrimary }]}>
+                      {currentLevelTitle}
+                    </Text>
+                  ) : null}
+                </View>
+              );
+            })}
           </View>
 
-          {/* Center level title */}
           <View style={styles.levelLabel}>
             <Text style={styles.levelLabelText}>
               {t('leaderboard.level', { value: currentLevel.rank })}
             </Text>
-            <Text style={[styles.levelSubtitle, { color: currentLevel.color }]}>{currentLevelTitle}</Text>
           </View>
-
         </LinearGradient>
 
-        {/* ── Section 2: Rank Status Card ───────────────────────────────── */}
+        {/* ── Section 2: Podium (Top 3) ──────────────────────────────────────── */}
+        {!loading && podiumEntries.length > 0 && (
+          <View style={styles.podiumSection}>
+            <View style={styles.podiumRow}>
+              {/* 2nd place */}
+              {podiumEntries[1] ? (
+                <PodiumCard entry={podiumEntries[1]} isMe={podiumEntries[1].id === user?.id} height={120} />
+              ) : <View style={styles.podiumPlaceholder} />}
+              {/* 1st place — tallest */}
+              {podiumEntries[0] ? (
+                <PodiumCard entry={podiumEntries[0]} isMe={podiumEntries[0].id === user?.id} height={150} />
+              ) : <View style={styles.podiumPlaceholder} />}
+              {/* 3rd place */}
+              {podiumEntries[2] ? (
+                <PodiumCard entry={podiumEntries[2]} isMe={podiumEntries[2].id === user?.id} height={100} />
+              ) : <View style={styles.podiumPlaceholder} />}
+            </View>
+          </View>
+        )}
+
+        {/* ── Section 3: Rank Status Card ────────────────────────────────────── */}
         <View style={styles.rankCard}>
           <View style={styles.weeklyUpdateCard}>
+            <MaterialIcons name="schedule" size={22} color={colors.textSecondary} />
             <View style={styles.weeklyUpdateCopy}>
               <Text style={styles.weeklyUpdateLabel}>{t('leaderboard.updatesInLabel')}</Text>
               <Text style={styles.weeklyUpdateValue}>{t('leaderboard.daysValue', { value: daysUntilReset })}</Text>
             </View>
-            <MaterialIcons name="info-outline" size={23} color={colors.textPrimary} />
           </View>
 
-          {/* Zone bar */}
           {entries.length > 0 ? (
             <RankZoneBar rank={myRank} total={entries.length} />
           ) : null}
         </View>
 
-        {/* ── Section 3: Leaderboard List ───────────────────────────────── */}
+        {/* ── Section 4: Leaderboard List ───────────────────────────────────── */}
         <View style={styles.listSection}>
-            <View style={styles.sectionHeadingRow}>
-              <Text style={styles.sectionTitle}>{t('leaderboard.title', { value: currentLevel.rank })}</Text>
-              <View testID="leaderboard-live" style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>{t('leaderboard.live')}</Text></View>
+          <View style={styles.sectionHeadingRow}>
+            <Text style={styles.sectionTitle}>{t('leaderboard.title', { value: currentLevel.rank })}</Text>
+            <View testID="leaderboard-live" style={styles.livePill}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>{t('leaderboard.live')}</Text>
             </View>
-            <Text style={styles.sectionSubtitle}>{t('leaderboard.subtitle')}</Text>
+          </View>
 
           {!loading && entries.length > 0 && getWeeklyZone(myRank, entries.length) !== 'promotion' ? (
             <View style={styles.promotionHint}>
-              <MaterialIcons name="arrow-upward" size={22} color={colors.success} />
+              <MaterialIcons name="arrow-upward" size={20} color={colors.success} />
               <Text style={styles.promotionHintText}>{t('leaderboard.rankHigherToPromoted')}</Text>
             </View>
           ) : null}
@@ -488,11 +492,21 @@ export default function LeaderboardScreen() {
           ) : entries.length === 0 ? (
             <View style={styles.emptyBox}>
               <MaterialIcons name="emoji-events" size={48} color={colors.textTertiary} />
-              <Text style={styles.emptyText}>{t('leaderboard.noRankings')}{'\n'}</Text>
+              <Text style={styles.emptyText}>{t('leaderboard.noRankings')}</Text>
             </View>
           ) : (
             <View style={styles.listContainer}>
-              {visibleEntries.map(entry => (
+              {restEntries.length > 0 && podiumEntries.length >= 3 && (
+                <View style={styles.separator}>
+                  <View style={styles.separatorLine} />
+                  <Text style={styles.separatorText}>4+</Text>
+                  <View style={styles.separatorLine} />
+                </View>
+              )}
+              {restEntries.map(entry => (
+                <BoardRow key={entry.id} entry={entry} isMe={entry.id === user?.id} />
+              ))}
+              {podiumEntries.length < 3 && visibleEntries.map(entry => (
                 <BoardRow key={entry.id} entry={entry} isMe={entry.id === user?.id} />
               ))}
             </View>
@@ -539,298 +553,267 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.levelLegend + '88',
     backgroundColor: colors.surface,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
+      android: { elevation: 6 },
+    }),
   },
   celebrationCopy: { flex: 1 },
   celebrationTitle: { color: colors.levelLegend, fontSize: FontSize.sm, fontWeight: FontWeight.extraBold },
   celebrationSubtitle: { color: colors.textSecondary, fontSize: FontSize.xs, marginTop: 2 },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 100 },
+
+  // ── Header ──────────────────────────────────────────────────────────────
   pageHeader: {
-    minHeight: 72,
+    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    backgroundColor: colors.surface,
+    paddingHorizontal: Spacing.md,
+    backgroundColor: colors.background,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   headerIconButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
   pageTitle: {
     flex: 1,
-    marginLeft: 6,
-    fontSize: 24,
-    lineHeight: 30,
+    textAlign: 'center',
+    fontSize: FontSize.xxl,
     fontWeight: FontWeight.extraBold,
     color: colors.textPrimary,
-    letterSpacing: -0.4,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
   },
 
-  // ── Section 1 Hero ────────────────────────────────────────────────────────
+  // ── Hero Section ─────────────────────────────────────────────────────────
   heroSection: {
     alignItems: 'center',
-    minHeight: 270,
-    paddingTop: 26,
-    paddingBottom: 24,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.lg,
     overflow: 'hidden',
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
   },
   spotlight: {
     position: 'absolute',
-    width: 150,
-    height: 230,
-    borderRadius: 76,
-    top: 18,
-    opacity: 0.78,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    top: 0,
+    opacity: 0.5,
   },
   badgesRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'center',
-    gap: 4,
-    minHeight: 180,
-    marginBottom: 2,
+    gap: Spacing.sm,
+    minHeight: 120,
+    marginBottom: Spacing.sm,
     zIndex: 2,
   },
   badgeWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    minWidth: 62,
+    gap: 6,
+    minWidth: 50,
   },
   currentBadgeWrap: {
-    minWidth: 128,
-    paddingTop: 8,
-  },
-  badgeAssembly: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  badgeWing: {
-    position: 'absolute',
-    top: '44%',
-    borderRadius: 8,
+    minWidth: 100,
+    paddingBottom: 4,
   },
   badgeShield: {
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#00000055',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  badgeShieldInner: {
-    width: '76%',
-    height: '76%',
-    borderRadius: 10,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeRibbon: {
-    position: 'absolute',
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: colors.surface + '88',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 6, shadowOffset: { width: 0, height: 3 } },
+      android: { elevation: 3 },
+    }),
   },
   badgeNum: {
     fontWeight: FontWeight.extraBold,
     includeFontPadding: false,
-    lineHeight: undefined,
   },
   badgeLabelCurrent: {
-    fontSize: FontSize.xl,
-    lineHeight: 28,
-    fontWeight: FontWeight.extraBold,
-    marginTop: -4,
+    fontSize: FontSize.sm,
+    lineHeight: 18,
+    fontWeight: FontWeight.bold,
+    marginTop: 2,
   },
   levelLabel: {
     alignItems: 'center',
-    marginTop: -2,
-    marginBottom: 12,
     zIndex: 2,
   },
   levelLabelText: {
-    fontSize: 32,
-    lineHeight: 38,
+    fontSize: FontSize.lg,
+    lineHeight: 24,
     fontWeight: FontWeight.extraBold,
-    color: colors.textPrimary,
-    letterSpacing: -0.6,
-  },
-  levelSubtitle: {
-    fontSize: FontSize.sm,
-    lineHeight: 20,
-    fontWeight: FontWeight.bold,
-    marginTop: -2,
+    color: colors.textSecondary,
   },
 
-  // ── Section 2 Rank Card ────────────────────────────────────────────────────
-  rankCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 22,
-    marginHorizontal: 20,
-    marginTop: 16,
-    marginBottom: 22,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    padding: 14,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
-    elevation: 3,
+  // ── Podium Section ───────────────────────────────────────────────────────
+  podiumSection: {
+    paddingHorizontal: Spacing.md,
+    marginTop: Spacing.sm,
   },
-  weeklyUpdateCard: {
-    minHeight: 104,
+  podiumRow: {
     flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+  },
+  podiumPlaceholder: {
+    flex: 1,
+  },
+  podiumCard: {
+    flex: 1,
+    borderRadius: Radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
+      android: { elevation: 4 },
+    }),
+  },
+  podiumCardMe: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+  },
+  podiumGradient: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    marginBottom: 18,
-    borderRadius: 18,
-    backgroundColor: colors.primary + '16',
+    gap: 4,
+    paddingVertical: Spacing.sm,
+  },
+  podiumMedal: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    marginBottom: 4,
+  },
+  podiumName: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.bold,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    paddingHorizontal: 4,
+  },
+  podiumXP: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.extraBold,
+    includeFontPadding: false,
+  },
+  podiumXPLabel: {
+    fontSize: 9,
+    color: colors.textTertiary,
+    fontWeight: FontWeight.bold,
+    letterSpacing: 0.5,
+  },
+  podiumBase: {
+    width: '100%',
+  },
+
+  // ── Rank Card ────────────────────────────────────────────────────────────
+  rankCard: {
+    backgroundColor: colors.surface,
+    borderRadius: Radius.lg,
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.lg,
     borderWidth: 1,
-    borderColor: colors.primary + '42',
+    borderColor: colors.border,
+    padding: Spacing.md,
+    ...Platform.select({
+      ios: { shadowColor: '#1C2D44', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
+      android: { elevation: 2 },
+    }),
+  },
+  weeklyUpdateCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    marginBottom: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: colors.surfaceVariant,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   weeklyUpdateCopy: {
     flex: 1,
-    alignItems: 'center',
   },
   weeklyUpdateLabel: {
     color: colors.textSecondary,
     fontSize: FontSize.sm,
-    lineHeight: 18,
     fontWeight: FontWeight.semiBold,
-    textAlign: 'center',
-    letterSpacing: 0.2,
   },
   weeklyUpdateValue: {
-    color: colors.primaryGlow,
-    fontSize: 30,
-    lineHeight: 36,
-    fontWeight: FontWeight.extraBold,
-    textAlign: 'center',
-    letterSpacing: -0.5,
-  },
-  rankCardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-  },
-  rankCardLeft: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  miniLevelBadge: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  miniLevelNum: {
+    color: colors.textPrimary,
     fontSize: FontSize.xl,
     fontWeight: FontWeight.extraBold,
-    includeFontPadding: false,
-  },
-  miniLevelLabel: {
-    fontSize: FontSize.xs,
-    fontWeight: FontWeight.bold,
-  },
-  rankCardRight: {
-    gap: 8,
-    flex: 1,
-    marginLeft: Spacing.md,
-  },
-  infoPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceVariant,
-    borderRadius: Radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 4,
-  },
-  infoPillLabel: {
-    fontSize: FontSize.sm,
-    color: colors.textSecondary,
-  },
-  infoPillVal: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.bold,
-    color: colors.textPrimary,
-    includeFontPadding: false,
+    marginTop: 2,
   },
 
-  // ── Zone Bar ───────────────────────────────────────────────────────────────
-  zoneBarContainer: { marginTop: Spacing.sm, overflow: 'hidden', paddingTop: 28 },
+  // ── Zone Bar ──────────────────────────────────────────────────────────────
+  zoneBarContainer: { marginTop: Spacing.sm, overflow: 'hidden', paddingTop: 30 },
   zoneLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   zoneLabel: {
-    fontSize: FontSize.sm,
-    lineHeight: 18,
+    fontSize: FontSize.xs,
+    lineHeight: 16,
     fontWeight: FontWeight.semiBold,
     flex: 1,
-    flexShrink: 1,
-    minWidth: 0,
     textAlign: 'center',
   },
   rankBadgeAbove: {
     position: 'absolute',
-    top: 20,
-    marginLeft: -50,
-    minWidth: 100,
+    top: 18,
+    marginLeft: -44,
+    minWidth: 88,
     alignItems: 'center',
-    borderWidth: 3,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    borderWidth: 2,
+    borderRadius: Radius.md,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     zIndex: 3,
   },
   rankBadgeAboveText: {
-    fontSize: 20,
-    lineHeight: 26,
+    fontSize: FontSize.base,
+    lineHeight: 20,
     fontWeight: FontWeight.extraBold,
   },
   rankPointerTail: {
     position: 'absolute',
-    bottom: -13,
+    bottom: -10,
     width: 0,
     height: 0,
-    borderLeftWidth: 10,
-    borderRightWidth: 10,
-    borderTopWidth: 13,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 10,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
   },
   zoneBarTrack: {
     flexDirection: 'row',
-    height: 16,
+    height: 12,
     borderRadius: Radius.full,
     overflow: 'hidden',
-    marginBottom: 5,
+    marginBottom: 4,
     position: 'relative',
   },
   zoneSegment: {
@@ -838,11 +821,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   zoneDot: {
     position: 'absolute',
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    top: -7,
-    marginLeft: -15,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    top: -6,
+    marginLeft: -12,
     borderWidth: 3,
     borderColor: colors.surface,
   },
@@ -853,64 +836,90 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   zoneRankNum: {
     fontSize: FontSize.xs,
-    color: colors.textSecondary,
+    color: colors.textTertiary,
     fontWeight: FontWeight.semiBold,
   },
-  zoneRankLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+
+  // ── List Section ──────────────────────────────────────────────────────────
+  listSection: {
+    paddingHorizontal: Spacing.md,
   },
-  zoneRankLabel: {
-    fontSize: 9,
-    color: colors.textTertiary,
-    textTransform: 'uppercase',
+  sectionHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.sm,
+  },
+  sectionTitle: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.extraBold,
+    color: colors.textSecondary,
     letterSpacing: 0.5,
   },
-
-  // ── Section 3 List ─────────────────────────────────────────────────────────
-  listSection: {
-    paddingHorizontal: 20,
+  livePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.success + '18',
+    borderRadius: Radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: colors.success + '55',
   },
-  sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 },
-  livePill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.success + '18', borderRadius: Radius.full, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: colors.success + '55' },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success },
   liveText: { color: colors.success, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8 },
-  sectionTitle: { color: colors.textPrimary, fontSize: FontSize.lg, fontWeight: FontWeight.extraBold },
-  sectionSubtitle: { color: colors.textTertiary, fontSize: FontSize.xs, marginBottom: 10 },
-  promotionHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, marginBottom: 4 },
+  promotionHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    marginBottom: 4,
+  },
   promotionHintText: { color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.bold },
-  listContainer: { gap: 10, paddingBottom: Spacing.xl },
+  listContainer: { gap: 8, paddingBottom: Spacing.xl },
+
+  // ── Board Row ─────────────────────────────────────────────────────────────
   boardRow: {
-    minHeight: 76,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderRadius: 18,
+    borderRadius: Radius.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    overflow: 'hidden',
+    backgroundColor: colors.surface,
   },
-  topThreeRow: { minHeight: 82, paddingVertical: 14 },
-  firstPlaceRow: { borderColor: colors.levelLegend + '88', shadowColor: colors.levelLegend, shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
-  secondPlaceRow: { borderColor: colors.levelGrinder + '66' },
-  thirdPlaceRow: { borderColor: colors.levelConsistent + '66' },
+  topThreeRow: {
+    borderWidth: 1.5,
+  },
+  firstPlaceRow: {
+    borderColor: colors.levelLegend + '66',
+    ...Platform.select({
+      ios: { shadowColor: colors.levelLegend, shadowOpacity: 0.1, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
+      android: { elevation: 2 },
+    }),
+  },
   boardRowMe: {
     borderColor: colors.primary,
     borderWidth: 2,
+    backgroundColor: colors.primary + '08',
   },
   boardRankBadge: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
+    width: 38,
+    height: 38,
+    borderRadius: 10,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 1,
   },
-  medalBadge: { width: 46, height: 46, borderRadius: 15, gap: 1 },
+  medalBadge: { width: 42, height: 42, borderRadius: 12 },
   boardRankText: {
-    fontSize: FontSize.xl,
+    fontSize: FontSize.md,
     fontWeight: FontWeight.extraBold,
     includeFontPadding: false,
   },
@@ -918,7 +927,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     flex: 1,
     minWidth: 0,
     fontSize: FontSize.base,
-    lineHeight: 20,
     fontWeight: FontWeight.semiBold,
     color: colors.textPrimary,
   },
@@ -929,58 +937,41 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   boardXPBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    minWidth: 70,
-    justifyContent: 'flex-end',
+    gap: 4,
   },
   boardXPText: {
-    fontSize: FontSize.lg,
-    lineHeight: 24,
+    fontSize: FontSize.md,
     fontWeight: FontWeight.extraBold,
     color: colors.textPrimary,
     includeFontPadding: false,
   },
-  boardXPTextNegative: { color: colors.danger },
-  xpShield: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceVariant,
-    borderWidth: 1.5,
-    borderColor: colors.borderStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
-    transform: [{ rotate: '30deg' }],
-  },
-  xpShieldInner: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    transform: [{ rotate: '-30deg' }],
-  },
-  xpMiniTag: {
-    backgroundColor: colors.surfaceVariant,
-    borderRadius: Radius.sm,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
   xpMiniText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: FontWeight.bold,
-    color: colors.textSecondary,
-    letterSpacing: 0.2,
-  },
-  separator: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  separatorText: {
-    fontSize: FontSize.base,
     color: colors.textTertiary,
-    letterSpacing: 4,
+    letterSpacing: 0.3,
   },
 
+  // ── Separator ──────────────────────────────────────────────────────────────
+  separator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    gap: 8,
+  },
+  separatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  separatorText: {
+    fontSize: FontSize.xs,
+    color: colors.textTertiary,
+    fontWeight: FontWeight.bold,
+    letterSpacing: 1,
+  },
+
+  // ── States ─────────────────────────────────────────────────────────────────
   loadingBox: {
     alignItems: 'center',
     paddingVertical: Spacing.xxl,
