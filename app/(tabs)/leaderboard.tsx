@@ -11,6 +11,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { LEVELS, getLevelForUser } from '@/constants/levels';
+import { formatXPValue, isNegativeXP } from '@/features/progression/services/xpDisplay';
 import { useApp } from '@/hooks/useApp';
 import { supabase } from '@/features/core/services/supabase';
 import { getWeeklyZone } from '@/features/progression/services/weeklyXp';
@@ -158,6 +159,8 @@ function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
     2: 'military-tech',
     3: 'workspace-premium',
   };
+  const displayXP = formatXPValue(entry.xp);
+  const negativeXP = isNegativeXP(entry.xp);
   const isTopThree = entry.rank <= 3;
   const medalIcon = medalIcons[entry.rank];
   const medalLabel = entry.rank === 1
@@ -173,7 +176,7 @@ function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
 
   return (
     <LinearGradient
-      accessibilityLabel={isTopThree ? `${entry.name}, ${medalLabel}, ${t('leaderboard.rank')} ${entry.rank}, ${entry.xp} ${t('common.xp')}` : `${entry.name}, ${t('leaderboard.rank')} ${entry.rank}, ${entry.xp} ${t('common.xp')}`}
+      accessibilityLabel={isTopThree ? `${entry.name}, ${medalLabel}, ${t('leaderboard.rank')} ${entry.rank}, ${displayXP} ${t('common.xp')}` : `${entry.name}, ${t('leaderboard.rank')} ${entry.rank}, ${displayXP} ${t('common.xp')}`}
       colors={rowColors}
       start={{ x: 0, y: 0.5 }}
       end={{ x: 1, y: 0.5 }}
@@ -194,7 +197,7 @@ function BoardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
         {entry.name}{isMe ? ` (${t('leaderboard.you')})` : ''}
       </Text>
       <View style={styles.boardXPBadge}>
-        <Text style={styles.boardXPText}>{entry.xp}</Text>
+        <Text style={[styles.boardXPText, negativeXP && styles.boardXPTextNegative]}>{displayXP}</Text>
         <View style={styles.xpShield}>
           <View style={styles.xpShieldInner}>
             <Text style={styles.xpMiniText}>{t('common.xp')}</Text>
@@ -543,28 +546,30 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 100 },
   pageHeader: {
-    minHeight: 68,
+    minHeight: 72,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    backgroundColor: colors.background,
+    paddingHorizontal: 20,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   headerIconButton: {
     width: 42,
     height: 42,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   pageTitle: {
     flex: 1,
-    marginLeft: 4,
-    fontSize: 27,
-    lineHeight: 32,
+    marginLeft: 6,
+    fontSize: 24,
+    lineHeight: 30,
     fontWeight: FontWeight.extraBold,
     color: colors.textPrimary,
+    letterSpacing: -0.4,
   },
   headerActions: {
     flexDirection: 'row',
@@ -576,9 +581,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   heroSection: {
     alignItems: 'center',
     minHeight: 270,
-    paddingTop: 28,
-    paddingBottom: 28,
+    paddingTop: 26,
+    paddingBottom: 24,
     overflow: 'hidden',
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
   },
   spotlight: {
     position: 'absolute',
@@ -658,10 +665,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     zIndex: 2,
   },
   levelLabelText: {
-    fontSize: 34,
-    lineHeight: 40,
+    fontSize: 32,
+    lineHeight: 38,
     fontWeight: FontWeight.extraBold,
     color: colors.textPrimary,
+    letterSpacing: -0.6,
   },
   levelSubtitle: {
     fontSize: FontSize.sm,
@@ -673,49 +681,51 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   // ── Section 2 Rank Card ────────────────────────────────────────────────────
   rankCard: {
     backgroundColor: colors.surface,
-    borderRadius: 18,
-    marginHorizontal: Spacing.md,
-    marginTop: -2,
-    marginBottom: Spacing.lg,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+    borderRadius: 22,
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 22,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
     padding: 14,
-    shadowColor: '#1C2D44',
-    shadowOffset: { width: 0, height: 3 },
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowRadius: 18,
+    elevation: 3,
   },
   weeklyUpdateCard: {
-    minHeight: 112,
+    minHeight: 104,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.lg,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceVariant,
+    paddingHorizontal: 16,
+    marginBottom: 18,
+    borderRadius: 18,
+    backgroundColor: colors.primary + '16',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.primary + '42',
   },
   weeklyUpdateCopy: {
     flex: 1,
     alignItems: 'center',
   },
   weeklyUpdateLabel: {
-    color: colors.textPrimary,
-    fontSize: 22,
-    lineHeight: 28,
+    color: colors.textSecondary,
+    fontSize: FontSize.sm,
+    lineHeight: 18,
     fontWeight: FontWeight.semiBold,
     textAlign: 'center',
+    letterSpacing: 0.2,
   },
   weeklyUpdateValue: {
-    color: colors.textPrimary,
-    fontSize: 34,
-    lineHeight: 40,
+    color: colors.primaryGlow,
+    fontSize: 30,
+    lineHeight: 36,
     fontWeight: FontWeight.extraBold,
     textAlign: 'center',
+    letterSpacing: -0.5,
   },
   rankCardTop: {
     flexDirection: 'row',
@@ -859,30 +869,30 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
 
   // ── Section 3 List ─────────────────────────────────────────────────────────
   listSection: {
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: 20,
   },
-  sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginBottom: 2 },
+  sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 },
   livePill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.success + '18', borderRadius: Radius.full, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: colors.success + '55' },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success },
   liveText: { color: colors.success, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8 },
-  sectionTitle: { display: 'none' },
-  sectionSubtitle: { display: 'none' },
+  sectionTitle: { color: colors.textPrimary, fontSize: FontSize.lg, fontWeight: FontWeight.extraBold },
+  sectionSubtitle: { color: colors.textTertiary, fontSize: FontSize.xs, marginBottom: 10 },
   promotionHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, marginBottom: 4 },
   promotionHintText: { color: colors.textPrimary, fontSize: FontSize.base, fontWeight: FontWeight.bold },
-  listContainer: { gap: 12, paddingBottom: Spacing.xl },
+  listContainer: { gap: 10, paddingBottom: Spacing.xl },
   boardRow: {
-    minHeight: 92,
+    minHeight: 76,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderWidth: 1.5,
+    gap: 12,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
   },
-  topThreeRow: { minHeight: 96, paddingVertical: 16 },
+  topThreeRow: { minHeight: 82, paddingVertical: 14 },
   firstPlaceRow: { borderColor: colors.levelLegend + '88', shadowColor: colors.levelLegend, shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   secondPlaceRow: { borderColor: colors.levelGrinder + '66' },
   thirdPlaceRow: { borderColor: colors.levelConsistent + '66' },
@@ -891,14 +901,14 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderWidth: 2,
   },
   boardRankBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 11,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  medalBadge: { width: 50, height: 50, borderRadius: 13, gap: 1 },
+  medalBadge: { width: 46, height: 46, borderRadius: 15, gap: 1 },
   boardRankText: {
     fontSize: FontSize.xl,
     fontWeight: FontWeight.extraBold,
@@ -919,7 +929,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   boardXPBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 7,
+    minWidth: 70,
+    justifyContent: 'flex-end',
   },
   boardXPText: {
     fontSize: FontSize.lg,
@@ -928,10 +940,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.textPrimary,
     includeFontPadding: false,
   },
+  boardXPTextNegative: { color: colors.danger },
   xpShield: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 12,
     backgroundColor: colors.surfaceVariant,
     borderWidth: 1.5,
     borderColor: colors.borderStrong,
