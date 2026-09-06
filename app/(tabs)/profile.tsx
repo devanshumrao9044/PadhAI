@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, TextInput, Alert, Platform, Image, ActivityIndicator, Switch
+  Modal, TextInput, Alert, Platform, Image, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -15,12 +15,13 @@ import { getSafeErrorMessage } from '@/features/core/services/safeError';
 import { useApp } from '@/hooks/useApp';
 import { useAuthSession } from '@/auth/AuthSessionProvider';
 import { getLevelForUser, getXPProgressForUser, LEVELS } from '@/constants/levels';
+import { formatXPValue, isNegativeXP } from '@/features/progression/services/xpDisplay';
 import XPBar from '@/components/ui/XPBar';
 import { getRecentSessions } from '@/features/profile/services/sessionHistory';
 import { loadTodoItems } from '@/features/productivity/services/productivity';
 import { fetchReferralStats } from '@/features/referrals/services/referralService';
 import { getWeeklyZone } from '@/features/progression/services/weeklyXp';
-import { STUDY_GOALS, PROFILE_LEARNER_TYPES } from '@/constants/studyGoals';
+import { STUDY_GOALS } from '@/constants/studyGoals';
 import {
   DEFAULT_NOTIFICATION_SETTINGS,
   loadNotificationSettings,
@@ -38,10 +39,12 @@ import {
 } from '@/features/profile/services/avatarImage';
 
 export default function ProfileScreen() {
-  const { colors, mode, toggleTheme } = useTheme();
-  const { language, setLanguage, t } = useLanguage();
+  const { colors } = useTheme();
+  const { language, t } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, setUser, sessions, chapters } = useApp();
+  const displayXP = formatXPValue(user?.xpTotal ?? 0);
+  const displayXPIsNegative = isNegativeXP(user?.xpTotal ?? 0);
   const router = useRouter();
   const { signOut, signingOut } = useAuthSession();
   const userId = user?.id;
@@ -401,9 +404,9 @@ export default function ProfileScreen() {
               </Text>
               <Text style={styles.levelExam}>{currentLevelCopy.exam}</Text>
             </View>
-            <View style={styles.xpBadge}>
-              <MaterialIcons name="bolt" size={16} color={colors.warning} />
-              <Text style={styles.xpBadgeText}>{t('profile.weeklyXPValue', { value: user.xpTotal })}</Text>
+            <View style={[styles.xpBadge, displayXPIsNegative && styles.xpBadgeNegative]}>
+              <MaterialIcons name="bolt" size={16} color={displayXPIsNegative ? colors.danger : colors.warning} />
+              <Text style={[styles.xpBadgeText, displayXPIsNegative && styles.xpBadgeNegativeText]}>{t('profile.weeklyXPValue', { value: displayXP })}</Text>
             </View>
           </View>
           <XPBar xp={user.xpTotal} levelRank={user.levelRank} />
@@ -553,7 +556,7 @@ export default function ProfileScreen() {
                     ? comebackBonus > 0
                       ? `+${baseXP} XP + ${comebackBonus} ${t('focus.comebackBonus').toLowerCase()}`
                       : `+${baseXP} XP`
-                    : `-${session.xpDeducted} XP`}
+                    : `${formatXPValue(-Math.abs(Number(session.xpDeducted ?? 0)))} XP`}
                 </Text>
               </View>
               );
@@ -590,7 +593,18 @@ export default function ProfileScreen() {
         <View style={styles.modalOverlay}>
           <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}>
             <View style={styles.modalSheet}>
-              <Text style={styles.modalTitle}>{t('profile.editProfile')}</Text>
+              <View style={styles.modalHeader}>
+                <View style={styles.modalHandle} />
+                <Text style={styles.modalTitle}>{t('profile.editProfile')}</Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.cancel')}
+                  style={styles.modalCloseButton}
+                  onPress={() => setEditVisible(false)}
+                >
+                  <MaterialIcons name="close" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
 
               <TouchableOpacity style={styles.modalAvatarEdit} onPress={pickImage}>
                 {editAvatarUrl ? (
@@ -641,17 +655,15 @@ export default function ProfileScreen() {
 
               <Text style={styles.inputLabel}>{t('profile.classLabel')}</Text>
               <View style={styles.chipRow}>
-                {PROFILE_LEARNER_TYPES.map(cls => (
-                  <TouchableOpacity
-                    key={cls}
-                    style={[styles.chip, editClass === cls && styles.chipActive]}
-                    onPress={() => setEditClass(cls)}
-                  >
-                    <Text style={[styles.chipText, editClass === cls && styles.chipTextActive]}>
-                      {cls}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                <TouchableOpacity
+                  style={[styles.chip, styles.commonStudyChip, editClass === 'SELF_STUDY' && styles.chipActive]}
+                  onPress={() => setEditClass('SELF_STUDY')}
+                >
+                  <MaterialIcons name="menu-book" size={17} color={editClass === 'SELF_STUDY' ? colors.primary : colors.textSecondary} />
+                  <Text style={[styles.chipText, editClass === 'SELF_STUDY' && styles.chipTextActive]}>
+                    {t('profile.commonStudy')}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               <Text style={styles.inputLabel}>{t('profile.dailyGoalMinutes')}</Text>
@@ -663,35 +675,6 @@ export default function ProfileScreen() {
                 placeholder={t('profile.goalPlaceholder')}
                 placeholderTextColor={colors.textTertiary}
               />
-
-              <View style={styles.modalPreferenceCard}>
-                <Text style={styles.modalPreferenceTitle}>{t('profile.editPreferences')}</Text>
-                <View style={styles.modalSettingRow}>
-                  <View style={styles.modalSettingInfo}><Text style={styles.modalSettingLabel}>{t('profile.theme')}</Text><Text style={styles.modalSettingValue}>{mode === 'dark' ? t('profile.darkMode') : t('profile.lightMode')}</Text></View>
-                  <Switch value={mode === 'light'} onValueChange={() => { void toggleTheme(); }} trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }} thumbColor={mode === 'light' ? colors.primary : colors.textTertiary} />
-                </View>
-                <View style={styles.modalSettingRow}>
-                  <View style={styles.modalSettingInfo}><Text style={styles.modalSettingLabel}>{t('profile.language')}</Text><Text style={styles.modalSettingValue}>{t('settings.languageDescription')}</Text></View>
-                  <View style={styles.languageOptions}>
-                    {(['en', 'hi'] as const).map(option => (
-                      <TouchableOpacity key={option} style={[styles.languageOption, language === option && styles.languageOptionActive]} onPress={() => { void setLanguage(option); }}>
-                        <Text style={[styles.languageOptionText, language === option && styles.languageOptionTextActive]}>{option === 'en' ? t('profile.english') : t('profile.hindi')}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-                <View style={styles.modalSettingRow}>
-                  <View style={styles.modalSettingInfo}><Text style={styles.modalSettingLabel}>{t('profile.notificationsDevice')}</Text><Text style={styles.modalSettingValue}>{t('profile.notificationsDescription')}</Text></View>
-                  <Switch value={notificationSettings.enabled} onValueChange={value => { void updateNotificationSettings({ enabled: value }); }} disabled={notificationBusy} trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }} thumbColor={notificationSettings.enabled ? colors.primary : colors.textTertiary} />
-                </View>
-                {notificationSettings.enabled ? (
-                  <View style={styles.modalReminderGroup}>
-                    <View style={styles.modalSettingRow}><View style={styles.modalSettingInfo}><Text style={styles.modalSettingLabel}>{t('profile.studyReminder')}</Text></View><Switch value={notificationSettings.studyReminder} onValueChange={value => { void updateNotificationSettings({ studyReminder: value }); }} disabled={notificationBusy} trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }} thumbColor={notificationSettings.studyReminder ? colors.primary : colors.textTertiary} /></View>
-                    <View style={styles.modalSettingRow}><View style={styles.modalSettingInfo}><Text style={styles.modalSettingLabel}>{t('profile.todoReminder')}</Text></View><Switch value={notificationSettings.todoReminder} onValueChange={value => { void updateNotificationSettings({ todoReminder: value }); }} disabled={notificationBusy} trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }} thumbColor={notificationSettings.todoReminder ? colors.primary : colors.textTertiary} /></View>
-                    <View style={styles.modalSettingRow}><View style={styles.modalSettingInfo}><Text style={styles.modalSettingLabel}>{t('profile.streakReminder')}</Text></View><Switch value={notificationSettings.streakReminder} onValueChange={value => { void updateNotificationSettings({ streakReminder: value }); }} disabled={notificationBusy} trackColor={{ false: colors.surfaceVariant, true: colors.primary + '88' }} thumbColor={notificationSettings.streakReminder ? colors.primary : colors.textTertiary} /></View>
-                  </View>
-                ) : null}
-              </View>
 
               <View style={styles.modalBtns}>
                 <TouchableOpacity
@@ -806,6 +789,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   levelExam: { fontSize: FontSize.sm, color: colors.textSecondary },
   xpBadge: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.warning + '22', borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 4 },
   xpBadgeText: { fontSize: FontSize.sm, lineHeight: 18, color: colors.warning, fontWeight: FontWeight.semiBold },
+  xpBadgeNegative: { backgroundColor: colors.danger + '18' },
+  xpBadgeNegativeText: { color: colors.danger },
   xpNeeded: { fontSize: FontSize.xs, color: colors.textTertiary, marginTop: 6 },
   statsGrid: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, padding: Spacing.md, marginBottom: Spacing.md },
   statItem: { alignItems: 'center', flex: 1, gap: 4 },
@@ -850,7 +835,10 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   referralCode: { fontSize: FontSize.xs, color: colors.primary, fontWeight: FontWeight.bold, marginTop: 8 },
   modalOverlay: { flex: 1, backgroundColor: colors.overlay },
   modalSheet: { backgroundColor: colors.surface, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.lg, paddingBottom: Spacing.xxl, marginTop: 'auto', borderWidth: 1, borderColor: colors.border },
-  modalTitle: { fontSize: FontSize.xl, lineHeight: 28, fontWeight: FontWeight.bold, color: colors.textPrimary, marginBottom: Spacing.lg, textAlign: 'center', flexShrink: 1 },
+  modalHeader: { position: 'relative', alignItems: 'center', marginBottom: Spacing.md },
+  modalHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: Spacing.md },
+  modalTitle: { fontSize: FontSize.xl, lineHeight: 28, fontWeight: FontWeight.bold, color: colors.textPrimary, textAlign: 'center', flexShrink: 1 },
+  modalCloseButton: { position: 'absolute', right: 0, bottom: 0, width: 34, height: 34, borderRadius: 17, backgroundColor: colors.surfaceVariant, alignItems: 'center', justifyContent: 'center' },
   modalPreferenceCard: { marginTop: Spacing.md, padding: Spacing.sm, paddingRight: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
   modalPreferenceTitle: { color: colors.textPrimary, fontSize: FontSize.sm, fontWeight: FontWeight.bold, marginBottom: 2 },
   modalSettingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.sm, paddingRight: Spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
@@ -867,6 +855,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   input: { backgroundColor: colors.surfaceVariant, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: Spacing.md, paddingVertical: 12, color: colors.textPrimary, fontSize: FontSize.md, marginBottom: 8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   chip: { flexGrow: 1, flexBasis: '28%', minWidth: 82, backgroundColor: colors.surfaceVariant, paddingHorizontal: 8, paddingVertical: 10, borderRadius: Radius.md, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+  commonStudyChip: { flexDirection: 'row', gap: 7, justifyContent: 'center', flexBasis: '100%', minHeight: 46 },
   chipActive: { backgroundColor: colors.primary + '22', borderColor: colors.primary },
   chipText: { color: colors.textSecondary, fontSize: FontSize.xs, lineHeight: 16, fontWeight: FontWeight.semiBold, textAlign: 'center', flexShrink: 1 },
   chipTextActive: { color: colors.primary, fontWeight: FontWeight.bold },
