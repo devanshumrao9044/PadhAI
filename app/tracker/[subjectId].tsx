@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   FlatList, View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, TextInput, Pressable, Platform
+  Modal, TextInput, Pressable, Platform, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -89,7 +89,8 @@ export default function SubjectDetailScreen() {
       setSubjectModalVisible(false);
     } catch (error: any) {
       console.error('Subject Update Error');
-      alert(getSafeErrorMessage(error, {
+      // ✅ Bug 15 Fixed: Changed alert() to native Alert.alert()
+      Alert.alert('Update Error', getSafeErrorMessage(error, {
         fallback: 'Failed to update subject. Please try again.',
         network: 'Check your connection and try again.',
         permission: 'You do not have permission to update this subject.',
@@ -106,7 +107,8 @@ export default function SubjectDetailScreen() {
       router.back(); // Redirect back to tracker main screen
     } catch (error: any) {
       console.error('Subject Delete Error');
-      alert(getSafeErrorMessage(error, {
+      // ✅ Bug 15 Fixed: Changed alert() to native Alert.alert()
+      Alert.alert('Delete Error', getSafeErrorMessage(error, {
         fallback: 'Failed to delete subject. Please try again.',
         network: 'Check your connection and try again.',
         permission: 'You do not have permission to delete this subject.',
@@ -144,7 +146,8 @@ export default function SubjectDetailScreen() {
       setModalVisible(false);
     } catch (error: any) {
       console.error('Save Error');
-      alert(getSafeErrorMessage(error, {
+      // ✅ Bug 15 Fixed: Changed alert() to native Alert.alert()
+      Alert.alert('Save Error', getSafeErrorMessage(error, {
         fallback: 'Failed to save. Please try again.',
         network: 'Check your connection and try again.',
         permission: 'You do not have permission to edit this chapter.',
@@ -165,6 +168,8 @@ export default function SubjectDetailScreen() {
       await updateChapter(id, { status, ...(completedDate ? { completedDate } : {}) });
     } catch (error: any) {
       console.error("Status Update Error", error);
+      // ✅ Bug 15 Fixed: Added Alert to prevent silent failure on status change
+      Alert.alert('Status Error', 'Failed to update status. Please check your connection.');
     }
   };
 
@@ -181,7 +186,8 @@ export default function SubjectDetailScreen() {
       setIsSelectionMode(false);
     } catch (error: any) {
       console.error('Bulk Delete Failed');
-      alert(getSafeErrorMessage(error, {
+      // ✅ Bug 15 Fixed: Changed alert() to native Alert.alert()
+      Alert.alert('Delete Error', getSafeErrorMessage(error, {
         fallback: 'Delete failed. Please try again.',
         network: 'Check your connection and try again.',
         permission: 'You do not have permission to delete these chapters.',
@@ -194,7 +200,8 @@ export default function SubjectDetailScreen() {
       await deleteChapter(id);
     } catch (error: any) {
       console.error('Delete Failed');
-      alert(getSafeErrorMessage(error, {
+      // ✅ Bug 15 Fixed: Changed alert() to native Alert.alert()
+      Alert.alert('Delete Error', getSafeErrorMessage(error, {
         fallback: 'Delete failed. Please try again.',
         network: 'Check your connection and try again.',
         permission: 'You do not have permission to delete this chapter.',
@@ -377,7 +384,13 @@ export default function SubjectDetailScreen() {
       )}
 
       {/* 🚀 Edit Subject Modal */}
-      <Modal visible={subjectModalVisible} transparent animationType="slide">
+      {/* ✅ Bug 15 Fixed: Added onRequestClose for Android back button */}
+      <Modal 
+        visible={subjectModalVisible} 
+        transparent 
+        animationType="slide"
+        onRequestClose={() => setSubjectModalVisible(false)}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
@@ -410,7 +423,13 @@ export default function SubjectDetailScreen() {
       </Modal>
 
       {/* Add/Edit Chapter Modal */}
-      <Modal visible={modalVisible} transparent animationType="slide">
+      {/* ✅ Bug 15 Fixed: Added onRequestClose for Android back button */}
+      <Modal 
+        visible={modalVisible} 
+        transparent 
+        animationType="slide"
+        onRequestClose={() => { setModalVisible(false); setShowPicker(false); }}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
@@ -594,4 +613,3 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   saveBtnDisabled: { opacity: 0.4 },
   saveBtnText: { color: colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
 });
-
