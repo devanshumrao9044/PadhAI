@@ -202,11 +202,12 @@ export default function NotificationsScreen() {
                   </View>
                 </TouchableOpacity>
 
+                {/* ✅ Bug 7 Fixed: Link is now interactive */}
                 {item.linkUrl ? (
-                  <View style={styles.linkInfo}>
-                    <MaterialIcons name="link" size={17} color={colors.textSecondary} />
-                    <Text style={styles.linkText}>{t('notifications.linkAttached')}</Text>
-                  </View>
+                  <TouchableOpacity style={styles.linkInfo} onPress={() => void openAttachment(item.linkUrl!)}>
+                    <MaterialIcons name="link" size={17} color={colors.primary} />
+                    <Text style={[styles.linkText, { color: colors.primary }]}>{t('notifications.linkAttached')}</Text>
+                  </TouchableOpacity>
                 ) : null}
 
                 {item.attachmentPath ? (
@@ -273,3 +274,4 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   pdfButtonText: { color: colors.primary, fontSize: FontSize.xs, lineHeight: 17, fontWeight: FontWeight.semiBold },
   deleteButton: { position: 'absolute', top: Spacing.sm, right: Spacing.sm, width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surfaceVariant, alignItems: 'center', justifyContent: 'center' },
 });
+
