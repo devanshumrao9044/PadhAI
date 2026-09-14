@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, Modal, Pressable, StyleSheet, Switch, Text, TextInput,
+  ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Switch, Text, TextInput,
   TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -59,9 +59,17 @@ export default function CalendarScreen() {
     return () => { mounted = false; };
   }, [user?.id]);
 
-  const persist = (next: CalendarEvent[]) => {
-    setEvents(next);
-    if (user?.id) void saveCalendarEvents(user.id, next);
+  // Added try/catch and rollback for network failures
+  const persist = async (next: CalendarEvent[]) => {
+    const previous = events;
+    setEvents(next); // Optimistic update
+    if (!user?.id) return;
+    try {
+      await saveCalendarEvents(user.id, next);
+    } catch (error) {
+      setEvents(previous); // Rollback on failure
+      Alert.alert(t('calendar.saveErrorTitle') || 'Error', t('calendar.saveErrorMessage') || 'Could not save the event. Please try again.');
+    }
   };
 
   const monthDays = useMemo(() => buildMonthDays(month), [month]);
@@ -72,9 +80,9 @@ export default function CalendarScreen() {
     setMonth(current => new Date(current.getFullYear(), current.getMonth() + delta, 1, 12));
   };
 
-  const deleteEvent = () => {
+  const deleteEvent = async () => {
     if (!deleteTarget) return;
-    persist(events.filter(event => event.id !== deleteTarget.id));
+    await persist(events.filter(event => event.id !== deleteTarget.id));
     setDeleteTarget(null);
   };
 
@@ -87,14 +95,18 @@ export default function CalendarScreen() {
     setTitleError(false);
     setSaving(true);
     const event: CalendarEvent = {
-      id: `${user.id}-calendar-${Date.now()}`,
+      // Added random string to prevent ID collision
+      id: `${user.id}-calendar-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       userId: user.id,
       title: title.trim() || t('calendar.dayOff'),
       date: selectedDate,
       isDayOff,
       createdAt: new Date().toISOString(),
     };
-    persist([event, ...events]);
+    
+    // Await persist to ensure the saving spinner actually shows
+    await persist([event, ...events]);
+    
     setTitle('');
     setIsDayOff(false);
     setModalVisible(false);
