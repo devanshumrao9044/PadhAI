@@ -42,7 +42,11 @@ export default function CalendarScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [title, setTitle] = useState('');
   const [isDayOff, setIsDayOff] = useState(false);
+  
+  // ✅ State Locks for Add and Delete operations
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  
   const [titleError, setTitleError] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<CalendarEvent | null>(null);
 
@@ -59,7 +63,6 @@ export default function CalendarScreen() {
     return () => { mounted = false; };
   }, [user?.id]);
 
-  // Added try/catch and rollback for network failures
   const persist = async (next: CalendarEvent[]) => {
     const previous = events;
     setEvents(next); // Optimistic update
@@ -81,22 +84,31 @@ export default function CalendarScreen() {
   };
 
   const deleteEvent = async () => {
-    if (!deleteTarget) return;
+    // ✅ Bug 17 Fixed: Added 'deleting' lock to prevent double-tap race conditions
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
     await persist(events.filter(event => event.id !== deleteTarget.id));
     setDeleteTarget(null);
+    setDeleting(false);
   };
 
   const addEvent = async () => {
-    if (!user?.id) return;
+    // ✅ Bug 17 Fixed: Added immediate 'saving' lock to prevent duplicate events on double-tap
+    if (!user?.id || saving) return;
     if (!title.trim() && !isDayOff) {
       setTitleError(true);
       return;
     }
     setTitleError(false);
     setSaving(true);
+    
+    // ✅ Bug 17 Fixed: Replaced weak Math.random() with true UUID generation to prevent collisions
+    const safeUUID = typeof crypto !== 'undefined' && crypto.randomUUID 
+      ? crypto.randomUUID() 
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
     const event: CalendarEvent = {
-      // Added random string to prevent ID collision
-      id: `${user.id}-calendar-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: `${user.id}-calendar-${safeUUID}`,
       userId: user.id,
       title: title.trim() || t('calendar.dayOff'),
       date: selectedDate,
@@ -104,7 +116,6 @@ export default function CalendarScreen() {
       createdAt: new Date().toISOString(),
     };
     
-    // Await persist to ensure the saving spinner actually shows
     await persist([event, ...events]);
     
     setTitle('');
@@ -192,8 +203,13 @@ export default function CalendarScreen() {
                   style={styles.deleteButton}
                   accessibilityRole="button"
                   accessibilityLabel={`${t('calendar.deleteEvent')}: ${event.title}`}
+                  disabled={deleting}
                 >
-                  <MaterialIcons name="delete-outline" size={21} color={colors.textTertiary} />
+                  {deleting && deleteTarget?.id === event.id ? (
+                    <ActivityIndicator size="small" color={colors.textTertiary} />
+                  ) : (
+                    <MaterialIcons name="delete-outline" size={21} color={colors.textTertiary} />
+                  )}
                 </TouchableOpacity>
               </View>
           ))}
@@ -206,11 +222,11 @@ export default function CalendarScreen() {
             <Text style={styles.confirmTitle}>{t('calendar.deleteConfirmTitle')}</Text>
             <Text style={styles.confirmText}>{t('calendar.deleteConfirmText')}</Text>
             <View style={styles.confirmActions}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => setDeleteTarget(null)}>
+              <TouchableOpacity style={[styles.cancelButton, deleting && styles.disabled]} onPress={() => setDeleteTarget(null)} disabled={deleting}>
                 <Text style={styles.cancelButtonText}>{t('calendar.cancel')}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.deleteConfirmButton} onPress={deleteEvent}>
-                <Text style={styles.deleteConfirmButtonText}>{t('calendar.deleteEvent')}</Text>
+              <TouchableOpacity style={[styles.deleteConfirmButton, deleting && styles.disabled]} onPress={deleteEvent} disabled={deleting}>
+                {deleting ? <ActivityIndicator color={colors.textPrimary} /> : <Text style={styles.deleteConfirmButtonText}>{t('calendar.deleteEvent')}</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -222,7 +238,7 @@ export default function CalendarScreen() {
           <View style={styles.sheet}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>{t('calendar.newEvent')}</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)} accessibilityLabel={t('calendar.close')}>
+              <TouchableOpacity onPress={() => setModalVisible(false)} accessibilityLabel={t('calendar.close')} disabled={saving}>
                 <MaterialIcons name="close" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -235,6 +251,7 @@ export default function CalendarScreen() {
               style={[styles.input, titleError && styles.inputError]}
               autoFocus={!isDayOff}
               maxLength={80}
+              editable={!saving}
             />
             {titleError ? <Text style={styles.fieldError}>{t('calendar.eventNameRequired')}</Text> : null}
             <View style={styles.switchRow}>
@@ -242,7 +259,7 @@ export default function CalendarScreen() {
                 <Text style={styles.switchTitle}>{t('calendar.dayOff')}</Text>
                 <Text style={styles.switchHint}>{t('calendar.dayOffHint')}</Text>
               </View>
-              <Switch value={isDayOff} onValueChange={value => { setIsDayOff(value); if (value) setTitleError(false); }} trackColor={{ false: colors.surfaceVariant, true: colors.primaryDim }} thumbColor={isDayOff ? colors.primary : colors.textTertiary} />
+              <Switch value={isDayOff} onValueChange={value => { setIsDayOff(value); if (value) setTitleError(false); }} disabled={saving} trackColor={{ false: colors.surfaceVariant, true: colors.primaryDim }} thumbColor={isDayOff ? colors.primary : colors.textTertiary} />
             </View>
             <TouchableOpacity style={[styles.saveButton, saving && styles.disabled]} disabled={saving} onPress={addEvent}>
               {saving ? <ActivityIndicator color={colors.background} /> : <Text style={styles.saveButtonText}>{t('calendar.save')}</Text>}
