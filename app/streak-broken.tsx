@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Animated,
+  View, Text, StyleSheet, TouchableOpacity, Animated, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -35,8 +35,10 @@ export default function StreakBrokenScreen() {
   const passedLost = params.lost ? parseInt(params.lost, 10) : 0;
   const displayLost = passedLost > 0 ? passedLost : (user?.streakCurrent ?? 0);
 
-  const message =
-    STREAK_BROKEN_MESSAGES[Math.floor(Math.random() * STREAK_BROKEN_MESSAGES.length)];
+  // ✅ Bug 10 Fixed: Text flicker issue resolved by keeping message stable in useState
+  const [message] = useState(
+    () => STREAK_BROKEN_MESSAGES[Math.floor(Math.random() * STREAK_BROKEN_MESSAGES.length)]
+  );
 
   // Animation refs are stable and this recovery entrance intentionally runs once.
   useEffect(() => {
@@ -85,6 +87,8 @@ export default function StreakBrokenScreen() {
     } catch {
       setStreakRecoveryPending(false, 0);
       setStarting(false);
+      // ✅ Bug 11 Fixed: Silent error issue resolved by adding Alert
+      Alert.alert(t('recovery.errorTitle') || 'Error', t('recovery.errorMessage') || 'Could not start the session. Please check your connection and try again.');
     }
   };
 
@@ -208,8 +212,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     flex: 1, alignItems: 'center', justifyContent: 'center',
     padding: Spacing.lg, paddingBottom: Spacing.xxl,
   },
-
-  // Hero
   iconSection: { alignItems: 'center', marginBottom: Spacing.lg },
   iconBg: {
     width: 120, height: 120, borderRadius: 60,
@@ -225,8 +227,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     fontSize: FontSize.xs, fontWeight: FontWeight.semiBold,
     color: colors.danger, letterSpacing: 3, marginTop: 8, textTransform: 'uppercase',
   },
-
-  // Text
   textSection: { alignItems: 'center', width: '100%', marginBottom: Spacing.md },
   title: {
     fontSize: FontSize.xxl, fontWeight: FontWeight.extraBold,
@@ -246,8 +246,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   infoText: { fontSize: FontSize.sm, color: colors.textSecondary },
   infoBold: { color: colors.textPrimary, fontWeight: FontWeight.semiBold },
-
-  // Challenge card
   challengeCard: {
     width: '100%', backgroundColor: colors.surface,
     borderRadius: Radius.xl,
@@ -271,8 +269,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.warning, letterSpacing: 1.5, textTransform: 'uppercase',
   },
   challengeSub: { fontSize: FontSize.sm, color: colors.textSecondary, marginTop: 2 },
-
-  // Recovery numbers
   recoveryRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: colors.surfaceVariant, borderRadius: Radius.md,
@@ -285,8 +281,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   recoveryLabel: { fontSize: 10, color: colors.textTertiary, marginTop: 2 },
   recoveryNote: { fontSize: FontSize.xs, color: colors.textTertiary, flex: 1 },
-
-  // Rule pills
   rulePillRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   rulePill: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
@@ -295,8 +289,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderWidth: 1, borderColor: colors.border,
   },
   rulePillText: { fontSize: FontSize.xs, color: colors.textSecondary, fontWeight: FontWeight.medium },
-
-  // CTA
   challengeBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: colors.warning, borderRadius: Radius.md, paddingVertical: 15,
@@ -306,8 +298,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.background, fontSize: FontSize.md, fontWeight: FontWeight.extraBold,
     letterSpacing: 0.5,
   },
-
-  // Skip
   skipSection: { width: '100%', marginTop: 4 },
   homeBtn: {
     backgroundColor: colors.surface, borderRadius: Radius.md,
@@ -316,4 +306,3 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   homeBtnText: { color: colors.textTertiary, fontSize: FontSize.sm, fontWeight: FontWeight.medium },
 });
-
