@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import {
   View, Text, StyleSheet, ScrollView,
   ActivityIndicator, RefreshControl, Animated, TouchableOpacity,
-  Platform,
+  Platform, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -65,7 +65,7 @@ function PodiumCard({ entry, isMe, height }: { entry: LeaderboardEntry; isMe: bo
       friction: 6,
       useNativeDriver: true,
     }).start();
-  }, []);
+  }, [scale]);
 
   return (
     <Animated.View style={[styles.podiumCard, { height, transform: [{ scale }] }, isMe && styles.podiumCardMe]}>
@@ -291,8 +291,13 @@ export default function LeaderboardScreen() {
       const { data, error } = await supabase.rpc('get_level_leaderboard', {
         p_level: currentLevel.rank,
       });
+      
       if (requestId !== leaderboardRequestIdRef.current) return;
-      if (!error && data) {
+      
+      // ✅ Bug 22 Fixed: Throwing error so that catch block can handle it securely instead of silent fail
+      if (error) throw error;
+      
+      if (data) {
         const nextEntries = data as LeaderboardEntry[];
         setEntries(nextEntries);
         void writeUserCache<LeaderboardCacheData>(user.id, 'leaderboard', {
@@ -314,11 +319,13 @@ export default function LeaderboardScreen() {
         }
       }
     } catch (e) {
-      console.log('Leaderboard fetch error:', e);
+      console.error('Leaderboard fetch error:', e);
+      // ✅ Bug 22 Fixed: Added missing UI Alert for network and database errors
+      Alert.alert(t('common.error') || 'Sync Error', 'Could not update leaderboard. Please check your connection and try again.');
     } finally {
       if (showSpinner && requestId === leaderboardRequestIdRef.current) setLoading(false);
     }
-  }, [celebrationStateReady, celebrationStorageKey, currentLevel.rank, triggerTopThreeCelebration, user?.id]);
+  }, [celebrationStateReady, celebrationStorageKey, currentLevel.rank, triggerTopThreeCelebration, user?.id, t]);
 
   const loadLeaderboard = useCallback(async () => {
     if (!celebrationStateReady || !user?.id) return;
@@ -993,3 +1000,4 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     lineHeight: 24,
   },
 });
+
