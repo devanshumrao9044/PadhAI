@@ -68,6 +68,33 @@ export default function ChapterDetailScreen() {
     }
   };
 
+  // ✅ Bug 16 Fixed: Added proper try/catch for toggle to prevent silent data failure
+  const handleToggleTopic = async (id: string) => {
+    try {
+      await toggleTopic(id);
+    } catch {
+      Alert.alert('Error', 'Could not update topic. Please check your connection.');
+    }
+  };
+
+  // ✅ Bug 16 Fixed: Added confirmation dialog to prevent accidental deletion and try/catch for network errors
+  const handleDeleteTopic = (id: string) => {
+    Alert.alert('Delete Topic', 'Are you sure you want to delete this topic?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', 
+        style: 'destructive', 
+        onPress: async () => {
+          try {
+            await deleteTopic(id);
+          } catch {
+            Alert.alert('Error', 'Could not delete topic. Please try again.');
+          }
+        }
+      }
+    ]);
+  };
+
   if (!chapter) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
@@ -169,7 +196,7 @@ export default function ChapterDetailScreen() {
             <View key={t.id} style={styles.topicRow}>
               <TouchableOpacity
                 style={[styles.checkbox, t.isDone ? styles.checkboxDone : null]}
-                onPress={() => toggleTopic(t.id)}
+                onPress={() => handleToggleTopic(t.id)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 {t.isDone ? <MaterialIcons name="check" size={14} color={colors.background} /> : null}
@@ -177,7 +204,7 @@ export default function ChapterDetailScreen() {
               <Text style={[styles.topicName, t.isDone ? styles.topicNameDone : null]}>
                 {t.name}
               </Text>
-              <TouchableOpacity onPress={() => deleteTopic(t.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <TouchableOpacity onPress={() => handleDeleteTopic(t.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <MaterialIcons name="delete-outline" size={18} color={colors.textTertiary} />
               </TouchableOpacity>
             </View>
