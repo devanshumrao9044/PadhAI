@@ -125,7 +125,13 @@ export default function TrackerScreen() {
       )}
 
       {/* Add Subject Bottom Sheet Modal */}
-      <Modal visible={modalVisible} transparent animationType="slide">
+      {/* ✅ Bug 14 Fixed: Added onRequestClose to prevent Android Back Button from breaking the app */}
+      <Modal 
+        visible={modalVisible} 
+        transparent 
+        animationType="slide"
+        onRequestClose={() => setModalVisible(false)}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
@@ -225,11 +231,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   optionsRow: { flexDirection: 'row', gap: 12, marginBottom: Spacing.lg, flexWrap: 'wrap' },
   colorCircle: { width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: 'transparent' },
   circleSelected: { borderColor: colors.textPrimary },
-
-  // 🚀 Styles for Icon Picker
   iconScrollRow: { gap: 12, marginBottom: Spacing.xl },
   iconBox: { width: 48, height: 48, borderRadius: Radius.md, backgroundColor: colors.surfaceVariant, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
-
   saveBtn: { borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center', marginTop: Spacing.sm },
   saveBtnDisabled: { opacity: 0.4 },
   saveBtnText: { color: colors.background, fontSize: FontSize.md, lineHeight: 22, fontWeight: FontWeight.bold, textAlign: 'center', flexShrink: 1 },
