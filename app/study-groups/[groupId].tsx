@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, Modal, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, Animated, KeyboardAvoidingView, Modal, Platform, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -207,8 +207,13 @@ export default function StudyGroupDetailScreen() {
 
   const submitReport = async (reasonCode: StudyGroupReportReason, details: string) => {
     if (!groupId) return;
-    await submitStudyGroupReport({ groupId, reasonCode, details });
-    showNotice(t('groups.reportSubmitted'));
+    // ✅ Bug 21 Fixed: Added try/catch to handle network failures securely instead of a silent crash
+    try {
+      await submitStudyGroupReport({ groupId, reasonCode, details });
+      showNotice(t('groups.reportSubmitted'));
+    } catch (error) {
+      Alert.alert(t('common.error') || 'Error', 'Could not submit the report. Please check your connection and try again.');
+    }
   };
 
   const canManageTargetAction = (action: 'demote' | 'remove', permissionKey: 'demoteCoAdmin' | 'removeMembers') => {
@@ -571,10 +576,32 @@ export default function StudyGroupDetailScreen() {
       <Modal visible={showSuspensionPicker} transparent animationType="slide" onRequestClose={() => setShowSuspensionPicker(false)}>
         <View style={styles.modalOverlay}><View style={styles.modalCard}><Text style={styles.modalTitle}>{t('groups.suspendDuration')}</Text><Text style={styles.modalSubtitle}>{t('groups.suspendGroupHint')}</Text>{SUSPEND_OPTIONS.map(option => <Pressable key={option.minutes} onPress={() => { void handleSuspend(option.minutes); }} disabled={lifecycleBusy} style={[styles.durationOption, lifecycleBusy && styles.disabled]}><MaterialIcons name="schedule" size={18} color={colors.primary} /><Text style={styles.durationOptionText}>{option.label}</Text></Pressable>)}<Pressable onPress={() => setShowSuspensionPicker(false)} style={styles.cancelButton}><Text style={styles.cancelText}>{t('common.cancel')}</Text></Pressable></View></View>
       </Modal>
+
+      {/* ✅ Bug 21 Fixed: Wrapped Edit Modal content in KeyboardAvoidingView to prevent Blind Typing */}
       <Modal visible={showGroupEditor} transparent animationType="slide" onRequestClose={() => setShowGroupEditor(false)}>
-        <View style={styles.modalOverlay}><View style={styles.modalCard}><Text style={styles.modalTitle}>{t('groups.permissionEditGroup')}</Text><TextInput value={editName} onChangeText={setEditName} placeholder={t('groups.groupName')} placeholderTextColor={colors.textTertiary} style={styles.editorInput} maxLength={60} /><TextInput value={editDescription} onChangeText={setEditDescription} placeholder={t('groups.description')} placeholderTextColor={colors.textTertiary} style={[styles.editorInput, styles.multiline]} maxLength={240} multiline textAlignVertical="top" /><TextInput value={editRules} onChangeText={setEditRules} placeholder={t('groups.rules')} placeholderTextColor={colors.textTertiary} style={[styles.editorInput, styles.multiline]} maxLength={2000} multiline textAlignVertical="top" /><TextInput value={editTargetExam} onChangeText={setEditTargetExam} placeholder={t('groups.targetExam')} placeholderTextColor={colors.textTertiary} style={styles.editorInput} maxLength={40} /><View style={styles.editorRow}><TextInput value={editDailyGoal} onChangeText={setEditDailyGoal} placeholder={t('groups.dailyGoal')} placeholderTextColor={colors.textTertiary} style={[styles.editorInput, styles.editorHalf]} keyboardType="number-pad" /><TextInput value={editMaxMembers} onChangeText={setEditMaxMembers} placeholder={t('groups.maxMembers')} placeholderTextColor={colors.textTertiary} style={[styles.editorInput, styles.editorHalf]} keyboardType="number-pad" /></View><View style={styles.modalActions}><Pressable onPress={() => setShowGroupEditor(false)} style={styles.cancelButton}><Text style={styles.cancelText}>{t('common.cancel')}</Text></Pressable><Pressable onPress={() => { void saveGroupDetails(); }} disabled={savingGroup} style={[styles.modalSubmit, savingGroup && styles.disabled]}><Text style={styles.primaryText}>{savingGroup ? t('common.loading') : t('groups.savePermissions')}</Text></Pressable></View></View></View>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>{t('groups.permissionEditGroup')}</Text>
+              <TextInput value={editName} onChangeText={setEditName} placeholder={t('groups.groupName')} placeholderTextColor={colors.textTertiary} style={styles.editorInput} maxLength={60} />
+              <TextInput value={editDescription} onChangeText={setEditDescription} placeholder={t('groups.description')} placeholderTextColor={colors.textTertiary} style={[styles.editorInput, styles.multiline]} maxLength={240} multiline textAlignVertical="top" />
+              <TextInput value={editRules} onChangeText={setEditRules} placeholder={t('groups.rules')} placeholderTextColor={colors.textTertiary} style={[styles.editorInput, styles.multiline]} maxLength={2000} multiline textAlignVertical="top" />
+              <TextInput value={editTargetExam} onChangeText={setEditTargetExam} placeholder={t('groups.targetExam')} placeholderTextColor={colors.textTertiary} style={styles.editorInput} maxLength={40} />
+              <View style={styles.editorRow}>
+                <TextInput value={editDailyGoal} onChangeText={setEditDailyGoal} placeholder={t('groups.dailyGoal')} placeholderTextColor={colors.textTertiary} style={[styles.editorInput, styles.editorHalf]} keyboardType="number-pad" />
+                <TextInput value={editMaxMembers} onChangeText={setEditMaxMembers} placeholder={t('groups.maxMembers')} placeholderTextColor={colors.textTertiary} style={[styles.editorInput, styles.editorHalf]} keyboardType="number-pad" />
+              </View>
+              <View style={styles.modalActions}>
+                <Pressable onPress={() => setShowGroupEditor(false)} style={styles.cancelButton}><Text style={styles.cancelText}>{t('common.cancel')}</Text></Pressable>
+                <Pressable onPress={() => { void saveGroupDetails(); }} disabled={savingGroup} style={[styles.modalSubmit, savingGroup && styles.disabled]}><Text style={styles.primaryText}>{savingGroup ? t('common.loading') : t('groups.savePermissions')}</Text></Pressable>
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
+
       <StudyGroupReportSheet visible={reportOpen} groupName={group?.name ?? ''} onClose={() => setReportOpen(false)} onSubmitted={submitReport} />
+      
       <Modal visible={Boolean(manageTarget)} transparent animationType="slide" onRequestClose={() => setManageTarget(null)}>
         <View style={styles.modalOverlay}><View style={styles.modalCard}><Text style={styles.modalTitle}>{t('groups.permissionsTitle')}</Text><Text style={styles.modalSubtitle}>{manageTarget?.name}</Text><Text style={styles.body}>{t('groups.permissionsHint')}</Text>{PERMISSION_ITEMS.map(item => <View key={item.key} style={styles.permissionRow}><Text style={styles.reasonText}>{t(`groups.${item.labelKey}` as any)}</Text><Switch value={permissionDraft[item.key]} onValueChange={value => setPermissionDraft(current => ({ ...current, [item.key]: value }))} trackColor={{ false: colors.border, true: colors.primary + '88' }} thumbColor={permissionDraft[item.key] ? colors.primary : colors.textTertiary} /></View>)}<View style={styles.modalActions}><Pressable onPress={() => setManageTarget(null)} style={styles.cancelButton}><Text style={styles.cancelText}>{t('common.cancel')}</Text></Pressable><Pressable onPress={() => { void saveMemberPermissions(); }} disabled={managing} style={[styles.modalSubmit, managing && styles.disabled]}><Text style={styles.primaryText}>{managing ? t('common.loading') : manageTarget?.role === 'admin' ? t('groups.savePermissions') : t('groups.makeCoAdmin')}</Text></Pressable></View>{manageTarget?.role === 'admin' && canManageTargetAction('demote', 'demoteCoAdmin') ? <Pressable onPress={() => { void demoteMember(); }} disabled={managing} style={styles.demoteButton}><Text style={styles.demoteText}>{t('groups.demoteCoAdmin')}</Text></Pressable> : null}{canManageTargetAction('remove', 'removeMembers') ? <Pressable onPress={() => { void removeMember(); }} disabled={managing} style={styles.removeButton}><Text style={styles.removeText}>{t('groups.removeMember')}</Text></Pressable> : null}</View></View>
       </Modal>
