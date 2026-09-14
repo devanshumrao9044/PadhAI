@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -45,8 +45,13 @@ export default function JoinStudyGroupScreen() {
 
   const submitGroupReport = async (reasonCode: StudyGroupReportReason, details: string) => {
     if (!group) return;
-    await submitStudyGroupReport({ groupId: group.id, inviteToken: token, reasonCode, details });
-    setMessage(t('groups.reportSubmitted'));
+    // ✅ Bug 20 Fixed: Added try/catch and native Alert to handle report submission errors
+    try {
+      await submitStudyGroupReport({ groupId: group.id, inviteToken: token, reasonCode, details });
+      setMessage(t('groups.reportSubmitted'));
+    } catch (reportError) {
+      Alert.alert(t('common.error') || 'Error', 'Could not submit the report. Please try again.');
+    }
   };
 
   const preview = async () => {
@@ -77,18 +82,28 @@ export default function JoinStudyGroupScreen() {
   };
 
   const join = async () => {
-    if (!group || !user?.id || !joinActionRef.current.acquire()) return;
+    if (!group || !joinActionRef.current.acquire()) return;
+
+    // ✅ Bug 20 Fixed: Added proper error message for missing user session instead of silent fail
+    if (!user?.id) {
+      setError('User session not found. Please log in again.');
+      joinActionRef.current.release();
+      return;
+    }
+
     setJoining(true);
     setError('');
     try {
       const status = await joinStudyGroup(group.id, token);
       if (status === 'pending') {
-        setMessage(t('groups.pendingApproval'));
+        // ✅ Bug 20 Fixed: We DO NOT navigate away if pending. Navigating would cause a Permission Denied error!
+        setMessage(t('groups.pendingApproval') || 'Join request sent. Pending approval by owner.');
       } else {
         await updateStudyGroupIcon(group.id, iconKey);
         setMessage(t('groups.joined'));
+        // ✅ Bug 20 Fixed: Only navigate if successfully joined (not pending)
+        router.replace(`/study-groups/${group.id}` as never);
       }
-      router.replace(`/study-groups/${group.id}` as never);
     } catch (joinError) {
       setError(getSafeErrorMessage(joinError, {
         fallback: 'Could not join this group. Please try again.',
@@ -116,6 +131,7 @@ export default function JoinStudyGroupScreen() {
         <Pressable onPress={preview} disabled={loading} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}>
           <Text style={styles.secondaryText}>{loading ? t('common.loading') : t('groups.joinGroup')}</Text>
         </Pressable>
+        
         {group ? (
           <View style={styles.previewCard}>
             <View style={styles.groupHeader}>
@@ -128,24 +144,41 @@ export default function JoinStudyGroupScreen() {
                 <MaterialIcons name="more-vert" size={22} color={colors.textSecondary} />
               </Pressable>
             </View>
+            
             {group.description ? <Text style={styles.body}>{group.description}</Text> : null}
+            
             <Text style={styles.sectionTitle}>{t('groups.rules')}</Text>
             <Text style={styles.body}>{group.rules || t('groups.noRules')}</Text>
+            
             <Text style={styles.sectionTitle}>{t('groups.chooseIcon')}</Text>
             <Text style={styles.hint}>{t('groups.iconHint')}</Text>
+            
             <View style={styles.iconGrid}>
               {STUDY_GROUP_ICON_OPTIONS.map(option => {
                 const selected = option.key === iconKey;
-                return <Pressable key={option.key} onPress={() => setIconKey(option.key)} style={[styles.iconChoice, selected && styles.iconChoiceSelected]}><MaterialIcons name={option.icon as any} size={24} color={selected ? colors.primary : colors.textSecondary} /></Pressable>;
+                return (
+                  <Pressable key={option.key} onPress={() => setIconKey(option.key)} style={[styles.iconChoice, selected && styles.iconChoiceSelected]}>
+                    <MaterialIcons name={option.icon as any} size={24} color={selected ? colors.primary : colors.textSecondary} />
+                  </Pressable>
+                );
               })}
             </View>
+            
             <Pressable onPress={join} disabled={joining} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, joining && styles.disabled]}>
               <Text style={styles.primaryText}>{joining ? t('common.loading') : t('groups.requestToJoin')}</Text>
             </Pressable>
           </View>
         ) : null}
-        {message ? <View style={styles.successBox}><MaterialIcons name="check-circle" size={25} color={colors.success} /><Text style={styles.successText}>{message}</Text></View> : null}
+        
+        {message ? (
+          <View style={styles.successBox}>
+            <MaterialIcons name="check-circle" size={25} color={colors.success} />
+            <Text style={styles.successText}>{message}</Text>
+          </View>
+        ) : null}
+        
         {error ? <Text style={styles.error}>{error}</Text> : null}
+        
         <StudyGroupReportSheet visible={reportOpen} groupName={group?.name ?? ''} onClose={() => setReportOpen(false)} onSubmitted={submitGroupReport} />
       </ScrollView>
     </SafeAreaView>
@@ -183,3 +216,4 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   disabled: { opacity: 0.55 },
   pressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
 });
+
