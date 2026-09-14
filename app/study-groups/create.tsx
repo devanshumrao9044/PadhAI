@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -39,6 +39,7 @@ export default function CreateStudyGroupScreen() {
     const trimmedName = name.trim();
     const goal = Number(dailyGoal);
     const limit = Number(maxMembers);
+    
     if (trimmedName.length < 2) {
       setError('Group name must be at least 2 characters.');
       createActionRef.current.release();
@@ -54,10 +55,14 @@ export default function CreateStudyGroupScreen() {
       createActionRef.current.release();
       return;
     }
+    
+    // ✅ Bug 19 Fixed: Prevent silent failure when user session is missing
     if (!user?.id) {
+      setError('User session not found. Please try again.');
       createActionRef.current.release();
       return;
     }
+    
     setError('');
     setSaving(true);
     try {
@@ -96,62 +101,74 @@ export default function CreateStudyGroupScreen() {
           <Text style={styles.subtitle}>{t('groups.subtitle')}</Text>
         </View>
       </View>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.label}>{t('groups.chooseIcon')}</Text>
-        <Text style={styles.hint}>{t('groups.iconHint')}</Text>
-        <View style={styles.iconGrid}>
-          {STUDY_GROUP_ICON_OPTIONS.map(option => {
-            const selected = option.key === iconKey;
-            return (
-              <Pressable key={option.key} onPress={() => setIconKey(option.key)} style={[styles.iconChoice, selected && styles.iconChoiceSelected]}>
-                <MaterialIcons name={option.icon as any} size={26} color={selected ? colors.primary : colors.textSecondary} />
+      
+      {/* ✅ Bug 19 Fixed: Wrapped in KeyboardAvoidingView to prevent keyboard overlapping text inputs */}
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoid}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <Text style={styles.label}>{t('groups.chooseIcon')}</Text>
+          <Text style={styles.hint}>{t('groups.iconHint')}</Text>
+          <View style={styles.iconGrid}>
+            {STUDY_GROUP_ICON_OPTIONS.map(option => {
+              const selected = option.key === iconKey;
+              return (
+                <Pressable key={option.key} onPress={() => setIconKey(option.key)} style={[styles.iconChoice, selected && styles.iconChoiceSelected]}>
+                  <MaterialIcons name={option.icon as any} size={26} color={selected ? colors.primary : colors.textSecondary} />
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Text style={styles.label}>{t('groups.title')}</Text>
+          <TextInput value={name} onChangeText={setName} placeholder="JEE PHODGE" placeholderTextColor={colors.textTertiary} style={styles.input} maxLength={60} />
+          
+          <TextInput value={description} onChangeText={setDescription} placeholder={t('groups.description')} placeholderTextColor={colors.textTertiary} style={[styles.input, styles.multiline]} maxLength={240} multiline />
+          
+          <TextInput value={rules} onChangeText={setRules} placeholder={t('groups.rules')} placeholderTextColor={colors.textTertiary} style={[styles.input, styles.rulesInput]} maxLength={2000} multiline />
+
+          <Text style={styles.label}>{t('groups.targetExam')}</Text>
+          <TextInput value={targetExam} onChangeText={value => setTargetExam(value as typeof targetExam)} placeholder="JEE / NEET / OTHER" placeholderTextColor={colors.textTertiary} style={styles.input} maxLength={40} autoCapitalize="characters" />
+          
+          <View style={styles.row}>
+            <View style={styles.half}>
+              <Text style={styles.smallLabel}>{t('groups.dailyGoal')}</Text>
+              <TextInput value={dailyGoal} onChangeText={setDailyGoal} keyboardType="number-pad" style={styles.input} placeholder="120" placeholderTextColor={colors.textTertiary} maxLength={4} />
+            </View>
+            <View style={styles.half}>
+              <Text style={styles.smallLabel}>{t('groups.maxMembers')}</Text>
+              <TextInput value={maxMembers} onChangeText={setMaxMembers} keyboardType="number-pad" style={styles.input} placeholder="12" placeholderTextColor={colors.textTertiary} maxLength={3} />
+            </View>
+          </View>
+
+          <Text style={styles.label}>Visibility</Text>
+          <View style={styles.visibilityRow}>
+            {(['private', 'public'] as StudyGroupVisibility[]).map(option => (
+              <Pressable key={option} onPress={() => setVisibility(option)} style={[styles.visibilityButton, visibility === option && styles.visibilityButtonSelected]}>
+                <MaterialIcons name={option === 'private' ? 'lock' : 'public'} size={18} color={visibility === option ? colors.primary : colors.textSecondary} />
+                <Text style={[styles.visibilityText, visibility === option && styles.visibilityTextSelected]}>
+                  {option === 'private' ? t('groups.privateGroup') : t('groups.publicGroup')}
+                </Text>
               </Pressable>
-            );
-          })}
-        </View>
-
-        <Text style={styles.label}>{t('groups.title')}</Text>
-        <TextInput value={name} onChangeText={setName} placeholder="JEE PHODGE" placeholderTextColor={colors.textTertiary} style={styles.input} maxLength={60} />
-        <TextInput value={description} onChangeText={setDescription} placeholder={t('groups.description')} placeholderTextColor={colors.textTertiary} style={[styles.input, styles.multiline]} maxLength={240} multiline />
-        <TextInput value={rules} onChangeText={setRules} placeholder={t('groups.rules')} placeholderTextColor={colors.textTertiary} style={[styles.input, styles.rulesInput]} maxLength={2000} multiline />
-
-        <Text style={styles.label}>{t('groups.targetExam')}</Text>
-        <TextInput value={targetExam} onChangeText={value => setTargetExam(value as typeof targetExam)} placeholder="JEE / NEET / OTHER" placeholderTextColor={colors.textTertiary} style={styles.input} maxLength={40} autoCapitalize="characters" />
-        <View style={styles.row}>
-          <View style={styles.half}>
-            <Text style={styles.smallLabel}>{t('groups.dailyGoal')}</Text>
-            <TextInput value={dailyGoal} onChangeText={setDailyGoal} keyboardType="number-pad" style={styles.input} placeholder="120" placeholderTextColor={colors.textTertiary} maxLength={4} />
+            ))}
           </View>
-          <View style={styles.half}>
-            <Text style={styles.smallLabel}>{t('groups.maxMembers')}</Text>
-            <TextInput value={maxMembers} onChangeText={setMaxMembers} keyboardType="number-pad" style={styles.input} placeholder="12" placeholderTextColor={colors.textTertiary} maxLength={3} />
-          </View>
-        </View>
 
-        <Text style={styles.label}>Visibility</Text>
-        <View style={styles.visibilityRow}>
-          {(['private', 'public'] as StudyGroupVisibility[]).map(option => (
-            <Pressable key={option} onPress={() => setVisibility(option)} style={[styles.visibilityButton, visibility === option && styles.visibilityButtonSelected]}>
-              <MaterialIcons name={option === 'private' ? 'lock' : 'public'} size={18} color={visibility === option ? colors.primary : colors.textSecondary} />
-              <Text style={[styles.visibilityText, visibility === option && styles.visibilityTextSelected]}>
-                {option === 'private' ? t('groups.privateGroup') : t('groups.publicGroup')}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        <Pressable onPress={handleCreate} disabled={saving} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, saving && styles.disabled]}>
-          <Text style={styles.primaryButtonText}>{saving ? t('common.loading') : t('groups.createGroup')}</Text>
-        </Pressable>
-        <Text style={styles.footerHint}>Private groups use an invite link and owner approval. Public groups are discoverable in search.</Text>
-      </ScrollView>
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+          
+          <Pressable onPress={handleCreate} disabled={saving} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, saving && styles.disabled]}>
+            <Text style={styles.primaryButtonText}>{saving ? t('common.loading') : t('groups.createGroup')}</Text>
+          </Pressable>
+          <Text style={styles.footerHint}>Private groups use an invite link and owner approval. Public groups are discoverable in search.</Text>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  keyboardAvoid: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
   headerCopy: { flex: 1 },
   title: { color: colors.textPrimary, fontSize: FontSize.xl, fontWeight: FontWeight.bold },
