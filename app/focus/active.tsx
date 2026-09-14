@@ -229,6 +229,9 @@ export default function FocusActiveScreen() {
   }, []);
 
   const handleManualFinish = () => {
+    // ✅ Bug 13 Fixed: Added immediate lock check to prevent multiple rapid taps (Duplicate XP / Multiple Alerts exploit)
+    if (isProcessing || isCompletingRef.current) return;
+
     if (elapsedRef.current < 60) {
       Alert.alert(t('focus.finishFocus'), t('focus.finishFocusMinimum'));
       return;
@@ -631,3 +634,4 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   exitCancel: { width: '100%', backgroundColor: colors.primary, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center' },
   exitCancelText: { color: colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
 });
+
