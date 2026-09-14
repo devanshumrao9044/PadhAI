@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, FlatList, Modal, Pressable, SafeAreaView, StyleSheet,
+  ActivityIndicator, Alert, FlatList, Modal, Pressable, SafeAreaView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -72,9 +72,20 @@ export default function TodoScreen() {
     return () => { mounted = false; };
   }, [items, language, today, user?.id]);
 
-  const persist = (next: TodoItem[]) => {
-    setItems(next);
-    if (user?.id) void saveTodoItems(user.id, next);
+  // ✅ Bug 12 Fixed: Added async/await, try/catch, and rollback to prevent silent data loss
+  const persist = async (next: TodoItem[]) => {
+    const previous = items;
+    setItems(next); // Optimistic UI update
+    if (!user?.id) return;
+    try {
+      await saveTodoItems(user.id, next);
+    } catch (error) {
+      setItems(previous); // Rollback if network fails
+      Alert.alert(
+        t('todo.saveErrorTitle') || 'Error', 
+        t('todo.saveErrorMessage') || 'Could not save your changes. Please check your connection.'
+      );
+    }
   };
 
   const visibleItems = useMemo(
@@ -82,13 +93,15 @@ export default function TodoScreen() {
     [items, selectedDate],
   );
 
-  const toggleItem = (id: string) => {
-    persist(items.map(item => item.id === id ? { ...item, completed: !item.completed } : item));
+  // ✅ Bug 12 Fixed: Awaited persist for correct flow
+  const toggleItem = async (id: string) => {
+    await persist(items.map(item => item.id === id ? { ...item, completed: !item.completed } : item));
   };
 
-  const deleteItem = () => {
+  // ✅ Bug 12 Fixed: Awaited persist for correct flow
+  const deleteItem = async () => {
     if (!deleteTarget) return;
-    persist(items.filter(item => item.id !== deleteTarget.id));
+    await persist(items.filter(item => item.id !== deleteTarget.id));
     setDeleteTarget(null);
   };
 
@@ -101,7 +114,8 @@ export default function TodoScreen() {
     setTitleError(false);
     setSaving(true);
     const item: TodoItem = {
-      id: `${user.id}-todo-${Date.now()}`,
+      // ✅ Bug 12 Fixed: Added random string to prevent ID Collision on fast double-taps
+      id: `${user.id}-todo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       userId: user.id,
       title: title.trim(),
       subjectId: selectedSubjectId,
@@ -109,7 +123,10 @@ export default function TodoScreen() {
       completed: false,
       createdAt: new Date().toISOString(),
     };
-    persist([item, ...items]);
+    
+    // ✅ Bug 12 Fixed: Awaited persist so the Saving spinner actually displays
+    await persist([item, ...items]);
+    
     setTitle('');
     setSelectedSubjectId(null);
     setModalVisible(false);
