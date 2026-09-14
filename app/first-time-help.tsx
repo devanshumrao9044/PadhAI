@@ -26,23 +26,41 @@ export default function FirstTimeHelpScreen() {
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
+    
+    // ✅ Fix 1: 4 सेकंड का टाइमआउट, ताकि यूज़र इनफिनिट लोडिंग पर ना अटके
+    const timeout = setTimeout(() => {
+      if (!cancelled) setReady(true);
+    }, 4000); 
+
     void (async () => {
       const seen = await getItem<boolean>(helpKey(user.id));
       if (cancelled) return;
+      clearTimeout(timeout); // अगर डेटा टाइम से आ गया, तो टाइमर हटा दो
+      
       if (seen) {
         router.replace('/focus/setup' as Parameters<typeof router.replace>[0]);
       } else {
         setReady(true);
       }
     })();
-    return () => { cancelled = true; };
+    
+    return () => { 
+      cancelled = true; 
+      clearTimeout(timeout);
+    };
   }, [user?.id]);
 
   const finish = async () => {
     if (!user?.id || working) return;
     setWorking(true);
-    await setItem(helpKey(user.id), true);
-    router.replace('/focus/setup' as Parameters<typeof router.replace>[0]);
+    
+    // ✅ Fix 2: try/catch लगाया ताकि स्टोरेज एरर आने पर बटन हमेशा के लिए ना अटके
+    try {
+      await setItem(helpKey(user.id), true);
+      router.replace('/focus/setup' as Parameters<typeof router.replace>[0]);
+    } catch (error) {
+      setWorking(false); // एरर आने पर स्टेट वापस रीसेट करें ताकि यूज़र फिर से कोशिश कर सके
+    }
   };
 
   if (!ready) {
