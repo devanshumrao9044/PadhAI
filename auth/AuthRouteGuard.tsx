@@ -36,6 +36,7 @@ export default function AuthRouteGuard() {
     routeSegments[0] === 'raise-ticket' ||
     routeSegments[0] === 'review-tickets' ||
     routeSegments[0] === 'admin' ||
+    routeSegments[0] === 'rewards' ||
     routeSegments[0] === 'first-time-help';
   const isSessionAllowedPublicRoute =
     routeSegments[0] === 'privacy-policy' ||
