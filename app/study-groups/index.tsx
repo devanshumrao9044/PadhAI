@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -47,6 +47,12 @@ export default function StudyGroupsScreen() {
   const searchActionRef = useRef(createSingleActionLock());
   const groupActionRef = useRef(createSingleActionLock());
 
+  // ✅ Bug 18 Fixed: Use Ref to track groups length without triggering dependency changes in useCallback
+  const myGroupsCountRef = useRef(0);
+  useEffect(() => {
+    myGroupsCountRef.current = myGroups.length;
+  }, [myGroups]);
+
   const loadGroups = useCallback(async (force = false) => {
     if (!user?.id) return;
     setError('');
@@ -62,16 +68,19 @@ export default function StudyGroupsScreen() {
       setMyGroups(fresh);
       await writeUserCache(user.id, 'studyGroups', fresh);
     } catch (loadError) {
-      if (!myGroups.length) setError(getSafeErrorMessage(loadError, {
-        fallback: 'Could not load groups. Please try again.',
-        network: 'Check your connection and try again.',
-        permission: 'You do not have permission to view these groups.',
-      }));
+      // ✅ Bug 18 Fixed: Using Ref instead of state variable prevents infinite loop in useFocusEffect
+      if (myGroupsCountRef.current === 0) {
+        setError(getSafeErrorMessage(loadError, {
+          fallback: 'Could not load groups. Please try again.',
+          network: 'Check your connection and try again.',
+          permission: 'You do not have permission to view these groups.',
+        }));
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [myGroups.length, user?.id]);
+  }, [user?.id]); // Removed myGroups.length from dependencies
 
   useFocusEffect(useCallback(() => {
     void loadGroups();
@@ -123,9 +132,15 @@ export default function StudyGroupsScreen() {
 
   const submitGroupReport = async (reasonCode: StudyGroupReportReason, details: string) => {
     if (!reportGroup) return;
-    await submitStudyGroupReport({ groupId: reportGroup.id, reasonCode, details });
-    setReportGroup(null);
-    setReportNotice(t('groups.reportSubmitted'));
+    // ✅ Bug 18 Fixed: Added proper try/catch block to prevent silent crash on failure
+    try {
+      await submitStudyGroupReport({ groupId: reportGroup.id, reasonCode, details });
+      setReportNotice(t('groups.reportSubmitted'));
+    } catch (error) {
+      Alert.alert(t('common.error') || 'Error', 'Could not submit the report. Please try again later.');
+    } finally {
+      setReportGroup(null);
+    }
   };
 
   const items: ListItem[] = query.trim()
@@ -249,3 +264,4 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   code: { color: colors.primary, fontSize: FontSize.xs, fontWeight: FontWeight.bold, marginLeft: 'auto' },
   pressed: { opacity: 0.8, transform: [{ scale: 0.99 }] },
 });
+
