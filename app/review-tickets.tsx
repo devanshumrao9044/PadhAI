@@ -122,12 +122,15 @@ export default function ReviewTicketsScreen() {
         .then(() => load(true))
         .finally(() => reportReviewRef.current.release());
     };
+    
+    // ✅ Bug 9 Fixed: Removed `onDismiss` & added `cancelable: false` 
+    // to prevent premature lock release bypassing the async task.
     Alert.alert('Review report', 'Choose a resolution status.', [
       { text: t('support.reviewed'), onPress: () => resolve('reviewed') },
       { text: t('support.actioned'), onPress: () => resolve('actioned', 'Reviewed by the PadhAI owner.') },
       { text: t('support.dismissed'), style: 'destructive', onPress: () => resolve('dismissed') },
       { text: t('common.cancel'), style: 'cancel', onPress: () => reportReviewRef.current.release() },
-    ], { cancelable: true, onDismiss: () => reportReviewRef.current.release() });
+    ], { cancelable: false }); 
   };
 
   const sendTicketResponse = async (ticket: StudyGroupTicket, status: Exclude<StudyGroupTicketStatus, 'open'>, responseOverride?: string) => {
@@ -294,3 +297,4 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   pressed: { opacity: 0.82 },
   disabled: { opacity: 0.55 },
 });
+
