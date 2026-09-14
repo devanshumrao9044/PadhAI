@@ -17,6 +17,8 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/features/core/services/supabase';
 import { useAuthSession } from '@/auth/AuthSessionProvider';
+// ✅ Bug 8 Fixed: Import shared password validation policy
+import { validatePassword } from '@/auth/passwordPolicy';
 
 export default function ResetPasswordScreen() {
   const { colors } = useTheme();
@@ -94,8 +96,13 @@ export default function ResetPasswordScreen() {
 
   const handleSubmit = async () => {
     setError(null);
-    const nextPasswordError = password.length < 6 ? 'Password must be at least 6 characters.' : '';
+    
+    // ✅ Bug 8 Fixed: Apply strong password policy instead of basic length check
+    const result = validatePassword(password);
+    const nextPasswordError = result.valid ? '' : result.error!;
+    
     const nextConfirmError = password !== confirmPassword ? 'Passwords do not match.' : '';
+    
     setPasswordError(nextPasswordError);
     setConfirmError(nextConfirmError);
     if (nextPasswordError || nextConfirmError) return;
