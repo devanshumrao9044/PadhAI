@@ -54,5 +54,6 @@ export function getSafeErrorMessage(
     return options.rateLimit ?? fallback;
   }
 
-  return message || fallback;
+  
+  return fallback;
 }
