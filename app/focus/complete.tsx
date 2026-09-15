@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -78,7 +77,10 @@ export default function FocusCompleteScreen() {
   const isRecovery = params.recovery === '1';
   const lostStreak = parseInt(params.lostStreak ?? '0', 10);
   const isPending = params.pending === '1';
-  const isRejected = params.rejected === '1';
+  
+  // BUG 25 FIX: Made isRejected a state so we can update it if a conflict occurs during sync
+  const [isRejected, setIsRejected] = useState(params.rejected === '1');
+  
   const clockAnomaly = params.clock === '1';
   const [syncedXP, setSyncedXP] = useState<number | null>(null);
   const recoveredStreak = Math.max(1, Math.ceil(lostStreak / 2));
@@ -106,20 +108,43 @@ export default function FocusCompleteScreen() {
   useEffect(() => {
     if (!isPending || !user?.id) return;
     let mounted = true;
+    
     const applyResults = (results: Awaited<ReturnType<typeof syncOfflineFocusQueue>>) => {
+      if (!mounted) return;
+      
+      // If queue is empty but we were pending, fallback to unblock
+      if (results.length === 0) {
+        setSyncedXP(xp);
+        return;
+      }
+
       const accepted = results.find(result => result.status === 'accepted' || result.status === 'duplicate');
-      if (mounted && accepted) {
+      if (accepted) {
         setSyncedXP(accepted.xpEarned ?? 0);
         void reload({ force: true });
+      } else {
+        // BUG 25 FIX: Unblock UI by handling conflict/rejection properly
+        setSyncedXP(0);
+        setIsRejected(true);
       }
     };
-    void syncOfflineFocusQueue(user.id).then(applyResults);
+    
+    // BUG 25 FIX: Catch network errors during offline queue sync to avoid infinite pending lock
+    void syncOfflineFocusQueue(user.id)
+      .then(applyResults)
+      .catch(error => {
+        if (!mounted) return;
+        console.error('[FocusComplete] Sync offline queue error:', error);
+        setSyncedXP(0);
+        setIsRejected(true);
+      });
+      
     const unsubscribe = subscribeToOfflineFocusReconnect(user.id, applyResults);
     return () => {
       mounted = false;
       unsubscribe();
     };
-  }, [isPending, reload, user?.id]);
+  }, [isPending, reload, user?.id, xp]);
 
   // AppContext applies streak recovery only after the full recovery session passes
   // the 30-minute policy. This screen only renders the confirmed result.
