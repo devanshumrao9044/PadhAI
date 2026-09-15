@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { LEVELS } from '@/constants/levels';
 
@@ -65,6 +66,10 @@ const PARTICLES = Array.from({ length: 24 }, (_, i) => ({
 
 export default function LevelUpScreen() {
   const { colors } = useTheme();
+  
+  // BUG 26 FIX: Destructured `t` from useLanguage to apply i18n
+  const { t } = useLanguage();
+  
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -235,7 +240,8 @@ export default function LevelUpScreen() {
             ]}
           >
             <View style={[styles.rankBadgeInner, { backgroundColor: levelDef.color }]}>
-              <Text style={styles.rankBadgeText}>LEVEL {newLevelRank}</Text>
+              {/* BUG 26 FIX: Applied t() function */}
+              <Text style={styles.rankBadgeText}>{t('focus.levelBadge') || 'LEVEL'} {newLevelRank}</Text>
             </View>
           </Animated.View>
 
@@ -246,28 +252,31 @@ export default function LevelUpScreen() {
               { opacity: textFade, transform: [{ translateY: textSlide }] },
             ]}
           >
-            <Text style={styles.levelUpLabel}>LEVEL UP!</Text>
+            {/* BUG 26 FIX: Applied t() function */}
+            <Text style={styles.levelUpLabel}>{t('focus.levelUpTitle') || 'LEVEL UP!'}</Text>
             <Text style={[styles.levelTitle, { color: levelDef.color }]}>{levelDef.realisticTitle}</Text>
             <Text style={styles.examTitle}>{levelDef.examTitle}</Text>
+            
+            {/* BUG 26 FIX: Applied t() function for the subtitle */}
             <Text style={styles.subtitle}>
-              Tune abhi ek naya milestone cross kiya hai.{'\n'}Yahi asli mehnat hai!
+              {t('focus.levelUpSubtitle') || "Tune abhi ek naya milestone cross kiya hai.\nYahi asli mehnat hai!"}
             </Text>
 
             {/* XP earned this session */}
             <View style={styles.xpRow}>
               <View style={styles.xpChip}>
                 <MaterialIcons name="bolt" size={18} color={colors.warning} />
-                <Text style={styles.xpChipText}>+{xpEarned} XP earned</Text>
+                <Text style={styles.xpChipText}>+{xpEarned} {t('focus.earnedXP') || 'XP earned'}</Text>
               </View>
               <View style={[styles.xpChip, { backgroundColor: levelDef.color + '22', borderColor: levelDef.color + '55' }]}>
                 <MaterialIcons name="emoji-events" size={18} color={levelDef.color} />
-                <Text style={[styles.xpChipText, { color: levelDef.color }]}>{totalXP} XP total</Text>
+                <Text style={[styles.xpChipText, { color: levelDef.color }]}>{totalXP} {t('focus.totalXP') || 'XP total'}</Text>
               </View>
             </View>
             {referralXpAwarded > 0 ? (
               <View style={styles.referralBonusRow}>
                 <MaterialIcons name="people" size={18} color={colors.success} />
-                <Text style={styles.referralBonusText}>Referral bonus: +{referralXpAwarded} XP</Text>
+                <Text style={styles.referralBonusText}>{t('focus.referralBonusLabel') || 'Referral bonus:'} +{referralXpAwarded} XP</Text>
               </View>
             ) : null}
           </Animated.View>
@@ -280,7 +289,8 @@ export default function LevelUpScreen() {
               activeOpacity={0.85}
             >
               <MaterialIcons name="rocket-launch" size={22} color="#FFF" />
-              <Text style={styles.continueBtnText}>Continue the Grind</Text>
+              {/* BUG 26 FIX: Applied t() function */}
+              <Text style={styles.continueBtnText}>{t('focus.continueGrind') || 'Continue the Grind'}</Text>
             </TouchableOpacity>
           </Animated.View>
         </View>
