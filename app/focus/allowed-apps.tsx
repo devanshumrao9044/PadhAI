@@ -60,13 +60,17 @@ export default function AllowedAppsScreen() {
     if (launchReleaseTimerRef.current) clearTimeout(launchReleaseTimerRef.current);
   }, []);
 
+  // BUG 27 FIX: Derived a boolean instead of passing the entire object
+  // which updates every tick. This prevents infinite re-fetching.
+  const hasActiveSession = !!activeSession;
+
   useEffect(() => {
-    if (!activeSession) {
+    if (!hasActiveSession) {
       router.replace('/(tabs)/focus');
       return;
     }
     loadApps();
-  }, [activeSession, loadApps, router]);
+  }, [hasActiveSession, loadApps, router]);
 
   const policyReasonLabel = (reason: string) => {
     switch (reason) {
