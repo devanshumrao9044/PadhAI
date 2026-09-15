@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, AppState, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -36,9 +36,18 @@ export default function FocusGuardSetupScreen() {
   const finish = useCallback(async () => {
     if (!user?.id || working) return;
     setWorking(true);
-    await setItem(focusGuardSetupKey(user.id), true);
-    router.replace(returnRoute as Parameters<typeof router.replace>[0]);
-  }, [returnRoute, router, user?.id, working]);
+    try {
+      await setItem(focusGuardSetupKey(user.id), true);
+      router.replace(returnRoute as Parameters<typeof router.replace>[0]);
+    } catch (error) {
+      console.error('[FocusGuardSetup] Failed to finalize setup:', error);
+      Alert.alert(
+        t('common.error') || 'Error',
+        t('focus.guardSetupSaveError') || 'Failed to save setup state. Please try again.'
+      );
+      setWorking(false); // 👈 Failure पर बटन वापस unlock होगा
+    }
+  }, [returnRoute, router, t, user?.id, working]);
 
   const refresh = useCallback(() => {
     const next = getFocusGuardStatus();
@@ -59,6 +68,10 @@ export default function FocusGuardSetupScreen() {
       setStatus(current);
       setLoading(false);
       if (seen && current.overlay && current.usageStats) void finish();
+    }).catch(err => {
+      if (cancelled) return;
+      console.error('[FocusGuardSetup] Failed to read setup key:', err);
+      setLoading(false);
     });
     return () => { cancelled = true; };
   }, [finish, user?.id]);
