@@ -36,18 +36,20 @@ export default function FocusGuardSetupScreen() {
   const finish = useCallback(async () => {
     if (!user?.id || working) return;
     setWorking(true);
+    
+    // BUG 23 FIX: Added try/catch block so that if saving fails, the button unstucks
     try {
       await setItem(focusGuardSetupKey(user.id), true);
       router.replace(returnRoute as Parameters<typeof router.replace>[0]);
     } catch (error) {
-      console.error('[FocusGuardSetup] Failed to finalize setup:', error);
+      console.error('[FocusGuardSetup] Failed to save setup state:', error);
+      setWorking(false); // Reset working state to unlock the button
       Alert.alert(
         t('common.error') || 'Error',
         t('focus.guardSetupSaveError') || 'Failed to save setup state. Please try again.'
       );
-      setWorking(false); // 👈 Failure पर बटन वापस unlock होगा
     }
-  }, [returnRoute, router, t, user?.id, working]);
+  }, [returnRoute, router, user?.id, working, t]);
 
   const refresh = useCallback(() => {
     const next = getFocusGuardStatus();
@@ -62,17 +64,22 @@ export default function FocusGuardSetupScreen() {
       return;
     }
     let cancelled = false;
-    void getItem<boolean>(focusGuardSetupKey(user.id)).then(seen => {
-      if (cancelled) return;
-      const current = getFocusGuardStatus();
-      setStatus(current);
-      setLoading(false);
-      if (seen && current.overlay && current.usageStats) void finish();
-    }).catch(err => {
-      if (cancelled) return;
-      console.error('[FocusGuardSetup] Failed to read setup key:', err);
-      setLoading(false);
-    });
+    
+    // BUG 23 FIX: Added .catch to prevent unhandled promise rejection from stucking the initial loading
+    void getItem<boolean>(focusGuardSetupKey(user.id))
+      .then(seen => {
+        if (cancelled) return;
+        const current = getFocusGuardStatus();
+        setStatus(current);
+        setLoading(false);
+        if (seen && current.overlay && current.usageStats) void finish();
+      })
+      .catch(error => {
+        if (cancelled) return;
+        console.error('[FocusGuardSetup] Failed to read storage:', error);
+        setLoading(false); // Stop initial loading spinner if storage read fails
+      });
+      
     return () => { cancelled = true; };
   }, [finish, user?.id]);
 
@@ -177,3 +184,4 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   note: { color: colors.textTertiary, fontSize: FontSize.xs, lineHeight: 18, textAlign: 'center', marginTop: Spacing.md },
   loading: { alignItems: 'center', paddingVertical: Spacing.xxl },
 });
+
