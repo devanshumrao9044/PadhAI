@@ -100,20 +100,34 @@ export default function SubjectDetailScreen() {
     }
   };
 
-  const handleDeleteSubject = async () => {
+  // BUG 28 FIX: Added safety confirmation before deleting the entire subject
+  const handleDeleteSubject = () => {
     if (!subject) return;
-    try {
-      await deleteSubject(subject.id);
-      router.back(); // Redirect back to tracker main screen
-    } catch (error: any) {
-      console.error('Subject Delete Error');
-      // ✅ Bug 15 Fixed: Changed alert() to native Alert.alert()
-      Alert.alert('Delete Error', getSafeErrorMessage(error, {
-        fallback: 'Failed to delete subject. Please try again.',
-        network: 'Check your connection and try again.',
-        permission: 'You do not have permission to delete this subject.',
-      }));
-    }
+
+    Alert.alert(
+      'Delete Subject',
+      `Are you sure you want to delete "${subject.name}"? All chapters and data inside this subject will be permanently lost.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive', 
+          onPress: async () => {
+            try {
+              await deleteSubject(subject.id);
+              router.back(); // Redirect back to tracker main screen
+            } catch (error: any) {
+              console.error('Subject Delete Error');
+              Alert.alert('Delete Error', getSafeErrorMessage(error, {
+                fallback: 'Failed to delete subject. Please try again.',
+                network: 'Check your connection and try again.',
+                permission: 'You do not have permission to delete this subject.',
+              }));
+            }
+          }
+        }
+      ]
+    );
   };
 
   // ── Chapter Form Handlers ───────────────────────
@@ -146,7 +160,6 @@ export default function SubjectDetailScreen() {
       setModalVisible(false);
     } catch (error: any) {
       console.error('Save Error');
-      // ✅ Bug 15 Fixed: Changed alert() to native Alert.alert()
       Alert.alert('Save Error', getSafeErrorMessage(error, {
         fallback: 'Failed to save. Please try again.',
         network: 'Check your connection and try again.',
@@ -168,7 +181,6 @@ export default function SubjectDetailScreen() {
       await updateChapter(id, { status, ...(completedDate ? { completedDate } : {}) });
     } catch (error: any) {
       console.error("Status Update Error", error);
-      // ✅ Bug 15 Fixed: Added Alert to prevent silent failure on status change
       Alert.alert('Status Error', 'Failed to update status. Please check your connection.');
     }
   };
@@ -178,35 +190,62 @@ export default function SubjectDetailScreen() {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
-  const handleBulkDelete = async () => {
+  // BUG 28 FIX: Added safety confirmation before bulk deleting chapters
+  const handleBulkDelete = () => {
     if (selectedIds.length === 0) return;
-    try {
-      await bulkDeleteChapters(selectedIds);
-      setSelectedIds([]);
-      setIsSelectionMode(false);
-    } catch (error: any) {
-      console.error('Bulk Delete Failed');
-      // ✅ Bug 15 Fixed: Changed alert() to native Alert.alert()
-      Alert.alert('Delete Error', getSafeErrorMessage(error, {
-        fallback: 'Delete failed. Please try again.',
-        network: 'Check your connection and try again.',
-        permission: 'You do not have permission to delete these chapters.',
-      }));
-    }
+    
+    Alert.alert(
+      'Delete Chapters',
+      `Are you sure you want to delete ${selectedIds.length} selected chapter(s)?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive', 
+          onPress: async () => {
+            try {
+              await bulkDeleteChapters(selectedIds);
+              setSelectedIds([]);
+              setIsSelectionMode(false);
+            } catch (error: any) {
+              console.error('Bulk Delete Failed');
+              Alert.alert('Delete Error', getSafeErrorMessage(error, {
+                fallback: 'Delete failed. Please try again.',
+                network: 'Check your connection and try again.',
+                permission: 'You do not have permission to delete these chapters.',
+              }));
+            }
+          }
+        }
+      ]
+    );
   };
 
-  const handleSingleDelete = async (id: string) => {
-    try {
-      await deleteChapter(id);
-    } catch (error: any) {
-      console.error('Delete Failed');
-      // ✅ Bug 15 Fixed: Changed alert() to native Alert.alert()
-      Alert.alert('Delete Error', getSafeErrorMessage(error, {
-        fallback: 'Delete failed. Please try again.',
-        network: 'Check your connection and try again.',
-        permission: 'You do not have permission to delete this chapter.',
-      }));
-    }
+  // BUG 28 FIX: Added safety confirmation before deleting a single chapter
+  const handleSingleDelete = (id: string) => {
+    Alert.alert(
+      'Delete Chapter',
+      'Are you sure you want to delete this chapter?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive', 
+          onPress: async () => {
+            try {
+              await deleteChapter(id);
+            } catch (error: any) {
+              console.error('Delete Failed');
+              Alert.alert('Delete Error', getSafeErrorMessage(error, {
+                fallback: 'Delete failed. Please try again.',
+                network: 'Check your connection and try again.',
+                permission: 'You do not have permission to delete this chapter.',
+              }));
+            }
+          }
+        }
+      ]
+    );
   };
 
   if (!subject) {
@@ -613,3 +652,4 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   saveBtnDisabled: { opacity: 0.4 },
   saveBtnText: { color: colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
 });
+
