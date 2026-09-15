@@ -23,8 +23,12 @@ export default function FocusBrokenScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1.2)).current;
 
-  // Stable random message reference
-  const messageRef = useRef(SESSION_BREAK_MESSAGES[Math.floor(Math.random() * SESSION_BREAK_MESSAGES.length)]);
+  // BUG 24 FIX: Added safe array check and fallback string to prevent undefined errors
+  const messageRef = useRef(
+    SESSION_BREAK_MESSAGES && SESSION_BREAK_MESSAGES.length > 0
+      ? SESSION_BREAK_MESSAGES[Math.floor(Math.random() * SESSION_BREAK_MESSAGES.length)]
+      : t('focus.sessionBroken') || 'Focus broken!'
+  );
 
   useEffect(() => {
     Animated.sequence([
@@ -101,7 +105,8 @@ export default function FocusBrokenScreen() {
 }
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0A0005' },
+  // BUG 24 FIX: Changed hardcoded '#0A0005' to dynamic `colors.background`
+  container: { flex: 1, backgroundColor: colors.background },
   content: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.xl },
   iconContainer: { marginBottom: Spacing.xl },
   iconBg: { width: 140, height: 140, borderRadius: 70, backgroundColor: colors.danger + '22', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.danger + '44' },
