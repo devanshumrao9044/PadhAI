@@ -72,16 +72,26 @@ export async function getItem<T>(key: string): Promise<T | null> {
   }
 }
 
-export async function setItem<T>(key: string, value: T): Promise<void> {
+// ✅ FIXED: Return boolean status and log errors instead of silently swallowing them
+export async function setItem<T>(key: string, value: T): Promise<boolean> {
   try {
     await getStorage().setItem(key, JSON.stringify(value));
-  } catch {}
+    return true;
+  } catch (error) {
+    console.warn(`[storage] Failed to persist key "${key}":`, error);
+    return false;
+  }
 }
 
-export async function removeItem(key: string): Promise<void> {
+// ✅ FIXED: Return boolean status and log errors
+export async function removeItem(key: string): Promise<boolean> {
   try {
     await getStorage().removeItem(key);
-  } catch {}
+    return true;
+  } catch (error) {
+    console.warn(`[storage] Failed to remove key "${key}":`, error);
+    return false;
+  }
 }
 
 export const StorageKeys = KEYS;
