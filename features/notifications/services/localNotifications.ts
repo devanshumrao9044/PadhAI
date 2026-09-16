@@ -77,35 +77,40 @@ function parseTime(value: string, fallback: string): { hour: number; minute: num
   return { hour: fallbackHour, minute: fallbackMinute };
 }
 
+// ✅ FIXED: Channels decouple कर दिए गए हैं। इसे ऐप स्टार्टअप पर भी कॉल किया जा सकता है।
+export async function ensureNotificationChannels(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync(CHANNEL_IDS.study, {
+    name: 'Study reminders',
+    importance: Notifications.AndroidImportance.DEFAULT,
+    vibrationPattern: [0, 250, 250, 250],
+    sound: 'default',
+  });
+  await Notifications.setNotificationChannelAsync(CHANNEL_IDS.todo, {
+    name: 'To-Do reminders',
+    importance: Notifications.AndroidImportance.DEFAULT,
+    vibrationPattern: [0, 200, 200],
+    sound: 'default',
+  });
+  await Notifications.setNotificationChannelAsync(CHANNEL_IDS.streak, {
+    name: 'Streak reminders',
+    importance: Notifications.AndroidImportance.HIGH,
+    vibrationPattern: [0, 300, 200, 300],
+    sound: 'default',
+  });
+  await Notifications.setNotificationChannelAsync(CHANNEL_IDS.admin, {
+    name: 'Admin announcements',
+    importance: Notifications.AndroidImportance.HIGH,
+    vibrationPattern: [0, 250, 250, 250],
+    sound: 'default',
+  });
+}
+
 async function ensurePermission(): Promise<boolean> {
   if (Platform.OS === 'web') return false;
   configureNotificationHandler();
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync(CHANNEL_IDS.study, {
-      name: 'Study reminders',
-      importance: Notifications.AndroidImportance.DEFAULT,
-      vibrationPattern: [0, 250, 250, 250],
-      sound: 'default',
-    });
-    await Notifications.setNotificationChannelAsync(CHANNEL_IDS.todo, {
-      name: 'To-Do reminders',
-      importance: Notifications.AndroidImportance.DEFAULT,
-      vibrationPattern: [0, 200, 200],
-      sound: 'default',
-    });
-    await Notifications.setNotificationChannelAsync(CHANNEL_IDS.streak, {
-      name: 'Streak reminders',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 300, 200, 300],
-      sound: 'default',
-    });
-    await Notifications.setNotificationChannelAsync(CHANNEL_IDS.admin, {
-      name: 'Admin announcements',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
-      sound: 'default',
-    });
-  }
+  // ✅ FIXED: Channel creation यहाँ से हटाकर ensureNotificationChannels में डाल दिया गया
+  
   const current = await Notifications.getPermissionsAsync();
   if (current.granted || current.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL) {
     return true;
@@ -156,6 +161,10 @@ export async function syncLocalNotifications(
   hasPendingTodo = false,
 ): Promise<boolean> {
   if (Platform.OS === 'web') return false;
+  
+  // ✅ FIXED: सेटिंग्स कुछ भी हों, चैनल्स हमेशा इनिशियलाइज़ होंगे ताकि Admin Push मिस न हो
+  await ensureNotificationChannels(); 
+  
   await cancelPadhaiReminders();
   if (!settings.enabled) return true;
   if (!settings.studyReminder && !settings.todoReminder && !settings.streakReminder) return true;
@@ -196,3 +205,4 @@ export async function clearLocalNotifications(): Promise<void> {
   if (Platform.OS === 'web') return;
   await cancelPadhaiReminders();
 }
+
