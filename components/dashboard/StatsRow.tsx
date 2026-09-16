@@ -5,6 +5,14 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ThemeColors } from '@/constants/theme';
 
+// ✅ FIXED: Helper function for Local Timezone date string instead of UTC
+function getLocalDateStr(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 interface Props {
   todayMins?: number;
   xp?: number;
@@ -18,7 +26,8 @@ export default function StatsRow({ todayMins = 0, xp = 0, chaptersTotal = 0, cha
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, getDailySummary } = useApp();
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  // ✅ FIXED: Using Local Date instead of UTC Date
+  const todayStr = getLocalDateStr();
   const summary = getDailySummary(todayStr);
   const todayMinutes = summary?.totalMinutes ?? todayMins;
   const goalMinutes = user?.dailyGoalMinutes || 120;
