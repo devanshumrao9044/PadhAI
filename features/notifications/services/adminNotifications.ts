@@ -232,10 +232,28 @@ export async function registerNotificationDevice(userId: string): Promise<boolea
   }
 }
 
+// ✅ FIXED: Now correctly extracts token and disables notifications for current device only
 export async function disableNotificationDevice(userId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('notification_devices')
-    .update({ enabled: false, last_seen_at: new Date().toISOString() })
-    .eq('user_id', userId);
-  return !error;
+  if (Platform.OS === 'web') return false;
+  
+  try {
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId
+      ?? (Constants as any).easConfig?.projectId
+      ?? process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
+      
+    const token = projectId
+      ? await Notifications.getExpoPushTokenAsync({ projectId })
+      : await Notifications.getExpoPushTokenAsync();
+
+    const { error } = await supabase
+      .from('notification_devices')
+      .update({ enabled: false, last_seen_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .eq('expo_push_token', token.data); 
+
+    return !error;
+  } catch (error) {
+    console.warn('Failed to disable notification device specifically', error);
+    return false;
+  }
 }
