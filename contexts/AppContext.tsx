@@ -555,7 +555,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         let loadedProfile: UserProfile | null = null;
         const { data: profileData } = await supabase
           .from('users')
-          .select('id,name,target_exam,class,daily_goal_minutes,xp,streak,longest_streak,last_study_date,created_at,avatar_url,my_referral_code,has_unlocked_reward')
+          // ✅ FIXED: Added level_rank to the select query
+          .select('id,name,target_exam,class,daily_goal_minutes,xp,streak,longest_streak,last_study_date,created_at,avatar_url,my_referral_code,has_unlocked_reward,level_rank')
           .eq('id', userId)
           .single();
 
