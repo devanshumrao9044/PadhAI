@@ -148,8 +148,6 @@ const mapChapter = (c: any): Chapter => ({
 });
 
 const mapSession = (s: any): FocusSession => {
-  // chapter_id is supported by the production focus_sessions schema.
-  // broken_at_percent and created_at remain local/derived compatibility fields.
   const startedAt = s.started_at ?? s.startedAt ?? new Date().toISOString();
   const endedAt = s.ended_at ?? s.endedAt ?? startedAt;
   return {
@@ -555,8 +553,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         let loadedProfile: UserProfile | null = null;
         const { data: profileData } = await supabase
           .from('users')
-          // ✅ FIXED: Added level_rank to the select query
-          .select('id,name,target_exam,class,daily_goal_minutes,xp,streak,longest_streak,last_study_date,created_at,avatar_url,my_referral_code,has_unlocked_reward,level_rank')
+          // ✅ FIXED: Using exact database column 'level' instead of 'level_rank'
+          .select('id,name,target_exam,class,daily_goal_minutes,xp,streak,longest_streak,last_study_date,created_at,avatar_url,my_referral_code,has_unlocked_reward,level')
           .eq('id', userId)
           .single();
 
@@ -796,8 +794,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [reload, user?.id]);
 
-  // ── setUser: local cache/state only. Server-controlled progression fields are
-  // settled by authenticated RPCs and reloaded from Supabase. ────────────────
   const setUser = async (u: UserProfile) => {
     userStateRef.current = u;
     setUserState(u);
@@ -811,7 +807,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await setItem(StorageKeys.ONBOARDED, v);
   };
 
-  // ── Subjects ──────────────────────────────────────────────────────────────
   const addSubject = async (name: string, colorHex: string, iconName: string): Promise<Subject> => {
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (!authUser) throw new Error('Not authenticated');
@@ -883,7 +878,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     lastLoadAtRef.current = null;
   };
 
-  // ── Chapters ──────────────────────────────────────────────────────────────
   const getChaptersForSubject = (subjectId: string) =>
     chapters.filter(c => c.subjectId === subjectId && !c.isDeleted).sort((a, b) => a.displayOrder - b.displayOrder);
 
@@ -958,7 +952,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // ── Topics (local only) ───────────────────────────────────────────────────
   const getTopicsForChapter = (chapterId: string) =>
     topics
       .filter(topic => topic.chapterId === chapterId && !topic.isDeleted)
@@ -994,10 +987,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (user?.id) void writeUserCache(user.id, 'topics', updated);
   };
 
-  // ── XP ────────────────────────────────────────────────────────────────────
-  // XP is granted or deducted only by the server-authoritative focus settlement
-  // RPC. Keeping these methods in the context preserves the public contract for
-  // older screens while making accidental client-side mutation impossible.
   const awardXP = async (_amount: number, _reason: string) => {
     throw new Error('XP can only be granted by a verified focus session.');
   };
@@ -1006,7 +995,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     throw new Error('XP can only be deducted by a verified focus session.');
   };
 
-  // ── Sessions ──────────────────────────────────────────────────────────────
   const startSession = async (plannedMins: number, subjectId: string | null, chapterId: string | null, isRecoverySession?: boolean, recoveryLostStreak?: number, studyGroupId?: string | null, openEnded = false): Promise<string> => {
     if (startSessionInFlightRef.current) throw new Error('A focus session is already starting.');
     if (activeSession && (activeSession.status === 'running' || activeSession.status === 'verification_required')) {
@@ -1015,25 +1003,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     startSessionInFlightRef.current = true;
     try {
       if (studyGroupId) await assertStudyGroupActive(studyGroupId);
-    const sessionId = uuidv4();
-    const active: ActiveSession = {
-      sessionId,
-      startedAt: new Date().toISOString(),
-      plannedMins,
-      openEnded,
-      subjectId,
-      chapterId,
-      studyGroupId: studyGroupId ?? null,
-      isRecovery: isRecoverySession ?? streakRecoveryPending,
-      recoveryLostStreak: isRecoverySession ? (recoveryLostStreak ?? lostStreakCount) : undefined,
-      status: 'running',
-      checkpointElapsedSeconds: 0,
-      lastCheckpointAt: new Date().toISOString(),
-      lastWallClockAt: new Date().toISOString(),
-      clockAnomaly: false,
-      processInstanceId: PROCESS_INSTANCE_ID,
-    };
-    setActiveSession(active);
+      const sessionId = uuidv4();
+      const active: ActiveSession = {
+        sessionId,
+        startedAt: new Date().toISOString(),
+        plannedMins,
+        openEnded,
+        subjectId,
+        chapterId,
+        studyGroupId: studyGroupId ?? null,
+        isRecovery: isRecoverySession ?? streakRecoveryPending,
+        recoveryLostStreak: isRecoverySession ? (recoveryLostStreak ?? lostStreakCount) : undefined,
+        status: 'running',
+        checkpointElapsedSeconds: 0,
+        lastCheckpointAt: new Date().toISOString(),
+        lastWallClockAt: new Date().toISOString(),
+        clockAnomaly: false,
+        processInstanceId: PROCESS_INSTANCE_ID,
+      };
+      setActiveSession(active);
       await setItem(StorageKeys.ACTIVE_SESSION, active);
       return sessionId;
     } finally {
@@ -1221,8 +1209,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         broken_at_percent: 100,
       });
       if (data.duplicate === true) {
-        // The server already settled this session. Reconcile by reload only;
-        // never replay the returned XP locally.
         setActiveSession(null);
         await setItem(StorageKeys.ACTIVE_SESSION, null);
         void reload({ force: true });
@@ -1262,9 +1248,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (studyGroupId) {
         try {
           await clearStudyGroupPresence(studyGroupId, activeUser.id);
-        } catch {
-          // Stale presence is treated as offline by the secure member-summary RPC.
-        }
+        } catch {}
       }
       void reload({ force: true });
       return { ...sessionObj, leveledUp, newLevelRank, totalXP: postSessionResult.newXPTotal, referralXpAwarded };
@@ -1377,9 +1361,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (studyGroupId) {
         try {
           await clearStudyGroupPresence(studyGroupId, activeUser.id);
-        } catch {
-          // Stale presence is treated as offline by the secure member-summary RPC.
-        }
+        } catch {}
       }
       void reload({ force: true });
       return sessionObj;
@@ -1545,8 +1527,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     comebackPending, hasUnlockedReward, referralCount, streakRecoveryPending, lostStreakCount, isLoading,
     stableSetUser, stableSetOnboarded, stableAddSubject, stableUpdateSubject, stableDeleteSubject,
     stableGetChaptersForSubject, stableAddChapter, stableUpdateChapter, stableDeleteChapter, stableBulkDeleteChapters,
-        stableGetTopicsForChapter, stableAddTopic, stableToggleTopic, stableDeleteTopic, stableStartSession, stableCheckpointActiveSession, stableDiscardActiveSession,
-     stableCompleteSession, stableBreakSession, stableGetDailySummary, stableGetLast7Days, stableGetLast30Days, stableGetLast90Days,
+    stableGetTopicsForChapter, stableAddTopic, stableToggleTopic, stableDeleteTopic, stableStartSession, stableCheckpointActiveSession, stableDiscardActiveSession,
+    stableCompleteSession, stableBreakSession, stableGetDailySummary, stableGetLast7Days, stableGetLast30Days, stableGetLast90Days,
     stableAwardXP, stableDeductXP, stableSetComebackPending, stableSetHasUnlockedReward, stableSetStreakRecoveryPending, reload,
   ]);
 
