@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Pressable, Modal } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext'; // ✅ FIXED: Imported Language Context
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import type { Subject } from '@/types/models';
 
@@ -18,6 +19,7 @@ export default function SubjectCard({
   subject, chapterCount, doneCount, weakCount, onPress, onDelete,
 }: SubjectCardProps) {
   const { colors } = useTheme();
+  const { t } = useLanguage(); // ✅ FIXED: Hook setup for i18n
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const progress = chapterCount > 0 ? doneCount / chapterCount : 0;
@@ -33,8 +35,9 @@ export default function SubjectCard({
           <View style={styles.info}>
             <Text style={styles.name}>{subject.name}</Text>
             <Text style={styles.meta}>
-              {chapterCount} chapters
-              {weakCount > 0 ? ` • ${weakCount} weak` : ''}
+              {/* ✅ FIXED: Replaced hardcoded text with translation keys */}
+              {chapterCount} {t('home.chapters')}
+              {weakCount > 0 ? ` • ${weakCount} ${t('status.weak')}` : ''}
             </Text>
           </View>
           <TouchableOpacity
@@ -56,7 +59,7 @@ export default function SubjectCard({
                 backgroundColor: subject.colorHex,
               }]} />
             </View>
-            <Text style={styles.progressText}>{doneCount}/{chapterCount} done</Text>
+            <Text style={styles.progressText}>{doneCount}/{chapterCount} {t('status.done')}</Text>
           </View>
         ) : null}
       </Pressable>
@@ -65,17 +68,18 @@ export default function SubjectCard({
       <Modal visible={confirmDelete} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.confirmCard}>
-            <Text style={styles.confirmTitle}>{`"${subject.name}" delete karo?`}</Text>
-            <Text style={styles.confirmSub}>All chapters will be removed.</Text>
+            {/* ✅ FIXED: Modal text i18n */}
+            <Text style={styles.confirmTitle}>{`"${subject.name}" ${t('common.delete')}?`}</Text>
+            <Text style={styles.confirmSub}>{t('home.deleteWarning')}</Text>
             <View style={styles.confirmBtns}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setConfirmDelete(false)}>
-                <Text style={styles.cancelText}>Cancel</Text>
+                <Text style={styles.cancelText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.deleteConfirmBtn}
                 onPress={() => { onDelete(); setConfirmDelete(false); }}
               >
-                <Text style={styles.deleteConfirmText}>Delete</Text>
+                <Text style={styles.deleteConfirmText}>{t('common.delete')}</Text>
               </TouchableOpacity>
             </View>
           </View>
