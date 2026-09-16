@@ -8,6 +8,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext'; // ✅ FIXED: Imported i18n Context
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import { useApp } from '@/hooks/useApp';
 import ChapterItem from '@/components/feature/ChapterItem';
@@ -16,13 +17,16 @@ import { getSafeErrorMessage } from '@/features/core/services/safeError';
 
 export default function SubjectDetailScreen() {
   const { colors } = useTheme();
+  const { t } = useLanguage(); // ✅ FIXED: Hook for translations
   const styles = useMemo(() => createStyles(colors), [colors]);
+  
   const statusOptions = useMemo(() => [
-    { value: 'not_started' as const, label: 'Not Started', color: colors.textTertiary },
-    { value: 'in_progress' as const, label: 'In Progress', color: colors.accent },
-    { value: 'done' as const, label: 'Done', color: colors.success },
-    { value: 'weak' as const, label: 'Weak', color: colors.warning },
-  ], [colors]);
+    { value: 'not_started' as const, label: t('status.notStarted') || 'Not Started', color: colors.textTertiary },
+    { value: 'in_progress' as const, label: t('status.inProgress') || 'In Progress', color: colors.accent },
+    { value: 'done' as const, label: t('status.done') || 'Done', color: colors.success },
+    { value: 'weak' as const, label: t('status.weak') || 'Weak', color: colors.warning },
+  ], [colors, t]);
+
   const router = useRouter();
   const { subjectId } = useLocalSearchParams<{ subjectId: string }>();
   const {
@@ -31,12 +35,8 @@ export default function SubjectDetailScreen() {
   } = useApp();
 
   const subject = subjects.find(s => s.id === subjectId);
-  // getChaptersForSubject is intentionally stable, so a useMemo depending only on
-  // that callback can retain the pre-insert chapter list. Recompute on each render
-  // to read the latest AppContext state after add/update/delete operations.
   const chapters = getChaptersForSubject(subjectId ?? '');
 
-  // -- Chapter Modal & Form States --
   const [modalVisible, setModalVisible] = useState(false);
   const [editingChapter, setEditingChapter] = useState<Chapter | null>(null);
   const [chapterName, setChapterName] = useState('');
@@ -44,23 +44,28 @@ export default function SubjectDetailScreen() {
   const [showPicker, setShowPicker] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // -- Subject Edit Modal States --
   const [subjectModalVisible, setSubjectModalVisible] = useState(false);
   const [editSubjectName, setEditSubjectName] = useState('');
   const [updatingSubject, setUpdatingSubject] = useState(false);
 
-  // -- Filter & Selection States --
   const [filterStatus, setFilterStatus] = useState<Chapter['status'] | 'all'>('all');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
 
+  // ✅ FIXED: Single state for Consistent Custom Confirm Modal
+  const [confirmDialog, setConfirmDialog] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
+  const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setConfirmDialog({ visible: true, title, message, onConfirm });
+  };
+
   const chapterCounts = useMemo(() => {
-    const counts = {
-      not_started: 0,
-      in_progress: 0,
-      done: 0,
-      weak: 0,
-    } as Record<Chapter['status'], number>;
+    const counts = { not_started: 0, in_progress: 0, done: 0, weak: 0 } as Record<Chapter['status'], number>;
     chapters.forEach(chapter => { counts[chapter.status] += 1; });
     return counts;
   }, [chapters]);
@@ -74,7 +79,6 @@ export default function SubjectDetailScreen() {
     ? Math.round((chapterCounts.done / chapters.length) * 100)
     : 0;
 
-  // ── Subject Handlers ────────────────────────────
   const openEditSubjectModal = () => {
     if (!subject) return;
     setEditSubjectName(subject.name);
@@ -88,49 +92,29 @@ export default function SubjectDetailScreen() {
       await updateSubject(subject.id, { name: editSubjectName.trim() });
       setSubjectModalVisible(false);
     } catch (error: any) {
-      console.error('Subject Update Error');
-      // ✅ Bug 15 Fixed: Changed alert() to native Alert.alert()
-      Alert.alert('Update Error', getSafeErrorMessage(error, {
-        fallback: 'Failed to update subject. Please try again.',
-        network: 'Check your connection and try again.',
-        permission: 'You do not have permission to update this subject.',
-      }));
+      Alert.alert(t('common.error') || 'Error', getSafeErrorMessage(error, { fallback: 'Failed to update.' }));
     } finally {
       setUpdatingSubject(false);
     }
   };
 
-  // BUG 28 FIX: Added safety confirmation before deleting the entire subject
+  // ✅ FIXED: Consistent Delete UI
   const handleDeleteSubject = () => {
     if (!subject) return;
-
-    Alert.alert(
-      'Delete Subject',
-      `Are you sure you want to delete "${subject.name}"? All chapters and data inside this subject will be permanently lost.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive', 
-          onPress: async () => {
-            try {
-              await deleteSubject(subject.id);
-              router.back(); // Redirect back to tracker main screen
-            } catch (error: any) {
-              console.error('Subject Delete Error');
-              Alert.alert('Delete Error', getSafeErrorMessage(error, {
-                fallback: 'Failed to delete subject. Please try again.',
-                network: 'Check your connection and try again.',
-                permission: 'You do not have permission to delete this subject.',
-              }));
-            }
-          }
+    showConfirm(
+      t('common.delete') || 'Delete',
+      t('tracker.deleteSubjectWarning') || `Are you sure you want to delete "${subject.name}"? All chapters will be permanently lost.`,
+      async () => {
+        try {
+          await deleteSubject(subject.id);
+          router.back();
+        } catch (error: any) {
+          Alert.alert(t('common.error') || 'Error', getSafeErrorMessage(error, { fallback: 'Failed to delete.' }));
         }
-      ]
+      }
     );
   };
 
-  // ── Chapter Form Handlers ───────────────────────
   const openAddModal = () => {
     setEditingChapter(null);
     setChapterName('');
@@ -148,10 +132,8 @@ export default function SubjectDetailScreen() {
   const handleSave = async () => {
     if (!chapterName.trim() || !subjectId) return;
     setSaving(true);
-
     try {
       const dateStr = plannedDateObj ? plannedDateObj.toISOString().split('T')[0] : null;
-
       if (editingChapter) {
         await updateChapter(editingChapter.id, { name: chapterName.trim(), plannedDate: dateStr });
       } else {
@@ -159,12 +141,7 @@ export default function SubjectDetailScreen() {
       }
       setModalVisible(false);
     } catch (error: any) {
-      console.error('Save Error');
-      Alert.alert('Save Error', getSafeErrorMessage(error, {
-        fallback: 'Failed to save. Please try again.',
-        network: 'Check your connection and try again.',
-        permission: 'You do not have permission to edit this chapter.',
-      }));
+      Alert.alert(t('common.error') || 'Error', getSafeErrorMessage(error, { fallback: 'Failed to save.' }));
     } finally {
       setSaving(false);
     }
@@ -180,71 +157,44 @@ export default function SubjectDetailScreen() {
       const completedDate = status === 'done' ? new Date().toISOString().split('T')[0] : undefined;
       await updateChapter(id, { status, ...(completedDate ? { completedDate } : {}) });
     } catch (error: any) {
-      console.error("Status Update Error", error);
-      Alert.alert('Status Error', 'Failed to update status. Please check your connection.');
+      Alert.alert(t('common.error') || 'Error', 'Failed to update status.');
     }
   };
 
-  // ── Delete Handlers ─────────────────────────────
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
-  // BUG 28 FIX: Added safety confirmation before bulk deleting chapters
+  // ✅ FIXED: Consistent Bulk Delete UI
   const handleBulkDelete = () => {
     if (selectedIds.length === 0) return;
-    
-    Alert.alert(
-      'Delete Chapters',
-      `Are you sure you want to delete ${selectedIds.length} selected chapter(s)?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive', 
-          onPress: async () => {
-            try {
-              await bulkDeleteChapters(selectedIds);
-              setSelectedIds([]);
-              setIsSelectionMode(false);
-            } catch (error: any) {
-              console.error('Bulk Delete Failed');
-              Alert.alert('Delete Error', getSafeErrorMessage(error, {
-                fallback: 'Delete failed. Please try again.',
-                network: 'Check your connection and try again.',
-                permission: 'You do not have permission to delete these chapters.',
-              }));
-            }
-          }
+    showConfirm(
+      t('common.delete') || 'Delete',
+      t('tracker.bulkDeleteWarning') || `Are you sure you want to delete ${selectedIds.length} selected chapter(s)?`,
+      async () => {
+        try {
+          await bulkDeleteChapters(selectedIds);
+          setSelectedIds([]);
+          setIsSelectionMode(false);
+        } catch (error: any) {
+          Alert.alert(t('common.error') || 'Error', getSafeErrorMessage(error, { fallback: 'Delete failed.' }));
         }
-      ]
+      }
     );
   };
 
-  // BUG 28 FIX: Added safety confirmation before deleting a single chapter
+  // ✅ FIXED: Consistent Single Delete UI
   const handleSingleDelete = (id: string) => {
-    Alert.alert(
-      'Delete Chapter',
-      'Are you sure you want to delete this chapter?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive', 
-          onPress: async () => {
-            try {
-              await deleteChapter(id);
-            } catch (error: any) {
-              console.error('Delete Failed');
-              Alert.alert('Delete Error', getSafeErrorMessage(error, {
-                fallback: 'Delete failed. Please try again.',
-                network: 'Check your connection and try again.',
-                permission: 'You do not have permission to delete this chapter.',
-              }));
-            }
-          }
+    showConfirm(
+      t('common.delete') || 'Delete',
+      t('tracker.deleteChapterWarning') || 'Are you sure you want to delete this chapter?',
+      async () => {
+        try {
+          await deleteChapter(id);
+        } catch (error: any) {
+          Alert.alert(t('common.error') || 'Error', getSafeErrorMessage(error, { fallback: 'Delete failed.' }));
         }
-      ]
+      }
     );
   };
 
@@ -253,10 +203,10 @@ export default function SubjectDetailScreen() {
       <SafeAreaView style={styles.container} edges={['top']}>
         <TouchableOpacity style={styles.backRow} onPress={() => router.back()}>
           <MaterialIcons name="arrow-back" size={24} color={colors.textPrimary} />
-          <Text style={styles.backText}>Back</Text>
+          <Text style={styles.backText}>{t('common.back') || 'Back'}</Text>
         </TouchableOpacity>
         <View style={styles.empty}>
-          <Text style={styles.emptyText}>Subject not found</Text>
+          <Text style={styles.emptyText}>{t('tracker.subjectNotFound') || 'Subject not found'}</Text>
         </View>
       </SafeAreaView>
     );
@@ -264,19 +214,13 @@ export default function SubjectDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-
-      {/* Dynamic Header */}
       {isSelectionMode ? (
         <View style={styles.selectionHeader}>
           <TouchableOpacity onPress={() => { setIsSelectionMode(false); setSelectedIds([]); }} style={styles.iconBtn}>
             <MaterialIcons name="close" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.selectionCount}>{selectedIds.length} Selected</Text>
-          <TouchableOpacity
-             onPress={handleBulkDelete}
-             style={styles.iconBtn}
-             disabled={selectedIds.length === 0}
-          >
+          <Text style={styles.selectionCount}>{selectedIds.length} {t('tracker.selected') || 'Selected'}</Text>
+          <TouchableOpacity onPress={handleBulkDelete} style={styles.iconBtn} disabled={selectedIds.length === 0}>
             <MaterialIcons name="delete" size={26} color={selectedIds.length > 0 ? '#ff4444' : colors.textTertiary} />
           </TouchableOpacity>
         </View>
@@ -285,12 +229,9 @@ export default function SubjectDetailScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <MaterialIcons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
-
           <View style={styles.headerInfo}>
             <View style={[styles.subjectDot, { backgroundColor: subject.colorHex }]} />
             <Text style={styles.subjectName} numberOfLines={1}>{subject.name}</Text>
-
-            {/* 🚀 Subject Action Buttons */}
             <TouchableOpacity onPress={openEditSubjectModal} style={styles.subjectActionBtn} hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}>
               <MaterialIcons name="edit" size={16} color={colors.textSecondary} />
             </TouchableOpacity>
@@ -298,18 +239,11 @@ export default function SubjectDetailScreen() {
               <MaterialIcons name="delete" size={16} color="#ff4444" />
             </TouchableOpacity>
           </View>
-
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity
-              style={[styles.addBtn, { backgroundColor: colors.surfaceVariant }]}
-              onPress={() => router.push({ pathname: '/(tabs)/focus', params: { subjectId: subject.id } } as any)}
-            >
+            <TouchableOpacity style={[styles.addBtn, { backgroundColor: colors.surfaceVariant }]} onPress={() => router.push({ pathname: '/(tabs)/focus', params: { subjectId: subject.id } } as any)}>
               <MaterialIcons name="timer" size={20} color={colors.primary} />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.addBtn, { backgroundColor: colors.surfaceVariant }]}
-              onPress={() => setIsSelectionMode(true)}
-            >
+            <TouchableOpacity style={[styles.addBtn, { backgroundColor: colors.surfaceVariant }]} onPress={() => setIsSelectionMode(true)}>
               <MaterialIcons name="checklist" size={20} color={colors.textPrimary} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.addBtn} onPress={openAddModal}>
@@ -319,52 +253,41 @@ export default function SubjectDetailScreen() {
         </View>
       )}
 
-      {/* Progress Bar */}
       <View style={styles.progressSection}>
         <View style={styles.progressRow}>
-          <Text style={styles.progressLabel}>{chapters.length} chapters • {donePct}% done</Text>
-          <Text style={styles.progressPct}>{chapters.filter(c => c.status === 'done').length}/{chapters.length}</Text>
+          <Text style={styles.progressLabel}>{chapters.length} {t('home.chapters') || 'chapters'} • {donePct}% {t('status.done') || 'done'}</Text>
+          <Text style={styles.progressPct}>{chapterCounts.done}/{chapters.length}</Text>
         </View>
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${donePct}%` as any, backgroundColor: subject.colorHex }]} />
         </View>
       </View>
 
-      {/* Filter Chips */}
       <View style={styles.filterScrollWrapper}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-          <Pressable
-            style={[styles.filterChip, filterStatus === 'all' && styles.filterChipActive]}
-            onPress={() => setFilterStatus('all')}
-          >
-            <Text style={[styles.filterText, filterStatus === 'all' && styles.filterTextActive]}>All ({chapters.length})</Text>
+          <Pressable style={[styles.filterChip, filterStatus === 'all' && styles.filterChipActive]} onPress={() => setFilterStatus('all')}>
+            <Text style={[styles.filterText, filterStatus === 'all' && styles.filterTextActive]}>{t('common.all') || 'All'} ({chapters.length})</Text>
           </Pressable>
           {statusOptions.map(o => {
             const count = chapterCounts[o.value];
             return (
               <Pressable
                 key={o.value}
-                style={[
-                  styles.filterChip,
-                  filterStatus === o.value && { borderColor: o.color, backgroundColor: o.color + '22' }
-                ]}
+                style={[styles.filterChip, filterStatus === o.value && { borderColor: o.color, backgroundColor: o.color + '22' }]}
                 onPress={() => setFilterStatus(o.value)}
               >
-                <Text style={[styles.filterText, filterStatus === o.value && { color: o.color }]}>
-                  {o.label} ({count})
-                </Text>
+                <Text style={[styles.filterText, filterStatus === o.value && { color: o.color }]}>{o.label} ({count})</Text>
               </Pressable>
             );
           })}
         </ScrollView>
       </View>
 
-      {/* Chapter List */}
       {filtered.length === 0 ? (
         <View style={styles.empty}>
           <MaterialIcons name="library-books" size={48} color={colors.textTertiary} />
-          <Text style={styles.emptyTitle}>No chapters yet</Text>
-          <Text style={styles.emptyText}>Add your first chapter</Text>
+          <Text style={styles.emptyTitle}>{t('tracker.noChapters') || 'No chapters yet'}</Text>
+          <Text style={styles.emptyText}>{t('tracker.addFirstChapter') || 'Add your first chapter'}</Text>
         </View>
       ) : (
         <FlatList
@@ -381,26 +304,15 @@ export default function SubjectDetailScreen() {
             return (
               <TouchableOpacity
                 activeOpacity={0.8}
-                onLongPress={() => {
-                  setIsSelectionMode(true);
-                  if (!selectedIds.includes(chapter.id)) toggleSelection(chapter.id);
-                }}
+                onLongPress={() => { setIsSelectionMode(true); if (!selectedIds.includes(chapter.id)) toggleSelection(chapter.id); }}
                 onPress={() => isSelectionMode ? toggleSelection(chapter.id) : router.push(`/tracker/chapters/${chapter.id}` as any)}
-                style={[
-                  styles.chapterRowContainer,
-                  isSelected && styles.chapterRowSelected,
-                ]}
+                style={[styles.chapterRowContainer, isSelected && styles.chapterRowSelected]}
               >
                 {isSelectionMode && (
                   <View style={styles.checkboxWrapper}>
-                    <MaterialIcons
-                      name={isSelected ? 'check-circle' : 'radio-button-unchecked'}
-                      size={24}
-                      color={isSelected ? colors.primary : colors.textTertiary}
-                    />
+                    <MaterialIcons name={isSelected ? 'check-circle' : 'radio-button-unchecked'} size={24} color={isSelected ? colors.primary : colors.textTertiary} />
                   </View>
                 )}
-
                 <View pointerEvents={isSelectionMode ? 'none' : 'auto'} style={{ flex: 1 }}>
                   <ChapterItem
                     chapter={chapter}
@@ -410,7 +322,6 @@ export default function SubjectDetailScreen() {
                     onStartFocus={() => router.push({ pathname: '/(tabs)/focus', params: { subjectId: subject.id, chapterId: chapter.id } } as any)}
                   />
                 </View>
-
                 {!isSelectionMode && (
                   <TouchableOpacity style={styles.editBtnIcon} onPress={() => openEditModal(chapter)}>
                     <MaterialIcons name="edit" size={20} color={colors.textSecondary} />
@@ -422,77 +333,80 @@ export default function SubjectDetailScreen() {
         />
       )}
 
-      {/* 🚀 Edit Subject Modal */}
-      {/* ✅ Bug 15 Fixed: Added onRequestClose for Android back button */}
-      <Modal 
-        visible={subjectModalVisible} 
-        transparent 
-        animationType="slide"
-        onRequestClose={() => setSubjectModalVisible(false)}
-      >
+      {/* ✅ FIXED: Beautiful Custom Confirm Modal (Consistent with SubjectCard) */}
+      <Modal visible={confirmDialog.visible} transparent animationType="fade" onRequestClose={() => setConfirmDialog(prev => ({ ...prev, visible: false }))}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>{confirmDialog.title}</Text>
+            <Text style={styles.confirmSub}>{confirmDialog.message}</Text>
+            <View style={styles.confirmBtns}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setConfirmDialog(prev => ({ ...prev, visible: false }))}>
+                <Text style={styles.cancelText}>{t('common.cancel') || 'Cancel'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.deleteConfirmBtn}
+                onPress={() => { confirmDialog.onConfirm(); setConfirmDialog(prev => ({ ...prev, visible: false })); }}
+              >
+                <Text style={styles.deleteConfirmText}>{t('common.delete') || 'Delete'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={subjectModalVisible} transparent animationType="slide" onRequestClose={() => setSubjectModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Rename Subject</Text>
+              <Text style={styles.modalTitle}>{t('tracker.renameSubject') || 'Rename Subject'}</Text>
               <TouchableOpacity onPress={() => setSubjectModalVisible(false)}>
                 <MaterialIcons name="close" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
-
             <TextInput
               style={styles.input}
-              placeholder="Subject Name"
+              placeholder={t('tracker.subjectName') || "Subject Name"}
               placeholderTextColor={colors.textTertiary}
               value={editSubjectName}
               onChangeText={setEditSubjectName}
               autoFocus
               maxLength={40}
             />
-
             <TouchableOpacity
               style={[styles.saveBtn, (!editSubjectName.trim() || updatingSubject) ? styles.saveBtnDisabled : null]}
               onPress={handleSaveSubject}
               disabled={!editSubjectName.trim() || updatingSubject}
               activeOpacity={0.8}
             >
-              <Text style={styles.saveBtnText}>{updatingSubject ? 'Saving...' : 'Save Changes'}</Text>
+              <Text style={styles.saveBtnText}>{updatingSubject ? (t('common.saving') || 'Saving...') : (t('common.saveChanges') || 'Save Changes')}</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* Add/Edit Chapter Modal */}
-      {/* ✅ Bug 15 Fixed: Added onRequestClose for Android back button */}
-      <Modal 
-        visible={modalVisible} 
-        transparent 
-        animationType="slide"
-        onRequestClose={() => { setModalVisible(false); setShowPicker(false); }}
-      >
+      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => { setModalVisible(false); setShowPicker(false); }}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{editingChapter ? 'Edit Chapter' : 'New Chapter'}</Text>
+              <Text style={styles.modalTitle}>{editingChapter ? (t('tracker.editChapter') || 'Edit Chapter') : (t('tracker.newChapter') || 'New Chapter')}</Text>
               <TouchableOpacity onPress={() => { setModalVisible(false); setShowPicker(false); }}>
                 <MaterialIcons name="close" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
-
             <TextInput
               style={styles.input}
-              placeholder="Chapter Name (e.g. Kinematics)"
+              placeholder={t('tracker.chapterName') || "Chapter Name (e.g. Kinematics)"}
               placeholderTextColor={colors.textTertiary}
               value={chapterName}
               onChangeText={setChapterName}
               autoFocus
               maxLength={60}
             />
-
             <TouchableOpacity style={styles.dateInput} onPress={() => setShowPicker(true)} activeOpacity={0.7}>
               <View style={styles.dateInputContent}>
                 <MaterialIcons name="calendar-today" size={20} color={plannedDateObj ? colors.primary : colors.textTertiary} />
                 <Text style={[styles.dateText, !plannedDateObj && { color: colors.textTertiary }]}>
-                  {plannedDateObj ? plannedDateObj.toISOString().split('T')[0] : 'Planned date (Optional)'}
+                  {plannedDateObj ? plannedDateObj.toISOString().split('T')[0] : (t('tracker.plannedDate') || 'Planned date (Optional)')}
                 </Text>
               </View>
               {plannedDateObj && (
@@ -501,13 +415,12 @@ export default function SubjectDetailScreen() {
                 </TouchableOpacity>
               )}
             </TouchableOpacity>
-
             {showPicker && (
               <View style={Platform.OS === 'ios' && styles.iosPickerContainer}>
                 {Platform.OS === 'ios' && (
                   <View style={styles.iosPickerHeader}>
                     <TouchableOpacity onPress={() => setShowPicker(false)}>
-                      <Text style={styles.iosPickerDone}>Done</Text>
+                      <Text style={styles.iosPickerDone}>{t('common.done') || 'Done'}</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -519,14 +432,13 @@ export default function SubjectDetailScreen() {
                 />
               </View>
             )}
-
             <TouchableOpacity
               style={[styles.saveBtn, (!chapterName.trim() || saving) ? styles.saveBtnDisabled : null]}
               onPress={handleSave}
               disabled={!chapterName.trim() || saving}
               activeOpacity={0.8}
             >
-              <Text style={styles.saveBtnText}>{saving ? 'Saving...' : (editingChapter ? 'Save Changes' : 'Add Chapter')}</Text>
+              <Text style={styles.saveBtnText}>{saving ? (t('common.saving') || 'Saving...') : (editingChapter ? (t('common.saveChanges') || 'Save Changes') : (t('tracker.addChapter') || 'Add Chapter'))}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -539,117 +451,59 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   backRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: Spacing.md },
   backText: { fontSize: FontSize.base, color: colors.textPrimary },
-
-  header: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: 12,
-  },
-  selectionHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md, paddingVertical: Spacing.md,
-    backgroundColor: colors.primary + '11', borderBottomWidth: 1, borderBottomColor: colors.border
-  },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: 12 },
+  selectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, backgroundColor: colors.primary + '11', borderBottomWidth: 1, borderBottomColor: colors.border },
   selectionCount: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: colors.textPrimary },
   iconBtn: { padding: 4 },
-
   backBtn: { padding: 4 },
   headerInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 4 },
   subjectDot: { width: 12, height: 12, borderRadius: 6, flexShrink: 0 },
   subjectName: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, color: colors.textPrimary, includeFontPadding: false, maxWidth: '60%' },
   subjectActionBtn: { padding: 4, justifyContent: 'center', alignItems: 'center' },
-  addBtn: {
-    backgroundColor: colors.primary, width: 36, height: 36,
-    borderRadius: 18, alignItems: 'center', justifyContent: 'center',
-  },
-
+  addBtn: { backgroundColor: colors.primary, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   progressSection: { paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm },
   progressRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   progressLabel: { fontSize: FontSize.sm, color: colors.textSecondary },
   progressPct: { fontSize: FontSize.sm, color: colors.textSecondary, fontWeight: FontWeight.semiBold },
   progressTrack: { height: 4, backgroundColor: colors.surfaceVariant, borderRadius: Radius.full, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: Radius.full },
-
   filterScrollWrapper: { height: 50, marginBottom: Spacing.sm },
-  filterRow: {
-    flexDirection: 'row', gap: 8,
-    paddingHorizontal: Spacing.md, alignItems: 'center',
-  },
-  filterChip: {
-    paddingHorizontal: 16, paddingVertical: 8,
-    backgroundColor: colors.surface, borderRadius: Radius.full,
-    borderWidth: 1, borderColor: colors.border,
-    alignItems: 'center', justifyContent: 'center',
-  },
+  filterRow: { flexDirection: 'row', gap: 8, paddingHorizontal: Spacing.md, alignItems: 'center' },
+  filterChip: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.surface, borderRadius: Radius.full, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
   filterChipActive: { borderColor: colors.primary, backgroundColor: colors.primary + '22' },
   filterText: { fontSize: FontSize.sm, color: colors.textSecondary, fontWeight: FontWeight.medium },
   filterTextActive: { color: colors.primary },
-
   list: { padding: Spacing.md, paddingTop: 0, paddingBottom: Spacing.xl, gap: Spacing.sm },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, padding: Spacing.xl },
   emptyTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: colors.textPrimary },
   emptyText: { fontSize: FontSize.base, color: colors.textSecondary },
-
-  chapterRowContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: Radius.lg,
-    paddingRight: Spacing.sm,
-  },
-  chapterRowSelected: {
-    backgroundColor: colors.primary + '11',
-    borderColor: colors.primary,
-    borderWidth: 1,
-  },
-  checkboxWrapper: {
-    paddingLeft: Spacing.md,
-    paddingRight: Spacing.xs,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  editBtnIcon: {
-    padding: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
+  chapterRowContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: Radius.lg, paddingRight: Spacing.sm },
+  chapterRowSelected: { backgroundColor: colors.primary + '11', borderColor: colors.primary, borderWidth: 1 },
+  checkboxWrapper: { paddingLeft: Spacing.md, paddingRight: Spacing.xs, justifyContent: 'center', alignItems: 'center' },
+  editBtnIcon: { padding: 10, justifyContent: 'center', alignItems: 'center' },
   modalOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
-  modalSheet: {
-    backgroundColor: colors.surface, borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl, padding: Spacing.lg, paddingBottom: Spacing.xxl,
-  },
+  modalSheet: { backgroundColor: colors.surface, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.lg, paddingBottom: Spacing.xxl },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
   modalTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: colors.textPrimary },
-  input: {
-    backgroundColor: colors.surfaceVariant, borderRadius: Radius.md,
-    borderWidth: 1, borderColor: colors.border,
-    paddingHorizontal: Spacing.md, paddingVertical: 14,
-    color: colors.textPrimary, fontSize: FontSize.md, marginBottom: Spacing.sm,
-  },
-
-  dateInput: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: colors.surfaceVariant, borderRadius: Radius.md,
-    borderWidth: 1, borderColor: colors.border,
-    paddingHorizontal: Spacing.md, paddingVertical: 14,
-    marginBottom: Spacing.sm,
-  },
+  input: { backgroundColor: colors.surfaceVariant, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: Spacing.md, paddingVertical: 14, color: colors.textPrimary, fontSize: FontSize.md, marginBottom: Spacing.sm },
+  dateInput: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.surfaceVariant, borderRadius: Radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: Spacing.md, paddingVertical: 14, marginBottom: Spacing.sm },
   dateInputContent: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   dateText: { fontSize: FontSize.md, color: colors.textPrimary },
-  iosPickerContainer: {
-    backgroundColor: colors.surface, borderRadius: Radius.md, overflow: 'hidden', marginBottom: Spacing.sm,
-  },
-  iosPickerHeader: {
-    alignItems: 'flex-end', padding: Spacing.sm, backgroundColor: colors.surfaceVariant,
-    borderBottomWidth: 1, borderBottomColor: colors.border
-  },
+  iosPickerContainer: { backgroundColor: colors.surface, borderRadius: Radius.md, overflow: 'hidden', marginBottom: Spacing.sm },
+  iosPickerHeader: { alignItems: 'flex-end', padding: Spacing.sm, backgroundColor: colors.surfaceVariant, borderBottomWidth: 1, borderBottomColor: colors.border },
   iosPickerDone: { color: colors.primary, fontWeight: 'bold', fontSize: FontSize.md },
-
-  saveBtn: {
-    backgroundColor: colors.primary, borderRadius: Radius.md,
-    paddingVertical: 14, alignItems: 'center', marginTop: Spacing.sm,
-  },
+  saveBtn: { backgroundColor: colors.primary, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center', marginTop: Spacing.sm },
   saveBtnDisabled: { opacity: 0.4 },
   saveBtnText: { color: colors.background, fontSize: FontSize.md, fontWeight: FontWeight.bold },
+  
+  // ✅ ADDED: Styles for the Custom Confirm Modal
+  confirmCard: { backgroundColor: colors.surface, borderRadius: Radius.xl, borderWidth: 1, borderColor: colors.border, padding: Spacing.lg, width: '100%', alignSelf: 'center', marginBottom: 'auto', marginTop: 'auto' },
+  confirmTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, color: colors.textPrimary, marginBottom: 6 },
+  confirmSub: { fontSize: FontSize.base, color: colors.textSecondary, marginBottom: Spacing.lg },
+  confirmBtns: { flexDirection: 'row', gap: 10 },
+  cancelBtn: { flex: 1, backgroundColor: colors.surfaceVariant, borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center' },
+  cancelText: { color: colors.textSecondary, fontWeight: FontWeight.semiBold },
+  deleteConfirmBtn: { flex: 1, backgroundColor: colors.danger, borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center' },
+  deleteConfirmText: { color: colors.textPrimary, fontWeight: FontWeight.bold },
 });
 
