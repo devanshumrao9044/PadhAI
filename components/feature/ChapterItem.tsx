@@ -2,15 +2,17 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Pressable, Modal } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLanguage } from '@/contexts/LanguageContext'; // ✅ FIXED: Imported Language Context for i18n
 import { ThemeColors, Spacing, FontSize, FontWeight, Radius } from '@/constants/theme';
 import type { Chapter } from '@/types/models';
 
-const STATUS_LABELS: Record<Chapter['status'], string> = {
-  not_started: 'Not Started',
-  in_progress: 'In Progress',
-  done: 'Done',
-  weak: 'Weak',
-};
+// ✅ FIXED: Helper function for Local Timezone date string
+function getLocalDateStr(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 const STATUS_ICONS: Record<Chapter['status'], string> = {
   not_started: 'radio-button-unchecked',
@@ -31,16 +33,29 @@ interface ChapterItemProps {
 
 export default function ChapterItem({ chapter, onStatusChange, onPress, onDelete, onStartFocus }: ChapterItemProps) {
   const { colors } = useTheme();
+  const { t } = useLanguage(); // ✅ FIXED: Hook for translations
   const styles = useMemo(() => createStyles(colors), [colors]);
+  
   const statusColors = useMemo(() => ({
     not_started: colors.textTertiary,
     in_progress: colors.accent,
     done: colors.success,
     weak: colors.warning,
   }), [colors]);
+
+  // ✅ FIXED: Moved inside to use translation hook
+  const STATUS_LABELS: Record<Chapter['status'], string> = {
+    not_started: t('status.notStarted') || 'Not Started',
+    in_progress: t('status.inProgress') || 'In Progress',
+    done: t('status.done') || 'Done',
+    weak: t('status.weak') || 'Weak',
+  };
+
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const color = statusColors[chapter.status];
-  const isOverdue = chapter.plannedDate && chapter.status !== 'done' && chapter.plannedDate < new Date().toISOString().split('T')[0];
+  
+  // ✅ FIXED: Using Local Date instead of UTC Date
+  const isOverdue = chapter.plannedDate && chapter.status !== 'done' && chapter.plannedDate < getLocalDateStr();
 
   return (
     <>
@@ -66,7 +81,7 @@ export default function ChapterItem({ chapter, onStatusChange, onPress, onDelete
             {isOverdue ? (
               <View style={styles.overduePill}>
                 <MaterialIcons name="schedule" size={10} color={colors.danger} />
-                <Text style={styles.overdueText}>Overdue</Text>
+                <Text style={styles.overdueText}>{t('tracker.overdue') || 'Overdue'}</Text>
               </View>
             ) : null}
             {chapter.plannedDate ? (
@@ -79,7 +94,7 @@ export default function ChapterItem({ chapter, onStatusChange, onPress, onDelete
           <TouchableOpacity
             onPress={onStartFocus}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="Start focus"
+            accessibilityLabel={t('common.startFocus') || "Start focus"}
           >
             <MaterialIcons name="play-arrow" size={20} color={colors.primary} />
           </TouchableOpacity>
@@ -101,7 +116,7 @@ export default function ChapterItem({ chapter, onStatusChange, onPress, onDelete
           onPress={() => setShowStatusMenu(false)}
         >
           <View style={styles.menuCard}>
-            <Text style={styles.menuTitle}>Status change karo</Text>
+            <Text style={styles.menuTitle}>{t('tracker.changeStatus') || 'Change Status'}</Text>
             {STATUS_OPTIONS.map(s => {
               const sc = statusColors[s];
               return (
