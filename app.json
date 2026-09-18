@@ -10,7 +10,11 @@
     "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.padhai.app"
+      "bundleIdentifier": "com.padhai.app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "PadhAI needs access to your photos so you can set or change your profile picture.",
+        "NSCameraUsageDescription": "PadhAI needs camera access so you can take a new profile picture."
+      }
     },
     "android": {
       "package": "com.padhai.app",
@@ -41,7 +45,8 @@
           }
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      "expo-image-picker"
     ],
     "experiments": {
       "typedRoutes": true
